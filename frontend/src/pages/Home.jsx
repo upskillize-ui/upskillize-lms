@@ -5,7 +5,7 @@ import Navbar from '../components/Navbar';
 import { 
   BookOpen, Users, Award, TrendingUp, ArrowRight, CheckCircle, Star, 
   PlayCircle, Zap, Target, Globe, X, Briefcase, GraduationCap, 
-  Building2, Linkedin, Mail, MapPin, Phone 
+  Building2, Linkedin, Mail, MapPin, Phone, Twitter
 } from 'lucide-react';
 
 // ─────────────────────────────────────────────────────────────
@@ -467,13 +467,24 @@ export default function Home() {
                 <li><Link to="/blog" className="hover:text-white transition">Blog</Link></li>
                 <li>
                   <a 
-                    href="https://www.linkedin.com/company/upskillize-excel-beyond" 
+                    href="https://www.linkedin.com/in/upskillize-excel-beyond" 
                     target="_blank" 
                     rel="noopener noreferrer"
                     className="hover:text-white transition inline-flex items-center gap-2"
                   >
                     <Linkedin size={16} />
                     LinkedIn
+                  </a>
+                </li>
+                <li>
+                  <a 
+                    href="https://x.com/upskillize36330" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="hover:text-white transition inline-flex items-center gap-2"
+                  >
+                    <Twitter size={16} />
+                      Twitter
                   </a>
                 </li>
               </ul>
@@ -499,13 +510,13 @@ export default function Home() {
                 </li>
                 <li className="flex items-center gap-2">
                   <Mail size={16} className="text-blue-400 flex-shrink-0" />
-                  <a href="mailto:info@upskillize.com" className="hover:text-white transition">
-                    info@upskillize.com
+                  <a href="mailto:amit@upskillize.com" className="hover:text-white transition">
+                    amit@upskillize.com
                   </a>
                 </li>
                 <li className="flex items-center gap-2">
                   <Phone size={16} className="text-blue-400 flex-shrink-0" />
-                  <span>+91 XXXXX XXXXX</span>
+                  <span>+91 98203 97297</span>
                 </li>
               </ul>
             </div>
@@ -515,7 +526,7 @@ export default function Home() {
           <div className="border-t border-gray-800 mt-8 pt-8">
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
               <div className="text-center md:text-left text-sm">
-                © 2026 Upskillize - Excel Beyond. All rights reserved.
+                © {new Date().getFullYear()} Upskillize - Excel Beyond. All rights reserved.
               </div>
               <div className="flex gap-6 text-sm">
                 <Link to="/terms" className="hover:text-white transition">Terms</Link>
