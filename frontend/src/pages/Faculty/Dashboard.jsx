@@ -1002,7 +1002,7 @@ function AssignmentManagement() {
                 <X className="h-6 w-6" />
               </button>
             </div>
-
+           
             {/* Submissions List */}
             <div className="space-y-4">
               {submissions.filter(s => s.grade === null).map((submission) => (
