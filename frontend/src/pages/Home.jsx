@@ -5,7 +5,7 @@ import Navbar from '../components/Navbar';
 import { 
   BookOpen, Users, Award, TrendingUp, ArrowRight, CheckCircle, Star, 
   PlayCircle, Zap, Target, Globe, X, Briefcase, GraduationCap, 
-  Building2, Linkedin, Mail, MapPin, Phone, Twitter
+  Building2, Linkedin, Mail, MapPin, Phone, Twitter 
 } from 'lucide-react';
 
 // ─────────────────────────────────────────────────────────────
@@ -123,7 +123,7 @@ export default function Home() {
             {/* Badge */}
             <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-700 px-4 py-2 rounded-full mb-8 border border-blue-200">
               <Zap size={16} className="text-blue-600" />
-              <span className="text-sm font-semibold">Business Consulting | IT Products | Academic & Corporate Courses</span>
+              <span className="text-sm font-semibold">Business Consulting | IT Products| IT Training | Academic & Corporate Courses</span>
             </div>
 
             {/* Main Heading */}

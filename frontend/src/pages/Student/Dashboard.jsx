@@ -702,8 +702,8 @@ function LearningPath() {
                     </span>
                   </div>
                 </div>
-
                 {/* Circular Progress */}
+
                 <div className="relative">
                   <svg className="w-20 h-20 transform -rotate-90">
                     <circle

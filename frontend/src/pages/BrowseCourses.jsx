@@ -339,7 +339,6 @@ export default function BrowseCourses() {
                 const courseCode = course.course_code;
                 const isFree = isFreeCourse(courseName, courseCode);
                 const isEnrolling = enrolling === course.id;
-
                 return (
                   <div key={course.id} className="bg-white rounded-xl shadow-md hover:shadow-xl transition overflow-hidden relative">
                     {/* Free/Paid Badge */}

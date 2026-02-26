@@ -51,7 +51,6 @@ export default function Login() {
       setLoading(false);
     }
   };
-
   const handleGoogleLogin = async () => {
     setError('');
     setLoading(true);
