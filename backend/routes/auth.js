@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
+const passport = require('passport');
+const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const jwt = require('jsonwebtoken');
 const { body } = require('express-validator');
 const crypto = require('crypto');
@@ -283,6 +285,55 @@ router.get('/me', authMiddleware, async (req, res) => {
     });
   }
 });
+
+// ─── Google OAuth ───────────────────────────────────────────
+passport.use(new GoogleStrategy({
+  clientID: process.env.GOOGLE_CLIENT_ID,
+  clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+  callbackURL: '/api/auth/google/callback'
+}, async (accessToken, refreshToken, profile, done) => {
+  try {
+    const db = require('../config/db'); // adjust path if needed
+    const email = profile.emails[0].value;
+
+    // Check if user exists
+    const [rows] = await db.query('SELECT * FROM users WHERE email = ?', [email]);
+    let user = rows[0];
+
+    if (!user) {
+      // Create new user
+      const [result] = await db.query(
+        'INSERT INTO users (full_name, email, role, phone, password) VALUES (?, ?, ?, ?, ?)',
+        [profile.displayName, email, 'student', '', 'google_oauth']
+      );
+      const [newUser] = await db.query('SELECT * FROM users WHERE id = ?', [result.insertId]);
+      user = newUser[0];
+    }
+
+    return done(null, user);
+  } catch (err) {
+    return done(err, null);
+  }
+}));
+
+// Google login - redirects to Google
+router.get('/google',
+  passport.authenticate('google', { scope: ['profile', 'email'], session: false })
+);
+
+// Google callback - Google redirects back here
+router.get('/google/callback',
+  passport.authenticate('google', { failureRedirect: `${process.env.FRONTEND_URL}/login`, session: false }),
+  (req, res) => {
+    const token = jwt.sign(
+      { id: req.user.id, email: req.user.email, role: req.user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+    res.redirect(`${process.env.FRONTEND_URL}/auth/callback?token=${token}`);
+  }
+);
+// ────────────────────────────────────────────────────────────
 
 // Logout (client-side token removal, but can log here)
 router.post('/logout', authMiddleware, (req, res) => {

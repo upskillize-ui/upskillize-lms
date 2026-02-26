@@ -5,6 +5,8 @@ const rateLimit = require('express-rate-limit');
 const cookieParser = require('cookie-parser');
 require('dotenv').config();
 const facultyRoutes = require('./routes/facultyProfile'); 
+const passport = require('passport');
+const session = require('express-session');
 
 const { sequelize, testConnection } = require('./config/database');
 const app = express();
@@ -19,7 +21,8 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use('/uploads', express.static('uploads'));
-
+app.use(session({ secret: process.env.JWT_SECRET, resave: false, saveUninitialized: false }));
+app.use(passport.initialize());
 
 // Rate limiting
 const limiter = rateLimit({

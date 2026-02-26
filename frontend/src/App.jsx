@@ -8,6 +8,7 @@ import AdminDashboard from './pages/Admin/Dashboard';
 import Home from './pages/Home';
 import BrowseCourses from './pages/BrowseCourses';
 import CourseView from './pages/CourseView';
+import AuthCallback from './pages/AuthCallback';
 
 // Loading Spinner Component
 const LoadingSpinner = () => (
@@ -96,6 +97,7 @@ function AppRoutes() {
 
       {/* 404 Not Found - Redirect to Home */}
       <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="/auth/callback" element={<AuthCallback />} />
     </Routes>
   );
 }
