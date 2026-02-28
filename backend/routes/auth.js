@@ -22,7 +22,6 @@ router.post('/register', [
   try {
     const { full_name, email, password, role, phone } = req.body;
 
-    // Check if user already exists
     const existingUser = await User.findOne({ where: { email } });
     if (existingUser) {
       return res.status(400).json({ 
@@ -31,10 +30,8 @@ router.post('/register', [
       });
     }
 
-    // Hash password
     const password_hash = await bcrypt.hash(password, 10);
 
-    // Create user
     const user = await User.create({
       full_name,
       email,
@@ -43,22 +40,14 @@ router.post('/register', [
       phone
     });
 
-    // Create role-specific record
     if (role === 'student') {
       const enrollmentNumber = 'STU' + Date.now();
-      await Student.create({
-        user_id: user.id,
-        enrollment_number: enrollmentNumber
-      });
+      await Student.create({ user_id: user.id, enrollment_number: enrollmentNumber });
     } else if (role === 'faculty') {
       const employeeId = 'FAC' + Date.now();
-      await Faculty.create({
-        user_id: user.id,
-        employee_id: employeeId
-      });
+      await Faculty.create({ user_id: user.id, employee_id: employeeId });
     }
 
-    // Send welcome email
     try {
       await sendEmail(
         email,
@@ -72,20 +61,11 @@ router.post('/register', [
     res.status(201).json({
       success: true,
       message: 'User registered successfully',
-      user: {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        full_name: user.full_name
-      }
+      user: { id: user.id, email: user.email, role: user.role, full_name: user.full_name }
     });
   } catch (error) {
     console.error('Registration error:', error);
-    res.status(500).json({ 
-      success: false,
-      message: 'Error registering user',
-      error: error.message 
-    });
+    res.status(500).json({ success: false, message: 'Error registering user', error: error.message });
   }
 });
 
@@ -98,33 +78,20 @@ router.post('/login', [
   try {
     const { email, password } = req.body;
 
-    // Find user
     const user = await User.findOne({ where: { email } });
     if (!user) {
-      return res.status(401).json({ 
-        success: false,
-        message: 'Invalid credentials' 
-      });
+      return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
 
-    // Check if account is active
     if (!user.is_active) {
-      return res.status(403).json({ 
-        success: false,
-        message: 'Account is inactive. Please contact administrator.' 
-      });
+      return res.status(403).json({ success: false, message: 'Account is inactive. Please contact administrator.' });
     }
 
-    // Verify password
     const isValidPassword = await bcrypt.compare(password, user.password_hash);
     if (!isValidPassword) {
-      return res.status(401).json({ 
-        success: false,
-        message: 'Invalid credentials' 
-      });
+      return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
 
-    // Get role-specific data
     let roleData = null;
     if (user.role === 'student') {
       roleData = await Student.findOne({ where: { user_id: user.id } });
@@ -132,14 +99,8 @@ router.post('/login', [
       roleData = await Faculty.findOne({ where: { user_id: user.id } });
     }
 
-    // Generate JWT token
     const token = jwt.sign(
-      { 
-        id: user.id, 
-        role: user.role,
-        email: user.email,
-        roleDataId: roleData?.id
-      },
+      { id: user.id, role: user.role, email: user.email, roleDataId: roleData?.id },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
@@ -160,11 +121,7 @@ router.post('/login', [
     });
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({ 
-      success: false,
-      message: 'Error during login',
-      error: error.message 
-    });
+    res.status(500).json({ success: false, message: 'Error during login', error: error.message });
   }
 });
 
@@ -178,21 +135,16 @@ router.post('/forgot-password', [
 
     const user = await User.findOne({ where: { email } });
     if (!user) {
-      return res.json({ 
-        success: true,
-        message: 'If the email exists, a reset link has been sent' 
-      });
+      return res.json({ success: true, message: 'If the email exists, a reset link has been sent' });
     }
 
-    // Generate reset token
     const resetToken = crypto.randomBytes(32).toString('hex');
-    const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour
+    const resetTokenExpiry = new Date(Date.now() + 3600000);
 
     user.reset_token = resetToken;
     user.reset_token_expiry = resetTokenExpiry;
     await user.save();
 
-    // Send reset email
     const resetLink = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
     await sendEmail(
       email,
@@ -200,16 +152,10 @@ router.post('/forgot-password', [
       `<p>Click <a href="${resetLink}">here</a> to reset your password. This link expires in 1 hour.</p>`
     );
 
-    res.json({ 
-      success: true,
-      message: 'If the email exists, a reset link has been sent' 
-    });
+    res.json({ success: true, message: 'If the email exists, a reset link has been sent' });
   } catch (error) {
     console.error('Forgot password error:', error);
-    res.status(500).json({ 
-      success: false,
-      message: 'Error processing request' 
-    });
+    res.status(500).json({ success: false, message: 'Error processing request' });
   }
 });
 
@@ -230,28 +176,18 @@ router.post('/reset-password', [
     });
 
     if (!user) {
-      return res.status(400).json({ 
-        success: false,
-        message: 'Invalid or expired reset token' 
-      });
+      return res.status(400).json({ success: false, message: 'Invalid or expired reset token' });
     }
 
-    // Hash new password
     user.password_hash = await bcrypt.hash(newPassword, 10);
     user.reset_token = null;
     user.reset_token_expiry = null;
     await user.save();
 
-    res.json({ 
-      success: true,
-      message: 'Password reset successful' 
-    });
+    res.json({ success: true, message: 'Password reset successful' });
   } catch (error) {
     console.error('Reset password error:', error);
-    res.status(500).json({ 
-      success: false,
-      message: 'Error resetting password' 
-    });
+    res.status(500).json({ success: false, message: 'Error resetting password' });
   }
 });
 
@@ -260,87 +196,100 @@ router.get('/me', authMiddleware, async (req, res) => {
   try {
     const user = await User.findByPk(req.user.id, {
       attributes: { exclude: ['password_hash', 'reset_token', 'reset_token_expiry'] },
-      include: [
-        { model: Student },
-        { model: Faculty }
-      ]
+      include: [{ model: Student }, { model: Faculty }]
     });
 
     if (!user) {
-      return res.status(404).json({ 
-        success: false,
-        message: 'User not found' 
-      });
+      return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    res.json({ 
-      success: true,
-      user 
-    });
+    res.json({ success: true, user });
   } catch (error) {
     console.error('Get user error:', error);
-    res.status(500).json({ 
-      success: false,
-      message: 'Error fetching user data' 
-    });
+    res.status(500).json({ success: false, message: 'Error fetching user data' });
   }
 });
 
-// ─── Google OAuth ───────────────────────────────────────────
+// ─── Google OAuth ────────────────────────────────────────────
 passport.use(new GoogleStrategy({
   clientID: process.env.GOOGLE_CLIENT_ID,
   clientSecret: process.env.GOOGLE_CLIENT_SECRET,
   callbackURL: '/api/auth/google/callback'
+// ✅ FIXED: Use Sequelize User/Student models instead of raw SQL db.query
 }, async (accessToken, refreshToken, profile, done) => {
   try {
-    const db = require('../config/db'); // adjust path if needed
     const email = profile.emails[0].value;
+    const full_name = profile.displayName;
 
-    // Check if user exists
-    const [rows] = await db.query('SELECT * FROM users WHERE email = ?', [email]);
-    let user = rows[0];
+    // Check if user already exists
+    let user = await User.findOne({ where: { email } });
 
     if (!user) {
-      // Create new user
-      const [result] = await db.query(
-        'INSERT INTO users (full_name, email, role, phone, password) VALUES (?, ?, ?, ?, ?)',
-        [profile.displayName, email, 'student', '', 'google_oauth']
-      );
-      const [newUser] = await db.query('SELECT * FROM users WHERE id = ?', [result.insertId]);
-      user = newUser[0];
+      // Create new user with a dummy hashed password (Google users won't use it)
+      const dummyHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
+      user = await User.create({
+        full_name,
+        email,
+        password_hash: dummyHash,
+        role: 'student',
+        phone: '',
+        is_active: true
+      });
+
+      // Create student record for them
+      await Student.create({
+        user_id: user.id,
+        enrollment_number: 'STU' + Date.now()
+      });
     }
 
     return done(null, user);
   } catch (err) {
+    console.error('Google OAuth error:', err);
     return done(err, null);
   }
 }));
 
-// Google login - redirects to Google
+// Step 1: Redirect user to Google
 router.get('/google',
   passport.authenticate('google', { scope: ['profile', 'email'], session: false })
 );
 
-// Google callback - Google redirects back here
+// Step 2: Google redirects back here with user info
 router.get('/google/callback',
-  passport.authenticate('google', { failureRedirect: `${process.env.FRONTEND_URL}/login`, session: false }),
-  (req, res) => {
-    const token = jwt.sign(
-      { id: req.user.id, email: req.user.email, role: req.user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' }
-    );
-    res.redirect(`${process.env.FRONTEND_URL}/auth/callback?token=${token}`);
+  passport.authenticate('google', {
+    failureRedirect: `${process.env.FRONTEND_URL}/login`,
+    session: false
+  }),
+  async (req, res) => {
+    try {
+      // Get role-specific data for JWT
+      let roleData = null;
+      if (req.user.role === 'student') {
+        roleData = await Student.findOne({ where: { user_id: req.user.id } });
+      } else if (req.user.role === 'faculty') {
+        roleData = await Faculty.findOne({ where: { user_id: req.user.id } });
+      }
+
+      const token = jwt.sign(
+        { id: req.user.id, email: req.user.email, role: req.user.role, roleDataId: roleData?.id },
+        process.env.JWT_SECRET,
+        { expiresIn: '7d' }
+      );
+
+      // Redirect to frontend with token
+      res.redirect(`${process.env.FRONTEND_URL}/auth/callback?token=${token}`);
+    } catch (err) {
+      console.error('Google callback error:', err);
+      res.redirect(`${process.env.FRONTEND_URL}/login`);
+    }
   }
 );
-// ────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
 
-// Logout (client-side token removal, but can log here)
+// Logout
 router.post('/logout', authMiddleware, (req, res) => {
-  res.json({ 
-    success: true,
-    message: 'Logged out successfully' 
-  });
+  res.json({ success: true, message: 'Logged out successfully' });
 });
 
 module.exports = router;

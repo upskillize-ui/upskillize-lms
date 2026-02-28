@@ -90,11 +90,9 @@ export default function Register() {
     }
   };
 
-  const handleGoogleLogin = () => {
-    // Redirect to your backend's Google OAuth endpoint
-    window.location.href = `${import.meta.env.VITE_API_URL || ''}/auth/google`;
-  };
-
+ const handleGoogleLogin = () => {
+  window.location.href = 'http://localhost:5000/api/auth/google';
+};
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
       <Navbar />
