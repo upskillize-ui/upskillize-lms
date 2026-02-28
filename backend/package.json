@@ -8,6 +8,9 @@
     "dev": "nodemon server.js",
     "migrate": "node migrations/runMigrations.js"
   },
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "keywords": [
     "lms",
     "education"
