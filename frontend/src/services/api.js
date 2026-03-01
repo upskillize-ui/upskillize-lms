@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-// API Base URL - hardcoded fallback to avoid process error
-const API_BASE_URL = window.REACT_APP_API_URL || 'http://localhost:5000/api';
+// API Base URL - Vite uses import.meta.env, not window.REACT_APP_*
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://upskillize-lms-backend.onrender.com/api';
 
 // Create axios instance
 const api = axios.create({
@@ -34,27 +34,21 @@ api.interceptors.request.use(
 // Response interceptor - Handle errors globally
 api.interceptors.response.use(
   (response) => {
-    // Log successful response
     console.log(`✅ API Response: ${response.config.url}`, response.data);
     return response;
   },
   (error) => {
-    // Log error response
     console.error('❌ API Error:', error.response?.data || error.message);
 
-    // Handle specific error cases
     if (error.response) {
-      // Server responded with error status
       const { status, data } = error.response;
 
       switch (status) {
         case 401:
-          // Unauthorized - clear token and redirect to login
           console.error('🔒 Unauthorized - Invalid or expired token');
           localStorage.removeItem('token');
           localStorage.removeItem('user');
           
-          // Only redirect if not already on login page
           if (window.location.pathname !== '/login') {
             window.location.href = '/login';
           }
@@ -76,11 +70,9 @@ api.interceptors.response.use(
           console.error(`⚠️ Error ${status}:`, data?.message || 'Unknown error');
       }
     } else if (error.request) {
-      // Request made but no response received
       console.error('📡 Network Error - No response from server');
-      console.error('Is the backend running on', API_BASE_URL, '?');
+      console.error('API URL:', API_BASE_URL);
     } else {
-      // Error in request setup
       console.error('⚙️ Request Setup Error:', error.message);
     }
 
