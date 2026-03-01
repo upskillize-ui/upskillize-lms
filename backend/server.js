@@ -11,6 +11,9 @@ const session = require('express-session');
 const { sequelize, testConnection } = require('./config/database');
 const app = express();
 
+// Trust Render's proxy (required for rate limiting on Render)
+app.set('trust proxy', 1);
+
 // Middleware
 app.use(helmet());
 app.use(cors({
