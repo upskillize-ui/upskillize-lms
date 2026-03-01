@@ -91,7 +91,7 @@ export default function Register() {
   };
 
  const handleGoogleLogin = () => {
-  window.location.href = `${import.meta.env.VITE_API_URL || 'https://upskillize-lms-backend.onrender.com/api'}/auth/google`;
+  window.location.href = 'https://upskillize-lms-backend.onrender.com/api/auth/google';
 };
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
