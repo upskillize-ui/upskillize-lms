@@ -1,4 +1,4 @@
-export const API_URL = import.meta.env.VITE_API_URL || 'https://upskillize-lms-backend.onrender.com/api';
+export const API_URL = 'https://upskillize-lms-backend.onrender.com/api';
 export const RAZORPAY_KEY_ID = import.meta.env.VITE_RAZORPAY_KEY_ID;
 
 export const ROLES = {
