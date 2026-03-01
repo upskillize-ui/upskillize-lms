@@ -106,7 +106,7 @@ export const AuthProvider = ({ children }) => {
         console.error('No response from server');
         return {
           success: false,
-          message: 'Cannot connect to server. Please check if the backend is running on http://localhost:5000'
+          message: 'Cannot connect to server. Please try again later.'
         };
       } else {
         // Error in request setup
