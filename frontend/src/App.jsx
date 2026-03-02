@@ -9,6 +9,8 @@ import Home from './pages/Home';
 import BrowseCourses from './pages/BrowseCourses';
 import CourseView from './pages/CourseView';
 import AuthCallback from './pages/AuthCallback';
+import ForgotPassword from './pages/ForgotPassword';
+import ChangePassword from './pages/ChangePassword';
 
 // Loading Spinner Component
 const LoadingSpinner = () => (
@@ -95,9 +97,13 @@ function AppRoutes() {
         }
       />
 
-      {/* 404 Not Found - Redirect to Home */}
-      <Route path="*" element={<Navigate to="/" replace />} />
-      <Route path="/auth/callback" element={<AuthCallback />} />
+      // ✅ FIXED ORDER
+      < Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/change-password" element={<ChangePassword />} />
+      <Route path="/reset-password"  element={<ChangePassword />} />
+      <Route path="/auth/callback"   element={<AuthCallback />} />
+      // ... protected routes ...
+      <Route path="*" element={<Navigate to="/" replace />} />  // ← last
     </Routes>
   );
 }
@@ -111,4 +117,4 @@ export default function App() {
       </AuthProvider>
     </BrowserRouter>
   );
-}
+}5

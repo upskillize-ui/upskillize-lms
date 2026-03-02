@@ -1,6 +1,5 @@
 import { createContext, useState, useContext, useEffect } from 'react';
-import axios from 'axios';
-import { API_URL } from '../config/constants';
+import api from '../services/api'; // ✅ uses your configured api instance
 
 const AuthContext = createContext(null);
 
@@ -17,12 +16,12 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState(localStorage.getItem('token'));
 
-  // Configure axios defaults
+  // Update api headers when token changes
   useEffect(() => {
     if (token) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
     } else {
-      delete axios.defaults.headers.common['Authorization'];
+      delete api.defaults.headers.common['Authorization'];
     }
   }, [token]);
 
@@ -36,7 +35,7 @@ export const AuthProvider = ({ children }) => {
         try {
           setToken(savedToken);
           setUser(JSON.parse(savedUser));
-          axios.defaults.headers.common['Authorization'] = `Bearer ${savedToken}`;
+          api.defaults.headers.common['Authorization'] = `Bearer ${savedToken}`;
         } catch (error) {
           console.error('Error loading user:', error);
           localStorage.removeItem('token');
@@ -49,35 +48,27 @@ export const AuthProvider = ({ children }) => {
     loadUser();
   }, []);
 
-  // Login function
+  // ✅ Login
   const login = async (email, password) => {
     try {
       console.log('🔐 Attempting login...');
-      console.log('API URL:', `${API_URL}/auth/login`);
-      
-      const response = await axios.post(`${API_URL}/auth/login`, {
-        email,
-        password
-      });
+
+      const response = await api.post('/auth/login', { email, password });
 
       console.log('✅ Login response:', response.data);
 
       if (response.data && response.data.success) {
         const { token: newToken, user: userData } = response.data;
 
-        // Save to state
         setToken(newToken);
         setUser(userData);
 
-        // Save to localStorage
         localStorage.setItem('token', newToken);
         localStorage.setItem('user', JSON.stringify(userData));
 
-        // Set axios default header
-        axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+        api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
 
-        console.log('✅ Login successful!');
-        console.log('User role:', userData.role);
+        console.log('✅ Login successful! Role:', userData.role);
 
         return {
           success: true,
@@ -93,24 +84,19 @@ export const AuthProvider = ({ children }) => {
       }
     } catch (error) {
       console.error('❌ Login error:', error);
-      
+
       if (error.response) {
-        // Server responded with error
         console.error('Response error:', error.response.data);
         return {
           success: false,
           message: error.response.data?.message || 'Invalid credentials'
         };
       } else if (error.request) {
-        // Request made but no response
-        console.error('No response from server');
         return {
           success: false,
-          message: 'Cannot connect to server. Please check if the backend is running on http://localhost:5000'
+          message: 'Cannot connect to server. Please check if the backend is running.'
         };
       } else {
-        // Error in request setup
-        console.error('Request error:', error.message);
         return {
           success: false,
           message: 'An error occurred during login'
@@ -119,12 +105,12 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Register function
+  // ✅ Register
   const register = async (userData) => {
     try {
       console.log('📝 Attempting registration...');
-      
-      const response = await axios.post(`${API_URL}/auth/register`, userData);
+
+      const response = await api.post('/auth/register', userData);
 
       console.log('✅ Registration response:', response.data);
 
@@ -142,7 +128,7 @@ export const AuthProvider = ({ children }) => {
       }
     } catch (error) {
       console.error('❌ Registration error:', error);
-      
+
       if (error.response) {
         return {
           success: false,
@@ -162,7 +148,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Google login function (placeholder)
+  // ✅ Google Login (placeholder)
   const googleLogin = async () => {
     try {
       console.log('🔐 Google login not yet implemented');
@@ -170,10 +156,6 @@ export const AuthProvider = ({ children }) => {
         success: false,
         message: 'Google login is not yet implemented'
       };
-      
-      // TODO: Implement Google OAuth
-      // const response = await axios.get(`${API_URL}/auth/google`);
-      // Handle Google OAuth flow
     } catch (error) {
       console.error('❌ Google login error:', error);
       return {
@@ -183,50 +165,44 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Logout function
+  // ✅ Logout
   const logout = async () => {
     try {
       console.log('👋 Logging out...');
-      
-      // Call backend logout endpoint (optional)
+
       if (token) {
-        await axios.post(`${API_URL}/auth/logout`).catch(err => {
-          console.error('Logout API error:', err);
+        await api.post('/auth/logout').catch(err => {
+          console.error('Logout API error (non-critical):', err);
         });
       }
 
-      // Clear state
       setUser(null);
       setToken(null);
-
-      // Clear localStorage
       localStorage.removeItem('token');
       localStorage.removeItem('user');
-
-      // Remove axios default header
-      delete axios.defaults.headers.common['Authorization'];
+      delete api.defaults.headers.common['Authorization'];
 
       console.log('✅ Logged out successfully');
-      
       return { success: true };
+
     } catch (error) {
       console.error('❌ Logout error:', error);
-      
+
       // Still clear local data even if API call fails
       setUser(null);
       setToken(null);
       localStorage.removeItem('token');
       localStorage.removeItem('user');
-      delete axios.defaults.headers.common['Authorization'];
-      
+      delete api.defaults.headers.common['Authorization'];
+
       return { success: true };
     }
   };
 
-  // Forgot password
+  // ✅ Forgot Password
   const forgotPassword = async (email) => {
     try {
-      const response = await axios.post(`${API_URL}/auth/forgot-password`, { email });
+      const response = await api.post('/auth/forgot-password', { email });
       return {
         success: true,
         message: response.data.message || 'Password reset email sent'
@@ -240,11 +216,11 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Reset password
-  const resetPassword = async (token, newPassword) => {
+  // ✅ Reset Password
+  const resetPassword = async (resetToken, newPassword) => {
     try {
-      const response = await axios.post(`${API_URL}/auth/reset-password`, {
-        token,
+      const response = await api.post('/auth/reset-password', {
+        token: resetToken,
         newPassword
       });
       return {
