@@ -26,19 +26,26 @@ export default function Register() {
   // ✅ NEW: Wake server the moment user opens this page
   // By the time they fill the form, server is already awake
   useEffect(() => {
-    const wakeServer = async () => {
-      try {
-        await api.get('/health', { timeout: 60000 });
-        setServerReady(true);
+  const wakeServer = async () => {
+    try {
+      // ✅ Use fetch directly instead of axios api instance
+      // This avoids CORS preflight issues during cold start
+      const res = await fetch(
+        'https://upskillize-lms-backend.onrender.com/api/health',
+        { signal: AbortSignal.timeout(60000) }
+      );
+      if (res.ok) {
         setServerStatus('ready');
-      } catch (err) {
-        // Don't block the user — allow form submission regardless
-        setServerReady(true);
-        setServerStatus('slow');
+        setTimeout(() => setServerStatus('hidden'), 3000);
+      } else {
+        setServerStatus('hidden');
       }
-    };
-    wakeServer();
-  }, []);
+    } catch (err) {
+      setServerStatus('hidden'); // Don't block user if health check fails
+    }
+  };
+  wakeServer();
+}, []);
 
   const countryCodes = [
     { code: '+91', country: 'India', flag: '🇮🇳' },

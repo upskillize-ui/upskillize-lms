@@ -18,6 +18,8 @@ app.set('trust proxy', 1);
 // This ensures UptimeRobot ping responds instantly without going through
 // helmet, cors, rate limiting etc.
 app.get('/api/health', (req, res) => {
+  // Explicitly set CORS for health check so browser fetch works
+  res.header('Access-Control-Allow-Origin', '*');
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
