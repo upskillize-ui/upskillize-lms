@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import Navbar from '../components/Navbar';
@@ -16,11 +16,30 @@ export default function Register() {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loadingMsg, setLoadingMsg] = useState('Creating account...'); // ✅ NEW
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [serverReady, setServerReady] = useState(false); // ✅ NEW
+  const [serverStatus, setServerStatus] = useState('waking'); // 'waking' | 'ready' | 'slow'
   const navigate = useNavigate();
 
-  // Common country codes
+  // ✅ NEW: Wake server the moment user opens this page
+  // By the time they fill the form, server is already awake
+  useEffect(() => {
+    const wakeServer = async () => {
+      try {
+        await api.get('/health', { timeout: 60000 });
+        setServerReady(true);
+        setServerStatus('ready');
+      } catch (err) {
+        // Don't block the user — allow form submission regardless
+        setServerReady(true);
+        setServerStatus('slow');
+      }
+    };
+    wakeServer();
+  }, []);
+
   const countryCodes = [
     { code: '+91', country: 'India', flag: '🇮🇳' },
     { code: '+1', country: 'USA/Canada', flag: '🇺🇸' },
@@ -56,18 +75,22 @@ export default function Register() {
       setError('Passwords do not match');
       return;
     }
-
     if (formData.password.length < 6) {
       setError('Password must be at least 6 characters long');
       return;
     }
-
     if (!formData.phone || formData.phone.length < 10) {
       setError('Please enter a valid phone number (minimum 10 digits)');
       return;
     }
 
     setLoading(true);
+    setLoadingMsg('Creating account...');
+
+    // ✅ Show helpful messages during long waits
+    const t1 = setTimeout(() => setLoadingMsg('Almost there...'), 5000);
+    const t2 = setTimeout(() => setLoadingMsg('Server is warming up, please wait...'), 12000);
+    const t3 = setTimeout(() => setLoadingMsg('Still working, don\'t close this page...'), 25000);
 
     try {
       const fullPhoneNumber = `${formData.country_code}${formData.phone}`;
@@ -78,25 +101,53 @@ export default function Register() {
         password: formData.password,
         role: formData.role,
         phone: fullPhoneNumber
-      });
+      }, { timeout: 60000 }); // ✅ 60s timeout to handle cold starts
 
       if (response.data.success) {
         navigate('/login');
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Registration failed');
+      if (err.code === 'ECONNABORTED') {
+        setError('Server took too long to respond. Please try submitting again — it should be faster now.');
+      } else {
+        setError(err.response?.data?.message || 'Registration failed. Please try again.');
+      }
     } finally {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
       setLoading(false);
     }
   };
 
- const handleGoogleLogin = () => {
-  window.location.href = `${import.meta.env.VITE_API_URL}/auth/google`;
-};
+  const handleGoogleLogin = () => {
+    window.location.href = `${import.meta.env.VITE_API_URL}/auth/google`;
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
       <Navbar />
-      
+
+      {/* ✅ NEW: Server status banner — only shows on cold start */}
+      {serverStatus === 'waking' && (
+        <div className="bg-yellow-50 border-b border-yellow-200 px-4 py-2 text-center">
+          <p className="text-yellow-800 text-sm flex items-center justify-center gap-2">
+            <svg className="animate-spin h-4 w-4 flex-shrink-0" viewBox="0 0 24 24" fill="none">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+            </svg>
+            Connecting to server, please wait a moment before registering...
+          </p>
+        </div>
+      )}
+      {serverStatus === 'ready' && (
+        <div className="bg-green-50 border-b border-green-200 px-4 py-2 text-center">
+          <p className="text-green-700 text-sm flex items-center justify-center gap-2">
+            ✅ Server is ready — you can register now!
+          </p>
+        </div>
+      )}
+
       <div className="flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-2xl shadow-xl border border-gray-100">
           <div className="text-center">
@@ -118,29 +169,15 @@ export default function Register() {
               onClick={handleGoogleLogin}
               className="w-full flex items-center justify-center gap-3 py-3 px-4 border-2 border-gray-200 rounded-lg bg-white hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm font-semibold text-gray-700 text-sm"
             >
-              {/* Google SVG Icon */}
               <svg className="h-5 w-5" viewBox="0 0 24 24">
-                <path
-                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                  fill="#4285F4"
-                />
-                <path
-                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                  fill="#34A853"
-                />
-                <path
-                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                  fill="#FBBC05"
-                />
-                <path
-                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                  fill="#EA4335"
-                />
+                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
               </svg>
               Continue with Google
             </button>
 
-            {/* Divider */}
             <div className="relative my-5">
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-gray-200" />
@@ -196,7 +233,7 @@ export default function Register() {
                 />
               </div>
 
-              {/* Phone Number with Country Code */}
+              {/* Phone Number */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   <Phone className="inline h-4 w-4 mr-1" />
@@ -240,38 +277,19 @@ export default function Register() {
                 </label>
                 <div className="space-y-3">
                   <label className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                    formData.role === 'student'
-                      ? 'border-accent bg-blue-50'
-                      : 'border-gray-300 hover:border-accent hover:bg-gray-50'
+                    formData.role === 'student' ? 'border-accent bg-blue-50' : 'border-gray-300 hover:border-accent hover:bg-gray-50'
                   }`}>
-                    <input
-                      type="radio"
-                      name="role"
-                      value="student"
-                      checked={formData.role === 'student'}
-                      onChange={handleChange}
-                      className="h-4 w-4 text-accent focus:ring-accent"
-                    />
+                    <input type="radio" name="role" value="student" checked={formData.role === 'student'} onChange={handleChange} className="h-4 w-4 text-accent focus:ring-accent"/>
                     <GraduationCap className="h-6 w-6 mx-3 text-accent" />
                     <div className="flex-1">
                       <div className="font-semibold text-gray-900">Student</div>
                       <div className="text-sm text-gray-600">Enroll in courses and learn new skills</div>
                     </div>
                   </label>
-
                   <label className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                    formData.role === 'faculty'
-                      ? 'border-accent bg-blue-50'
-                      : 'border-gray-300 hover:border-accent hover:bg-gray-50'
+                    formData.role === 'faculty' ? 'border-accent bg-blue-50' : 'border-gray-300 hover:border-accent hover:bg-gray-50'
                   }`}>
-                    <input
-                      type="radio"
-                      name="role"
-                      value="faculty"
-                      checked={formData.role === 'faculty'}
-                      onChange={handleChange}
-                      className="h-4 w-4 text-accent focus:ring-accent"
-                    />
+                    <input type="radio" name="role" value="faculty" checked={formData.role === 'faculty'} onChange={handleChange} className="h-4 w-4 text-accent focus:ring-accent"/>
                     <Users className="h-6 w-6 mx-3 text-accent" />
                     <div className="flex-1">
                       <div className="font-semibold text-gray-900">Faculty</div>
@@ -281,7 +299,7 @@ export default function Register() {
                 </div>
               </div>
 
-              {/* Password with Eye Toggle */}
+              {/* Password */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   <Lock className="inline h-4 w-4 mr-1" />
@@ -298,23 +316,15 @@ export default function Register() {
                     placeholder="Minimum 6 characters"
                     minLength="6"
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
+                  <button type="button" onClick={() => setShowPassword(!showPassword)}
                     className="absolute inset-y-0 right-0 flex items-center pr-4 text-gray-400 hover:text-gray-600 transition-colors"
-                    tabIndex={-1}
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-5 w-5" />
-                    ) : (
-                      <Eye className="h-5 w-5" />
-                    )}
+                    tabIndex={-1}>
+                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </button>
                 </div>
               </div>
 
-              {/* Confirm Password with Eye Toggle */}
+              {/* Confirm Password */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   <Lock className="inline h-4 w-4 mr-1" />
@@ -330,18 +340,10 @@ export default function Register() {
                     className="block w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition"
                     placeholder="Re-enter your password"
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                     className="absolute inset-y-0 right-0 flex items-center pr-4 text-gray-400 hover:text-gray-600 transition-colors"
-                    tabIndex={-1}
-                    aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
-                  >
-                    {showConfirmPassword ? (
-                      <EyeOff className="h-5 w-5" />
-                    ) : (
-                      <Eye className="h-5 w-5" />
-                    )}
+                    tabIndex={-1}>
+                    {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </button>
                 </div>
               </div>
@@ -360,7 +362,8 @@ export default function Register() {
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
-                    Creating account...
+                    {/* ✅ Dynamic message so user knows what's happening */}
+                    {loadingMsg}
                   </>
                 ) : (
                   'Create Account'
@@ -368,7 +371,6 @@ export default function Register() {
               </button>
             </div>
 
-            {/* Sign In Link */}
             <div className="text-sm text-center pt-4 border-t border-gray-200">
               <span className="text-gray-600">Already have an account? </span>
               <Link to="/login" className="font-semibold text-accent hover:text-blue-600 transition">
@@ -377,7 +379,6 @@ export default function Register() {
             </div>
           </form>
 
-          {/* Additional Info */}
           <div className="mt-6 pt-6 border-t border-gray-200">
             <p className="text-xs text-center text-gray-500">
               By creating an account, you agree to our{' '}
