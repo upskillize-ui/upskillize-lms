@@ -4,13 +4,10 @@ import axios from 'axios';
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://upskillize-lms-backend.onrender.com/api';
 
 const api = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-  timeout: 60000, // ✅ 60s to handle Render free tier cold starts
+  baseURL: import.meta.env.VITE_API_URL,
+  timeout: 15000, // fail fast after 15s — show user a proper error
+  headers: { 'Content-Type': 'application/json' }
 });
-
 // Request interceptor - attach token
 api.interceptors.request.use(
   (config) => {
