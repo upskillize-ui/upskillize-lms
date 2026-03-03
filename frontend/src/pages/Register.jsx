@@ -355,7 +355,7 @@ export default function Register() {
 
             {/* Submit Button */}
             <div className="pt-2">
-              // ✅ Replace with — blocks submit until server ready
+              
 <button
   type="submit"
   disabled={loading || serverStatus === 'waking'}
