@@ -16,6 +16,13 @@ const sequelize = new Sequelize(
       acquire: 30000,
       idle: 10000
     },
+    // Aiven requires SSL in production
+    dialectOptions: process.env.NODE_ENV === 'production' ? {
+      ssl: {
+        require: true,
+        rejectUnauthorized: false
+      }
+    } : {},
     define: {
       timestamps: true,
       underscored: true
@@ -23,7 +30,6 @@ const sequelize = new Sequelize(
   }
 );
 
-// Test database connection
 const testConnection = async () => {
   try {
     await sequelize.authenticate();
