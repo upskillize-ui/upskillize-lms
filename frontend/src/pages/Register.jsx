@@ -24,12 +24,9 @@ export default function Register() {
   const navigate = useNavigate();
 
   // ✅ NEW: Wake server the moment user opens this page
-  // By the time they fill the form, server is already awake
-  useEffect(() => {
+ useEffect(() => {
   const wakeServer = async () => {
     try {
-      // ✅ Use fetch directly instead of axios api instance
-      // This avoids CORS preflight issues during cold start
       const res = await fetch(
         'https://upskillize-lms-backend.onrender.com/api/health',
         { signal: AbortSignal.timeout(60000) }
@@ -41,7 +38,7 @@ export default function Register() {
         setServerStatus('hidden');
       }
     } catch (err) {
-      setServerStatus('hidden'); // Don't block user if health check fails
+      setServerStatus('hidden');
     }
   };
   wakeServer();
@@ -358,24 +355,32 @@ export default function Register() {
 
             {/* Submit Button */}
             <div className="pt-2">
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full flex justify-center items-center gap-2 py-3 px-4 border border-transparent rounded-lg shadow-md text-base font-semibold text-white bg-gradient-to-r from-accent to-blue-600 hover:from-blue-600 hover:to-accent focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105"
-              >
-                {loading ? (
-                  <>
-                    <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    {/* ✅ Dynamic message so user knows what's happening */}
-                    {loadingMsg}
-                  </>
-                ) : (
-                  'Create Account'
-                )}
-              </button>
+              // ✅ Replace with — blocks submit until server ready
+<button
+  type="submit"
+  disabled={loading || serverStatus === 'waking'}
+  className="w-full flex justify-center items-center gap-2 py-3 px-4 border border-transparent rounded-lg shadow-md text-base font-semibold text-white bg-gradient-to-r from-accent to-blue-600 hover:from-blue-600 hover:to-accent focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+>
+  {serverStatus === 'waking' ? (
+    <>
+      <svg className="animate-spin h-5 w-5 text-white" viewBox="0 0 24 24" fill="none">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+      </svg>
+      Waiting for server...
+    </>
+  ) : loading ? (
+    <>
+      <svg className="animate-spin h-5 w-5 text-white" viewBox="0 0 24 24" fill="none">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+      </svg>
+      {loadingMsg}
+    </>
+  ) : (
+    'Create Account'
+  )}
+</button>
             </div>
 
             <div className="text-sm text-center pt-4 border-t border-gray-200">

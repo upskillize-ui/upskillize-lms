@@ -15,10 +15,8 @@ const app = express();
 app.set('trust proxy', 1);
 
 // ✅ FIX 1: Health check FIRST — before all middleware
-// This ensures UptimeRobot ping responds instantly without going through
-// helmet, cors, rate limiting etc.
+// ✅ Replace with — allows CORS from browser fetch
 app.get('/api/health', (req, res) => {
-  // Explicitly set CORS for health check so browser fetch works
   res.header('Access-Control-Allow-Origin', '*');
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
