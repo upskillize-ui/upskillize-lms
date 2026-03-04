@@ -41,6 +41,62 @@ router.get('/', async (req, res) => {
   }
 });
 
+// ============================================================
+// TEMP SEED ROUTE — DELETE AFTER USE
+// Visit: /api/courses/seed-production once after deploy
+// ============================================================
+router.get('/seed-production', async (req, res) => {
+  try {
+    await Course.bulkCreate([
+      {
+        course_name: 'Banking Foundation',
+        course_code: 'BANK-FOUND-001',
+        description: '4-part video course covering banking fundamentals, products, lending and compliance.',
+        category: 'Banking & Finance',
+        is_active: true,
+        price: 0.00
+      },
+      {
+        course_name: 'Banking Foundation - Part 1: Banking Basics',
+        course_code: 'BANK-FOUND-001-P1',
+        description: 'Introduction to banking fundamentals and core concepts.',
+        category: 'Banking & Finance',
+        is_active: true,
+        price: 0.00
+      },
+      {
+        course_name: 'Banking Foundation - Part 2: Products & Services',
+        course_code: 'BANK-FOUND-001-P2',
+        description: 'Overview of banking products, accounts and services.',
+        category: 'Banking & Finance',
+        is_active: true,
+        price: 0.00
+      },
+      {
+        course_name: 'Banking Foundation - Part 3: Lending & Payments',
+        course_code: 'BANK-FOUND-001-P3',
+        description: 'Understanding lending, loans and payment systems.',
+        category: 'Banking & Finance',
+        is_active: true,
+        price: 0.00
+      },
+      {
+        course_name: 'Banking Foundation - Part 4: Compliance & Risk',
+        course_code: 'BANK-FOUND-001-P4',
+        description: 'Banking compliance, regulations and risk management.',
+        category: 'Banking & Finance',
+        is_active: true,
+        price: 0.00
+      },
+    ], { ignoreDuplicates: true });
+
+    res.json({ success: true, message: 'Courses seeded to production successfully!' });
+  } catch (error) {
+    console.error('Seed error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Get course by ID with modules and lessons
 router.get('/:id', async (req, res) => {
   try {
