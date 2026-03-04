@@ -276,7 +276,15 @@ function MyCourses() {
   const [withdrawing, setWithdrawing] = useState(null);
   const [openVideo, setOpenVideo] = useState(null);
 
-  const COURSE_VIDEOS = { 36: '/videos/bfsi-promo.mp4' };
+   const COURSE_VIDEOS = {
+    37: 'https://www.youtube.com/embed/y3HKCaLPqtU?rel=0&modestbranding=1',
+    38: 'https://www.youtube.com/embed/y3HKCaLPqtU?rel=0&modestbranding=1',
+    39: 'https://www.youtube.com/embed/cPHKvABl9s4?rel=0&modestbranding=1',
+    40: 'https://www.youtube.com/embed/BM9ShEKAgVY?rel=0&modestbranding=1',
+    41: 'https://www.youtube.com/embed/Ap7Gk2Nj52c?rel=0&modestbranding=1',
+  };
+  const isYouTube = (url) => url?.includes('youtube.com/embed');
+  const getYouTubeId = (url) => url?.split('/embed/')[1]?.split('?')[0];
 
   useEffect(() => { fetchEnrollments(); }, []);
 
@@ -358,7 +366,15 @@ function MyCourses() {
                   <div className="bg-gray-900">
                     {isVideoOpen ? (
                       <div className="relative">
-                        <video className="w-full" style={{ maxHeight: '200px', objectFit: 'cover' }} src={videoSrc} controls autoPlay />
+                        <iframe
+                          src={videoSrc}
+                          className="w-full"
+                          style={{ height: '200px' }}
+                          frameBorder="0"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowFullScreen
+                          title={course.course_name}
+                        />
                         <button onClick={() => setOpenVideo(null)} className="absolute top-2 right-2 w-8 h-8 bg-black/70 text-white rounded-full flex items-center justify-center">✕</button>
                       </div>
                     ) : (

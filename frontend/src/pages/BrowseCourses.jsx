@@ -11,8 +11,24 @@ import {
 const FREE_COURSE_KEYWORDS = [
   'mba++', 'mba ++',
   'corporate readiness',
-  'bfsi', 'bfsi domain'
+  'bfsi', 'bfsi domain',
+  'banking foundation',   // ← Banking Foundation is FREE
+  'bank-found',           // ← matches course code BANK-FOUND-001
 ];
+
+// ─── YouTube Video IDs for Banking Foundation playlist ───────────
+// Video 1: https://youtu.be/y3HKCaLPqtU
+// Video 2: https://youtu.be/cPHKvABl9s4
+// Video 3: https://youtu.be/BM9ShEKAgVY
+// Video 4: https://youtu.be/Ap7Gk2Nj52c
+const YOUTUBE_THUMBNAILS = {
+  // Map course_id → YouTube video ID for thumbnail preview
+  10: 'y3HKCaLPqtU',  // Main: Banking Foundation (shows Part 1 thumbnail)
+  11: 'y3HKCaLPqtU',  // Sub-course 1 → Part 1
+  12: 'cPHKvABl9s4',  // Sub-course 2 → Part 2
+  13: 'BM9ShEKAgVY',  // Sub-course 3 → Part 3
+  14: 'Ap7Gk2Nj52c',  // Sub-course 4 → Part 4
+};
 
 function isFreeCourse(courseName = '', courseCode = '') {
   const name = courseName.toLowerCase().trim();
@@ -49,9 +65,17 @@ function MyCourses({ onSwitchToBrowse }) {
   const [withdrawing, setWithdrawing] = useState(null);
   const [openVideo, setOpenVideo] = useState(null);
 
+  // For YouTube courses: store embed URL instead of local mp4
   const COURSE_VIDEOS = {
     36: '/videos/bfsi-promo.mp4',
+    // Banking Foundation sub-courses (YouTube embeds)
+    10: 'https://www.youtube.com/embed/y3HKCaLPqtU?rel=0&modestbranding=1',
+    11: 'https://www.youtube.com/embed/y3HKCaLPqtU?rel=0&modestbranding=1',
+    12: 'https://www.youtube.com/embed/cPHKvABl9s4?rel=0&modestbranding=1',
+    13: 'https://www.youtube.com/embed/BM9ShEKAgVY?rel=0&modestbranding=1',
+    14: 'https://www.youtube.com/embed/Ap7Gk2Nj52c?rel=0&modestbranding=1',
   };
+  const isYouTubeUrl = (url) => url && url.includes('youtube.com/embed');
 
   useEffect(() => { fetchEnrollments(); }, []);
 
@@ -139,19 +163,46 @@ function MyCourses({ onSwitchToBrowse }) {
                   <div className="bg-gray-900">
                     {isVideoOpen ? (
                       <div className="relative">
-                        <video className="w-full" style={{ maxHeight: '200px', objectFit: 'cover' }}
-                          src={videoSrc} controls autoPlay />
+                        {isYouTubeUrl(videoSrc) ? (
+                          <div className="relative" style={{ paddingTop: '56.25%' }}>
+                            <iframe
+                              className="absolute inset-0 w-full h-full"
+                              src={videoSrc + '&autoplay=1'}
+                              title="Course Video"
+                              frameBorder="0"
+                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                              allowFullScreen
+                            />
+                          </div>
+                        ) : (
+                          <video className="w-full" style={{ maxHeight: '200px', objectFit: 'cover' }}
+                            src={videoSrc} controls autoPlay />
+                        )}
                         <button onClick={() => setOpenVideo(null)}
-                          className="absolute top-2 right-2 w-8 h-8 bg-black/70 text-white rounded-full flex items-center justify-center">✕</button>
+                          className="absolute top-2 right-2 w-8 h-8 bg-black/70 text-white rounded-full flex items-center justify-center z-10">✕</button>
                       </div>
                     ) : (
                       <button onClick={() => setOpenVideo(enrollment.id)}
                         className="w-full flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-blue-900 to-blue-700 text-white hover:from-blue-800 hover:to-blue-600 transition group">
-                        <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
-                          <PlayCircle size={22} className="text-white" />
-                        </div>
-                        <div className="text-left">
-                          <p className="text-xs font-bold text-yellow-300 uppercase">🎬 Course Video</p>
+                        {/* YouTube thumbnail if available */}
+                        {YOUTUBE_THUMBNAILS[course.id] && (
+                          <div className="w-14 h-10 rounded overflow-hidden flex-shrink-0">
+                            <img
+                              src={`https://img.youtube.com/vi/${YOUTUBE_THUMBNAILS[course.id]}/mqdefault.jpg`}
+                              alt="preview"
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        )}
+                        {!YOUTUBE_THUMBNAILS[course.id] && (
+                          <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+                            <PlayCircle size={22} className="text-white" />
+                          </div>
+                        )}
+                        <div className="text-left flex-1">
+                          <p className="text-xs font-bold text-yellow-300 uppercase">
+                            {YOUTUBE_THUMBNAILS[course.id] ? '▶ YouTube Video' : '🎬 Course Video'}
+                          </p>
                           <p className="text-xs text-blue-200">Watch overview</p>
                         </div>
                         <span className="ml-auto text-blue-300 text-sm font-semibold">▶ Play</span>
@@ -427,6 +478,7 @@ export function FreeCoursesWidget() {
     { name: 'MBA++', icon: '🎓', path: '/student/browse' },
     { name: 'Corporate Readiness', icon: '💼', path: '/student/browse' },
     { name: 'BFSI Domain Excellence', icon: '🏦', path: '/student/browse' },
+    { name: 'Banking Foundation', icon: '🏛️', path: '/student/browse', isNew: true },
   ];
 
   return (
@@ -438,10 +490,13 @@ export function FreeCoursesWidget() {
           <p className="text-sm text-green-600">These courses are included at no cost</p>
         </div>
       </div>
-      <div className="grid md:grid-cols-3 gap-3">
+      <div className="grid md:grid-cols-4 gap-3">
         {freeCourses.map((course, idx) => (
           <a key={idx} href={course.path}
-            className="bg-white rounded-lg p-4 flex items-center gap-3 hover:shadow-md transition border border-green-100">
+            className="bg-white rounded-lg p-4 flex items-center gap-3 hover:shadow-md transition border border-green-100 relative">
+            {course.isNew && (
+              <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">NEW</span>
+            )}
             <span className="text-2xl">{course.icon}</span>
             <span className="font-semibold text-gray-800 text-sm">{course.name}</span>
           </a>

@@ -3,169 +3,237 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
   PlayCircle, CheckCircle, Clock, BookOpen, FileText, 
   Video, Download, ChevronLeft, ChevronRight, Menu, X,
-  Award, BarChart, MessageSquare, Share2, Star
+  Award, BarChart, MessageSquare, Share2, Star, Youtube
 } from 'lucide-react';
 import api from '../../services/api';
 
+// ============================================================
+// BANKING FOUNDATION — 4 YouTube Videos Playlist
+// Video 1: https://youtu.be/y3HKCaLPqtU
+// Video 2: https://youtu.be/cPHKvABl9s4
+// Video 3: https://youtu.be/BM9ShEKAgVY
+// Video 4: https://youtu.be/Ap7Gk2Nj52c
+// ============================================================
+
+// Helper: convert youtu.be short URL → YouTube embed URL
+function toEmbedUrl(youtubeId, autoplay = false) {
+  return `https://www.youtube.com/embed/${youtubeId}?rel=0&modestbranding=1${autoplay ? '&autoplay=1' : ''}`;
+}
+
+// ============================================================
+// COURSE CONTENT — Banking Foundation (4 Sub-Courses / Videos)
+// Replace IDs below if your DB uses different course IDs
+// ============================================================
+const BANKING_FOUNDATION_CONTENT = {
+  courseName: 'Banking Foundation',
+  isFree: true,
+  modules: [
+    {
+      title: 'Module 1: Banking Foundations',
+      duration: '~60 min',
+      lessons: [
+        {
+          title: 'Banking Foundation – Part 1',
+          duration: '~60 min',
+          type: 'youtube',
+          youtubeId: 'y3HKCaLPqtU',           // https://youtu.be/y3HKCaLPqtU
+          videoUrl: toEmbedUrl('y3HKCaLPqtU'),
+          description: 'Introduction to banking fundamentals, financial markets overview and the role of banks in the global economy.'
+        }
+      ]
+    },
+    {
+      title: 'Module 2: Banking Products & Services',
+      duration: '~60 min',
+      lessons: [
+        {
+          title: 'Banking Foundation – Part 2',
+          duration: '~60 min',
+          type: 'youtube',
+          youtubeId: 'cPHKvABl9s4',           // https://youtu.be/cPHKvABl9s4
+          videoUrl: toEmbedUrl('cPHKvABl9s4'),
+          description: 'Deep dive into retail banking, corporate banking, investment banking and Islamic banking products.'
+        }
+      ]
+    },
+    {
+      title: 'Module 3: Lending & Payments',
+      duration: '~60 min',
+      lessons: [
+        {
+          title: 'Banking Foundation – Part 3',
+          duration: '~60 min',
+          type: 'youtube',
+          youtubeId: 'BM9ShEKAgVY',           // https://youtu.be/BM9ShEKAgVY
+          videoUrl: toEmbedUrl('BM9ShEKAgVY'),
+          description: 'Lending products, retail lending process, payment systems and the cards ecosystem explained.'
+        }
+      ]
+    },
+    {
+      title: 'Module 4: Compliance & Risk',
+      duration: '~60 min',
+      lessons: [
+        {
+          title: 'Banking Foundation – Part 4',
+          duration: '~60 min',
+          type: 'youtube',
+          youtubeId: 'Ap7Gk2Nj52c',           // https://youtu.be/Ap7Gk2Nj52c
+          videoUrl: toEmbedUrl('Ap7Gk2Nj52c'),
+          description: 'Regulatory compliance, KYC/AML, risk management and banking regulations in the modern era.'
+        }
+      ]
+    }
+  ]
+};
+
+// Map course IDs from your DB to the Banking Foundation content
+// Add all sub-course IDs that belong to Banking Foundation here
+const COURSE_CONTENT_MAP = {
+  // Main course ID
+  10: BANKING_FOUNDATION_CONTENT,
+  // Sub-course IDs (Modules 1–4)
+  11: { ...BANKING_FOUNDATION_CONTENT, modules: [BANKING_FOUNDATION_CONTENT.modules[0]] },
+  12: { ...BANKING_FOUNDATION_CONTENT, modules: [BANKING_FOUNDATION_CONTENT.modules[1]] },
+  13: { ...BANKING_FOUNDATION_CONTENT, modules: [BANKING_FOUNDATION_CONTENT.modules[2]] },
+  14: { ...BANKING_FOUNDATION_CONTENT, modules: [BANKING_FOUNDATION_CONTENT.modules[3]] },
+};
+
+// ============================================================
+// YOUTUBE PLAYER COMPONENT
+// Replaces the old <video> tag — renders an iframe for YouTube
+// ============================================================
+function YouTubePlayer({ videoUrl, title }) {
+  return (
+    <div className="relative w-full" style={{ paddingTop: '56.25%' /* 16:9 */ }}>
+      <iframe
+        className="absolute inset-0 w-full h-full rounded-t-xl"
+        src={videoUrl}
+        title={title}
+        frameBorder="0"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+        allowFullScreen
+      />
+    </div>
+  );
+}
+
+// ============================================================
+// MAIN COURSE PLAYER
+// ============================================================
 export default function CoursePlayer() {
   const { courseId } = useParams();
   const navigate = useNavigate();
-  const videoRef = useRef(null);
 
-  const [course, setCourse] = useState(null);
-  const [enrollment, setEnrollment] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [course, setCourse]           = useState(null);
+  const [enrollment, setEnrollment]   = useState(null);
+  const [loading, setLoading]         = useState(true);
   const [currentModule, setCurrentModule] = useState(0);
   const [currentLesson, setCurrentLesson] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [completedLessons, setCompletedLessons] = useState(new Set());
-  const [videoError, setVideoError] = useState(false);
 
-  useEffect(() => {
-    fetchCourseData();
-  }, [courseId]);
+  // Pick content based on courseId — fallback to full Banking Foundation
+  const courseContent =
+    COURSE_CONTENT_MAP[parseInt(courseId)] || BANKING_FOUNDATION_CONTENT;
+
+  const currentLessonData =
+    courseContent.modules[currentModule]?.lessons[currentLesson];
+
+  // ── Fetch course + enrollment from API ──────────────────
+  useEffect(() => { fetchCourseData(); }, [courseId]);
 
   const fetchCourseData = async () => {
     try {
-      // Fetch course details
-      const courseResponse = await api.get(`/courses/${courseId}`);
-      const enrollmentResponse = await api.get(`/enrollments/my-enrollments`);
-      
-      if (courseResponse.data.success) {
-        setCourse(courseResponse.data.course);
-      }
+      const [courseRes, enrollRes] = await Promise.all([
+        api.get(`/courses/${courseId}`),
+        api.get('/enrollments/my-enrollments')
+      ]);
 
-      if (enrollmentResponse.data.success) {
-        const userEnrollment = enrollmentResponse.data.enrollments.find(
+      if (courseRes.data.success) setCourse(courseRes.data.course);
+
+      if (enrollRes.data.success) {
+        const found = enrollRes.data.enrollments.find(
           e => (e.Course?.id || e.course?.id) === parseInt(courseId)
         );
-        setEnrollment(userEnrollment);
+        setEnrollment(found);
       }
-    } catch (error) {
-      console.error('Error fetching course:', error);
+    } catch (err) {
+      console.error('Error fetching course:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  // BFSI Course Content Structure
-  const courseContent = {
-    modules: [
-      {
-        title: 'Day 1: Banking Foundations',
-        duration: '8 hours',
-        lessons: [
-          { title: 'Module 1: Overview of Financial Markets', duration: '2h', type: 'video', videoUrl: '/videos/bfsi-promo.mp4' },
-          { title: 'Module 2: Introduction to Banking', duration: '3h', type: 'video', videoUrl: '/videos/bfsi-promo.mp4' },
-          { title: 'Module 3: Types of Banks - Global Scenario', duration: '3h', type: 'video', videoUrl: '/videos/bfsi-promo.mp4' }
-        ]
-      },
-      {
-        title: 'Day 2: Banking Products & Services',
-        duration: '8 hours',
-        lessons: [
-          { title: 'Module 4: Retail Banking', duration: '2h', type: 'video', videoUrl: '/videos/bfsi-promo.mp4' },
-          { title: 'Module 5: Corporate Banking', duration: '2h', type: 'video', videoUrl: '/videos/bfsi-promo.mp4' },
-          { title: 'Module 6: Investment Banking', duration: '2h', type: 'video', videoUrl: '/videos/bfsi-promo.mp4' },
-          { title: 'Module 7: Islamic Banking', duration: '2h', type: 'video', videoUrl: '/videos/bfsi-promo.mp4' }
-        ]
-      },
-      {
-        title: 'Day 3: Lending & Payments',
-        duration: '8 hours',
-        lessons: [
-          { title: 'Module 8: Lending Products', duration: '2h', type: 'video', videoUrl: '/videos/bfsi-promo.mp4' },
-          { title: 'Module 9: Retail Lending Process', duration: '2h', type: 'video', videoUrl: '/videos/bfsi-promo.mp4' },
-          { title: 'Module 10: Payment Systems', duration: '2h', type: 'video', videoUrl: '/videos/bfsi-promo.mp4' },
-          { title: 'Module 11: Cards Ecosystem', duration: '2h', type: 'video', videoUrl: '/videos/bfsi-promo.mp4' }
-        ]
-      },
-      {
-        title: 'Day 4: Risk & Compliance',
-        duration: '8 hours',
-        lessons: [
-          { title: 'Module 12: Customer Personas', duration: '2h', type: 'video', videoUrl: '/videos/bfsi-promo.mp4' },
-          { title: 'Module 13: Crime and Compliance', duration: '2h', type: 'video', videoUrl: '/videos/bfsi-promo.mp4' },
-          { title: 'Module 14: Risk Management', duration: '2h', type: 'video', videoUrl: '/videos/bfsi-promo.mp4' },
-          { title: 'Module 15: Banking Regulation', duration: '2h', type: 'video', videoUrl: '/videos/bfsi-promo.mp4' }
-        ]
-      },
-      {
-        title: 'Day 5: Future Banking & AI',
-        duration: '8 hours',
-        lessons: [
-          { title: 'Module 16: Banking Software', duration: '2h', type: 'video', videoUrl: '/videos/bfsi-promo.mp4' },
-          { title: 'Module 17: GenAI & Agentic AI in Finance', duration: '3h', type: 'video', videoUrl: '/videos/bfsi-promo.mp4' },
-          { title: 'Module 18: New Age Banking & Fintech', duration: '2h', type: 'video', videoUrl: '/videos/bfsi-promo.mp4' },
-          { title: 'Module 19: Insurance Domain', duration: '1h', type: 'video', videoUrl: '/videos/bfsi-promo.mp4' }
-        ]
-      }
-    ]
+  // ── Progress helpers ─────────────────────────────────────
+  const isLessonCompleted = (modIdx, lesIdx) =>
+    completedLessons.has(`${modIdx}-${lesIdx}`);
+
+  const calculateProgress = () => {
+    const total = courseContent.modules.reduce(
+      (acc, mod) => acc + mod.lessons.length, 0
+    );
+    return total ? Math.round((completedLessons.size / total) * 100) : 0;
   };
 
-  const currentLessonData = courseContent.modules[currentModule]?.lessons[currentLesson];
-
   const handleLessonComplete = async () => {
-    const lessonKey = `${currentModule}-${currentLesson}`;
-    setCompletedLessons(prev => new Set([...prev, lessonKey]));
+    const key = `${currentModule}-${currentLesson}`;
+    const updated = new Set([...completedLessons, key]);
+    setCompletedLessons(updated);
 
-    // Update progress in backend
     try {
-      const totalLessons = courseContent.modules.reduce((acc, mod) => acc + mod.lessons.length, 0);
-      const completedCount = completedLessons.size + 1;
-      const progressPercentage = Math.round((completedCount / totalLessons) * 100);
-
+      const total = courseContent.modules.reduce(
+        (acc, mod) => acc + mod.lessons.length, 0
+      );
+      const pct = Math.round((updated.size / total) * 100);
       await api.put(`/enrollments/${enrollment?.id}/progress`, {
-        progress_percentage: progressPercentage
+        progress_percentage: pct
       });
-    } catch (error) {
-      console.error('Error updating progress:', error);
+    } catch (err) {
+      console.error('Progress update error:', err);
     }
 
-    // Move to next lesson
     handleNextLesson();
   };
 
   const handleNextLesson = () => {
-    const currentModuleLessons = courseContent.modules[currentModule].lessons;
-    
-    if (currentLesson < currentModuleLessons.length - 1) {
-      setCurrentLesson(currentLesson + 1);
+    const modLessons = courseContent.modules[currentModule].lessons;
+    if (currentLesson < modLessons.length - 1) {
+      setCurrentLesson(l => l + 1);
     } else if (currentModule < courseContent.modules.length - 1) {
-      setCurrentModule(currentModule + 1);
+      setCurrentModule(m => m + 1);
       setCurrentLesson(0);
     }
   };
 
   const handlePreviousLesson = () => {
     if (currentLesson > 0) {
-      setCurrentLesson(currentLesson - 1);
+      setCurrentLesson(l => l - 1);
     } else if (currentModule > 0) {
-      setCurrentModule(currentModule - 1);
+      setCurrentModule(m => m - 1);
       setCurrentLesson(courseContent.modules[currentModule - 1].lessons.length - 1);
     }
   };
 
-  const isLessonCompleted = (moduleIdx, lessonIdx) => {
-    return completedLessons.has(`${moduleIdx}-${lessonIdx}`);
-  };
+  const isLastLesson =
+    currentModule === courseContent.modules.length - 1 &&
+    currentLesson === courseContent.modules[currentModule].lessons.length - 1;
 
-  const calculateProgress = () => {
-    const totalLessons = courseContent.modules.reduce((acc, mod) => acc + mod.lessons.length, 0);
-    return Math.round((completedLessons.size / totalLessons) * 100);
-  };
+  const isFirstLesson = currentModule === 0 && currentLesson === 0;
 
+  // ── Loading state ────────────────────────────────────────
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-500 mx-auto mb-4" />
           <p className="text-gray-600">Loading course...</p>
         </div>
       </div>
     );
   }
 
+  // ── Not enrolled ─────────────────────────────────────────
   if (!course && !enrollment) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -173,244 +241,305 @@ export default function CoursePlayer() {
           <BookOpen className="h-16 w-16 text-gray-400 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Course Not Found</h2>
           <p className="text-gray-600 mb-6">You may not be enrolled in this course</p>
-          <Link
-            to="/student/courses"
-            className="inline-block bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg transition"
-          >
-            Back to My Courses
+          <Link to="/student/courses"
+            className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold transition">
+            Browse Courses
           </Link>
         </div>
       </div>
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Top Navigation Bar */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-40">
-        <div className="flex items-center justify-between px-4 py-3">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="lg:hidden p-2 hover:bg-gray-100 rounded-lg transition"
-            >
-              {sidebarOpen ? <X size={24} /> : <Menu size={24} />}
-            </button>
-            <Link
-              to="/student/courses"
-              className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition"
-            >
-              <ChevronLeft size={20} />
-              <span className="hidden sm:inline">Back to Courses</span>
-            </Link>
-          </div>
+  const progress = calculateProgress();
 
-          <div className="flex-1 mx-4 max-w-2xl">
-            <h1 className="font-bold text-gray-900 truncate">
-              {course?.course_name || course?.name || 'BFSI Excellence Program'}
-            </h1>
-            <div className="flex items-center gap-4 text-sm text-gray-600 mt-1">
-              <span className="flex items-center gap-1">
-                <BarChart size={16} />
-                {calculateProgress()}% Complete
-              </span>
-              <span className="flex items-center gap-1">
-                <Clock size={16} />
-                {currentLessonData?.duration || '2h'}
-              </span>
+  // ── RENDER ───────────────────────────────────────────────
+  return (
+    <div className="flex h-screen bg-gray-100 overflow-hidden">
+
+      {/* ── SIDEBAR ── */}
+      <aside className={`
+        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+        lg:translate-x-0 fixed lg:static inset-y-0 left-0 z-30
+        w-80 bg-white border-r border-gray-200 overflow-y-auto
+        transition-transform duration-300 ease-in-out flex flex-col
+      `}>
+        {/* Sidebar Header */}
+        <div className="p-4 border-b border-gray-200 bg-gradient-to-r from-[#1e5a8e] to-[#164266]">
+          <div className="flex items-center gap-2 mb-1">
+            <Youtube size={18} className="text-red-400" />
+            <span className="text-xs font-bold text-red-300 uppercase tracking-widest">YouTube Playlist</span>
+          </div>
+          <h2 className="font-bold text-white text-base leading-tight">
+            {courseContent.courseName}
+          </h2>
+          {courseContent.isFree && (
+            <span className="inline-block mt-2 text-xs bg-green-500 text-white px-2 py-0.5 rounded-full font-bold">
+              FREE COURSE
+            </span>
+          )}
+
+          {/* Progress Bar */}
+          <div className="mt-3">
+            <div className="flex justify-between text-xs text-blue-200 mb-1">
+              <span>Your Progress</span>
+              <span>{progress}%</span>
+            </div>
+            <div className="w-full bg-blue-900 rounded-full h-2">
+              <div
+                className="bg-green-400 h-2 rounded-full transition-all duration-500"
+                style={{ width: `${progress}%` }}
+              />
             </div>
           </div>
+        </div>
 
-          <div className="flex items-center gap-2">
-            <button className="p-2 hover:bg-gray-100 rounded-lg transition">
-              <Share2 size={20} />
-            </button>
+        {/* Lesson List */}
+        <div className="p-4 flex-1">
+          <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">
+            {courseContent.modules.length} Modules · {courseContent.modules.reduce((a, m) => a + m.lessons.length, 0)} Videos
+          </h3>
+
+          {courseContent.modules.map((module, modIdx) => (
+            <div key={modIdx} className="mb-4">
+              {/* Module Title */}
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-2">
+                <h4 className="font-semibold text-sm text-gray-900">{module.title}</h4>
+                <p className="text-xs text-gray-500 mt-0.5">{module.duration}</p>
+              </div>
+
+              {/* Lessons */}
+              <div className="space-y-1 ml-2">
+                {module.lessons.map((lesson, lesIdx) => {
+                  const isActive    = modIdx === currentModule && lesIdx === currentLesson;
+                  const isCompleted = isLessonCompleted(modIdx, lesIdx);
+
+                  return (
+                    <button
+                      key={lesIdx}
+                      onClick={() => { setCurrentModule(modIdx); setCurrentLesson(lesIdx); }}
+                      className={`
+                        w-full text-left p-3 rounded-lg transition flex items-start gap-3
+                        ${isActive
+                          ? 'bg-blue-50 border-2 border-blue-500'
+                          : 'hover:bg-gray-50 border-2 border-transparent'}
+                      `}
+                    >
+                      <div className="flex-shrink-0 mt-0.5">
+                        {isCompleted
+                          ? <CheckCircle size={20} className="text-green-500" />
+                          : <Youtube size={20} className={isActive ? 'text-red-500' : 'text-gray-400'} />
+                        }
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-medium truncate ${isActive ? 'text-blue-900' : 'text-gray-900'}`}>
+                          {lesson.title}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-0.5">{lesson.duration}</p>
+                      </div>
+                      {isActive && (
+                        <span className="flex-shrink-0 text-xs bg-blue-500 text-white px-1.5 py-0.5 rounded font-bold">
+                          NOW
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      </aside>
+
+      {/* ── MAIN CONTENT ── */}
+      <main className="flex-1 overflow-y-auto">
+        {/* Top bar */}
+        <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3 sticky top-0 z-10">
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="text-gray-500 hover:text-gray-800 hover:bg-gray-100 p-2 rounded-lg transition lg:hidden"
+          >
+            {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+          <button
+            onClick={() => navigate(-1)}
+            className="text-gray-500 hover:text-gray-800 flex items-center gap-1 text-sm transition"
+          >
+            <ChevronLeft size={18} /> Back
+          </button>
+          <div className="flex-1 text-center">
+            <p className="text-sm font-semibold text-gray-800 truncate">
+              {courseContent.courseName}
+            </p>
+          </div>
+          <div className="flex items-center gap-1 text-xs text-gray-500">
+            <Youtube size={14} className="text-red-500" />
+            <span>YouTube</span>
           </div>
         </div>
 
-        {/* Progress Bar */}
-        <div className="h-1 bg-gray-200">
-          <div 
-            className="h-full bg-blue-500 transition-all duration-500"
-            style={{ width: `${calculateProgress()}%` }}
-          />
-        </div>
-      </div>
+        <div className="max-w-5xl mx-auto p-4 md:p-6">
 
-      <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar - Course Content */}
-        <aside className={`
-          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-          lg:translate-x-0 fixed lg:static inset-y-0 left-0 z-30
-          w-80 bg-white border-r border-gray-200 overflow-y-auto
-          transition-transform duration-300 ease-in-out
-        `}>
-          <div className="p-4">
-            <h2 className="font-bold text-lg mb-4">Course Content</h2>
-            
-            {courseContent.modules.map((module, moduleIdx) => (
-              <div key={moduleIdx} className="mb-4">
-                <div className="bg-gray-50 rounded-lg p-3 mb-2">
-                  <h3 className="font-semibold text-sm text-gray-900">{module.title}</h3>
-                  <p className="text-xs text-gray-600 mt-1">{module.duration}</p>
-                </div>
-                
-                <div className="space-y-1 ml-2">
-                  {module.lessons.map((lesson, lessonIdx) => {
-                    const isActive = moduleIdx === currentModule && lessonIdx === currentLesson;
-                    const isCompleted = isLessonCompleted(moduleIdx, lessonIdx);
-                    
-                    return (
-                      <button
-                        key={lessonIdx}
-                        onClick={() => {
-                          setCurrentModule(moduleIdx);
-                          setCurrentLesson(lessonIdx);
-                        }}
-                        className={`
-                          w-full text-left p-3 rounded-lg transition flex items-start gap-3
-                          ${isActive ? 'bg-blue-50 border-2 border-blue-500' : 'hover:bg-gray-50 border-2 border-transparent'}
-                        `}
-                      >
-                        <div className="flex-shrink-0 mt-0.5">
-                          {isCompleted ? (
-                            <CheckCircle size={20} className="text-green-500" />
-                          ) : lesson.type === 'video' ? (
-                            <PlayCircle size={20} className={isActive ? 'text-blue-600' : 'text-gray-400'} />
-                          ) : (
-                            <FileText size={20} className={isActive ? 'text-blue-600' : 'text-gray-400'} />
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className={`text-sm font-medium ${isActive ? 'text-blue-900' : 'text-gray-900'}`}>
-                            {lesson.title}
-                          </p>
-                          <p className="text-xs text-gray-500 mt-1">{lesson.duration}</p>
-                        </div>
-                      </button>
-                    );
-                  })}
+          {/* ── YOUTUBE VIDEO PLAYER ── */}
+          <div className="bg-black rounded-xl overflow-hidden mb-6 shadow-2xl">
+            {currentLessonData?.type === 'youtube' ? (
+              <YouTubePlayer
+                videoUrl={currentLessonData.videoUrl}
+                title={currentLessonData.title}
+              />
+            ) : (
+              <div className="aspect-video flex flex-col items-center justify-center bg-gray-900 text-white">
+                <Video size={64} className="text-gray-600 mb-4" />
+                <p className="text-lg font-semibold">Video Not Available</p>
+              </div>
+            )}
+          </div>
+
+          {/* ── LESSON INFO ── */}
+          <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+            <div className="flex items-start justify-between gap-4 mb-4">
+              <div className="flex-1">
+                {/* Module badge */}
+                <span className="inline-block text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-full mb-2">
+                  {courseContent.modules[currentModule]?.title}
+                </span>
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                  {currentLessonData?.title}
+                </h2>
+                <div className="flex items-center gap-4 text-sm text-gray-600">
+                  <span className="flex items-center gap-1">
+                    <Clock size={16} /> {currentLessonData?.duration}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <BookOpen size={16} />
+                    Video {currentLesson + 1} of {courseContent.modules[currentModule]?.lessons.length}
+                  </span>
+                  <span className="flex items-center gap-1 text-red-500">
+                    <Youtube size={16} /> YouTube
+                  </span>
                 </div>
               </div>
-            ))}
-          </div>
-        </aside>
 
-        {/* Main Content Area */}
-        <main className="flex-1 overflow-y-auto">
-          <div className="max-w-5xl mx-auto p-6">
-            {/* Video Player */}
-            <div className="bg-black rounded-xl overflow-hidden mb-6 shadow-2xl">
-              {!videoError ? (
-                <video
-                  ref={videoRef}
-                  className="w-full aspect-video"
-                  src={currentLessonData?.videoUrl}
-                  controls
-                  autoPlay
-                  onError={() => setVideoError(true)}
+              {/* Mark Complete Button */}
+              {!isLessonCompleted(currentModule, currentLesson) ? (
+                <button
+                  onClick={handleLessonComplete}
+                  className="flex-shrink-0 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-semibold transition flex items-center gap-2 shadow"
                 >
-                  Your browser does not support the video tag.
-                </video>
+                  <CheckCircle size={20} /> Mark Complete
+                </button>
               ) : (
-                <div className="aspect-video flex flex-col items-center justify-center bg-gray-900 text-white">
-                  <Video size={64} className="text-gray-600 mb-4" />
-                  <p className="text-lg font-semibold mb-2">Video Not Available</p>
-                  <p className="text-sm text-gray-400">This lesson video is being prepared</p>
+                <div className="flex-shrink-0 flex items-center gap-2 text-green-600 font-semibold text-sm bg-green-50 px-4 py-2 rounded-lg border border-green-200">
+                  <CheckCircle size={20} /> Completed!
                 </div>
               )}
             </div>
 
-            {/* Lesson Info */}
-            <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                    {currentLessonData?.title}
-                  </h2>
-                  <div className="flex items-center gap-4 text-sm text-gray-600">
-                    <span className="flex items-center gap-1">
-                      <Clock size={16} />
-                      {currentLessonData?.duration}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <BookOpen size={16} />
-                      Lesson {currentLesson + 1} of {courseContent.modules[currentModule].lessons.length}
-                    </span>
-                  </div>
-                </div>
-                
-                {!isLessonCompleted(currentModule, currentLesson) && (
-                  <button
-                    onClick={handleLessonComplete}
-                    className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-semibold transition flex items-center gap-2"
-                  >
-                    <CheckCircle size={20} />
-                    Mark Complete
-                  </button>
-                )}
-              </div>
-
-              <div className="prose max-w-none">
-                <h3 className="text-lg font-semibold mb-3">About this lesson</h3>
-                <p className="text-gray-600">
-                  This comprehensive module covers essential concepts in banking and financial services. 
-                  You'll learn practical skills and industry best practices that are immediately applicable 
-                  in real-world scenarios.
+            {/* Description */}
+            {currentLessonData?.description && (
+              <div className="border-t border-gray-100 pt-4">
+                <h3 className="text-sm font-bold text-gray-700 mb-2">About this lesson</h3>
+                <p className="text-gray-600 text-sm leading-relaxed">
+                  {currentLessonData.description}
                 </p>
               </div>
-            </div>
+            )}
 
-            {/* Navigation Buttons */}
-            <div className="flex gap-4">
-              <button
-                onClick={handlePreviousLesson}
-                disabled={currentModule === 0 && currentLesson === 0}
-                className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-900 px-6 py-3 rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                <ChevronLeft size={20} />
-                Previous Lesson
-              </button>
-              <button
-                onClick={handleNextLesson}
-                disabled={
-                  currentModule === courseContent.modules.length - 1 && 
-                  currentLesson === courseContent.modules[currentModule].lessons.length - 1
-                }
-                className="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                Next Lesson
-                <ChevronRight size={20} />
-              </button>
-            </div>
-
-            {/* Additional Resources */}
-            <div className="mt-6 bg-white rounded-xl shadow-md p-6">
-              <h3 className="text-lg font-bold mb-4">Resources & Downloads</h3>
-              <div className="grid md:grid-cols-2 gap-4">
-                <button className="flex items-center gap-3 p-4 border-2 border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition">
-                  <Download size={20} className="text-blue-600" />
-                  <div className="text-left">
-                    <p className="font-semibold text-sm">Lesson Slides (PDF)</p>
-                    <p className="text-xs text-gray-500">2.5 MB</p>
-                  </div>
-                </button>
-                <button className="flex items-center gap-3 p-4 border-2 border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition">
-                  <FileText size={20} className="text-blue-600" />
-                  <div className="text-left">
-                    <p className="font-semibold text-sm">Practice Exercise</p>
-                    <p className="text-xs text-gray-500">Coming Soon</p>
-                  </div>
-                </button>
+            {/* YouTube Watch Link */}
+            {currentLessonData?.youtubeId && (
+              <div className="mt-4 pt-4 border-t border-gray-100 flex items-center gap-3">
+                <Youtube size={18} className="text-red-500 flex-shrink-0" />
+                <a
+                  href={`https://youtu.be/${currentLessonData.youtubeId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-blue-600 hover:underline font-medium"
+                >
+                  Watch on YouTube ↗
+                </a>
+                <span className="text-xs text-gray-400">(opens in new tab)</span>
               </div>
+            )}
+          </div>
+
+          {/* ── NAVIGATION BUTTONS ── */}
+          <div className="flex gap-4 mb-6">
+            <button
+              onClick={handlePreviousLesson}
+              disabled={isFirstLesson}
+              className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-900 px-6 py-3 rounded-lg font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              <ChevronLeft size={20} /> Previous
+            </button>
+            <button
+              onClick={handleNextLesson}
+              disabled={isLastLesson}
+              className="flex-1 bg-[#1e5a8e] hover:bg-[#164266] text-white px-6 py-3 rounded-lg font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              Next Video <ChevronRight size={20} />
+            </button>
+          </div>
+
+          {/* ── PLAYLIST OVERVIEW ── */}
+          <div className="bg-white rounded-xl shadow-md p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Youtube size={20} className="text-red-500" />
+              <h3 className="text-lg font-bold">Banking Foundation Playlist</h3>
+              <span className="text-xs bg-green-100 text-green-700 font-bold px-2 py-0.5 rounded-full ml-auto">
+                FREE
+              </span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {courseContent.modules.map((mod, modIdx) =>
+                mod.lessons.map((lesson, lesIdx) => {
+                  const isActive    = modIdx === currentModule && lesIdx === currentLesson;
+                  const isCompleted = isLessonCompleted(modIdx, lesIdx);
+                  return (
+                    <button
+                      key={`${modIdx}-${lesIdx}`}
+                      onClick={() => { setCurrentModule(modIdx); setCurrentLesson(lesIdx); }}
+                      className={`flex items-center gap-3 p-3 rounded-xl border-2 text-left transition
+                        ${isActive    ? 'border-blue-500 bg-blue-50'   :
+                          isCompleted ? 'border-green-300 bg-green-50' :
+                                        'border-gray-200 hover:border-blue-300 hover:bg-gray-50'}`}
+                    >
+                      {/* Thumbnail */}
+                      <div className="flex-shrink-0 w-20 h-12 rounded-lg overflow-hidden bg-gray-200 relative">
+                        <img
+                          src={`https://img.youtube.com/vi/${lesson.youtubeId}/mqdefault.jpg`}
+                          alt={lesson.title}
+                          className="w-full h-full object-cover"
+                        />
+                        {isActive && (
+                          <div className="absolute inset-0 bg-blue-500/30 flex items-center justify-center">
+                            <PlayCircle size={20} className="text-white" />
+                          </div>
+                        )}
+                        {isCompleted && !isActive && (
+                          <div className="absolute inset-0 bg-green-500/40 flex items-center justify-center">
+                            <CheckCircle size={18} className="text-white" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-semibold truncate ${isActive ? 'text-blue-900' : 'text-gray-900'}`}>
+                          Part {modIdx + 1}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-0.5 truncate">{mod.title}</p>
+                        <p className="text-xs text-gray-400">{lesson.duration}</p>
+                      </div>
+                    </button>
+                  );
+                })
+              )}
             </div>
           </div>
-        </main>
-      </div>
 
-      {/* Mobile Sidebar Overlay */}
+        </div>
+      </main>
+
+      {/* Mobile sidebar overlay */}
       {sidebarOpen && (
-        <div 
+        <div
           className="lg:hidden fixed inset-0 bg-black/50 z-20"
           onClick={() => setSidebarOpen(false)}
         />
