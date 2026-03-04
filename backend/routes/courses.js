@@ -43,56 +43,108 @@ router.get('/', async (req, res) => {
 
 // ============================================================
 // TEMP SEED ROUTE — DELETE AFTER USE
-// Visit: /api/courses/seed-production once after deploy
+// Adds 4 video modules to Banking Foundation (course id=1)
+// Visit: /api/courses/seed-videos once after deploy
 // ============================================================
-router.get('/seed-production', async (req, res) => {
+router.get('/seed-videos', async (req, res) => {
   try {
-    await Course.bulkCreate([
-      {
-        course_name: 'Banking Foundation',
-        course_code: 'BANK-FOUND-001',
-        description: '4-part video course covering banking fundamentals, products, lending and compliance.',
-        category: 'Banking & Finance',
-        is_active: true,
-        price: 0.00
-      },
-      {
-        course_name: 'Banking Foundation - Part 1: Banking Basics',
-        course_code: 'BANK-FOUND-001-P1',
-        description: 'Introduction to banking fundamentals and core concepts.',
-        category: 'Banking & Finance',
-        is_active: true,
-        price: 0.00
-      },
-      {
-        course_name: 'Banking Foundation - Part 2: Products & Services',
-        course_code: 'BANK-FOUND-001-P2',
-        description: 'Overview of banking products, accounts and services.',
-        category: 'Banking & Finance',
-        is_active: true,
-        price: 0.00
-      },
-      {
-        course_name: 'Banking Foundation - Part 3: Lending & Payments',
-        course_code: 'BANK-FOUND-001-P3',
-        description: 'Understanding lending, loans and payment systems.',
-        category: 'Banking & Finance',
-        is_active: true,
-        price: 0.00
-      },
-      {
-        course_name: 'Banking Foundation - Part 4: Compliance & Risk',
-        course_code: 'BANK-FOUND-001-P4',
-        description: 'Banking compliance, regulations and risk management.',
-        category: 'Banking & Finance',
-        is_active: true,
-        price: 0.00
-      },
-    ], { ignoreDuplicates: true });
+    // Find Banking Foundation main course
+    const course = await Course.findOne({ where: { course_code: 'BANK-FOUND-001' } });
+    if (!course) {
+      return res.status(404).json({ success: false, message: 'Banking Foundation course not found' });
+    }
 
-    res.json({ success: true, message: 'Courses seeded to production successfully!' });
+    // Hide the 4 sub-part courses (they are redundant now)
+    await Course.update(
+      { is_active: false },
+      { where: { course_code: { [Op.like]: 'BANK-FOUND-001-P%' } } }
+    );
+
+    // Create 4 modules inside Banking Foundation
+    const modules = [
+      {
+        course_id: course.id,
+        module_name: 'Module 1: Banking Basics',
+        description: 'Introduction to banking fundamentals and core concepts.',
+        sequence_order: 1
+      },
+      {
+        course_id: course.id,
+        module_name: 'Module 2: Products & Services',
+        description: 'Overview of banking products, accounts and services.',
+        sequence_order: 2
+      },
+      {
+        course_id: course.id,
+        module_name: 'Module 3: Lending & Payments',
+        description: 'Understanding lending, loans and payment systems.',
+        sequence_order: 3
+      },
+      {
+        course_id: course.id,
+        module_name: 'Module 4: Compliance & Risk',
+        description: 'Banking compliance, regulations and risk management.',
+        sequence_order: 4
+      }
+    ];
+
+    const createdModules = await CourseModule.bulkCreate(modules, { ignoreDuplicates: false });
+
+    // Create 1 video lesson per module
+    const lessons = [
+      {
+        course_module_id: createdModules[0].id,
+        lesson_name: 'Banking Basics - Full Video',
+        description: 'Introduction to banking fundamentals and core concepts.',
+        sequence_order: 1,
+        content_type: 'video',
+        youtube_video_id: 'y3HKCaLPqtU',
+        content_url: 'https://www.youtube.com/watch?v=y3HKCaLPqtU',
+        is_preview: true
+      },
+      {
+        course_module_id: createdModules[1].id,
+        lesson_name: 'Products & Services - Full Video',
+        description: 'Overview of banking products, accounts and services.',
+        sequence_order: 1,
+        content_type: 'video',
+        youtube_video_id: 'cPHKvABl9s4',
+        content_url: 'https://www.youtube.com/watch?v=cPHKvABl9s4',
+        is_preview: false
+      },
+      {
+        course_module_id: createdModules[2].id,
+        lesson_name: 'Lending & Payments - Full Video',
+        description: 'Understanding lending, loans and payment systems.',
+        sequence_order: 1,
+        content_type: 'video',
+        youtube_video_id: 'BM9ShEKAgVY',
+        content_url: 'https://www.youtube.com/watch?v=BM9ShEKAgVY',
+        is_preview: false
+      },
+      {
+        course_module_id: createdModules[3].id,
+        lesson_name: 'Compliance & Risk - Full Video',
+        description: 'Banking compliance, regulations and risk management.',
+        sequence_order: 1,
+        content_type: 'video',
+        youtube_video_id: 'Ap7Gk2Nj52c',
+        content_url: 'https://www.youtube.com/watch?v=Ap7Gk2Nj52c',
+        is_preview: false
+      }
+    ];
+
+    await Lesson.bulkCreate(lessons);
+
+    res.json({
+      success: true,
+      message: 'Videos seeded successfully! Banking Foundation now has 4 video modules.',
+      course_id: course.id,
+      modules_created: createdModules.length,
+      lessons_created: lessons.length
+    });
   } catch (error) {
-    console.error('Seed error:', error);
+    console.error('Seed videos error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
