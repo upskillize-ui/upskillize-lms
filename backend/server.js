@@ -31,26 +31,23 @@ app.use(helmet());
 app.use(cors({
   origin: function (origin, callback) {
     const allowedOrigins = [
-      process.env.CORS_ORIGIN,           // set this in Render env vars
-      process.env.FRONTEND_URL,          // backup
+      'https://lms.upskillize.com',
+      'https://www.upskillize.com',
+      'https://upskillize.netlify.app',
       'http://localhost:5173',
       'http://localhost:3000',
-    ].filter(Boolean);
-
-    // Allow requests with no origin (mobile apps, Postman, UptimeRobot)
-    if (!origin) return callback(null, true);
-
-    if (allowedOrigins.includes(origin)) {
+    ];
+    if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
+      console.error('CORS blocked:', origin);
       callback(new Error(`CORS blocked: ${origin}`));
     }
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
-
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
