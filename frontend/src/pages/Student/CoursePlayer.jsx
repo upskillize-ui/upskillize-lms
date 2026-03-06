@@ -96,56 +96,54 @@ const PAYMENTS_CARDS_CONTENT = {
     {
       id: 1,
       title: 'Module 1: Payment Systems',
-      lessons: [
-        {
-          id: 1,
-          title: 'Payment Systems - Full Video',
-          type: 'youtube',
-          youtubeId: 'cG1kVkzS2pE',
-          duration: '~60 min',
-        }
-      ]
+      lessons: [{
+        id: 1,
+        title: 'Payment Systems - Full Video',
+        type: 'youtube',
+        youtubeId: 'cG1kVkzS2pE',
+        duration: '~60 min',
+      }]
     },
     {
       id: 2,
       title: 'Module 2: Digital Payments',
-      lessons: [
-        {
-          id: 2,
-          title: 'Digital Payments - Full Video',
-          type: 'youtube',
-          youtubeId: 'hwwYU0R9gb8',
-          duration: '~60 min',
-        }
-      ]
+      lessons: [{
+        id: 2,
+        title: 'Digital Payments - Full Video',
+        type: 'youtube',
+        youtubeId: 'hwwYU0R9gb8',
+        duration: '~60 min',
+      }]
     },
     {
       id: 3,
       title: 'Module 3: Card Products',
-      lessons: [
-        {
-          id: 3,
-          title: 'Card Products - Full Video',
-          type: 'youtube',
-          youtubeId: 'ixl5eY5Y4PA',
-          duration: '~60 min',
-        }
-      ]
+      lessons: [{
+        id: 3,
+        title: 'Card Products - Full Video',
+        type: 'youtube',
+        youtubeId: 'ixl5eY5Y4PA',
+        duration: '~60 min',
+      }]
     },
   ]
 };
 
 const COURSE_CONTENT_MAP = {
-  // Banking Foundation — DB id 37
+  // ── PRODUCTION IDs (Aiven database) ──
+  1: BANKING_FOUNDATION_CONTENT,   // Banking Foundation
+  6: PAYMENTS_CARDS_CONTENT,       // Payments & Cards
+
+  // ── LOCAL IDs (localhost database) ──
   37: BANKING_FOUNDATION_CONTENT,
-  // Old local IDs (fallback)
-  10: BANKING_FOUNDATION_CONTENT,
-  11: { ...BANKING_FOUNDATION_CONTENT, modules: [BANKING_FOUNDATION_CONTENT.modules[0]] },
-  12: { ...BANKING_FOUNDATION_CONTENT, modules: [BANKING_FOUNDATION_CONTENT.modules[1]] },
-  13: { ...BANKING_FOUNDATION_CONTENT, modules: [BANKING_FOUNDATION_CONTENT.modules[2]] },
-  14: { ...BANKING_FOUNDATION_CONTENT, modules: [BANKING_FOUNDATION_CONTENT.modules[3]] },
-  // Payments & Cards — DB id 42
   42: PAYMENTS_CARDS_CONTENT,
+
+  // ── Old sub-course IDs (inactive but kept as fallback) ──
+  2: { ...BANKING_FOUNDATION_CONTENT, modules: [BANKING_FOUNDATION_CONTENT.modules[0]] },
+  3: { ...BANKING_FOUNDATION_CONTENT, modules: [BANKING_FOUNDATION_CONTENT.modules[1]] },
+  4: { ...BANKING_FOUNDATION_CONTENT, modules: [BANKING_FOUNDATION_CONTENT.modules[2]] },
+  5: { ...BANKING_FOUNDATION_CONTENT, modules: [BANKING_FOUNDATION_CONTENT.modules[3]] },
+  10: BANKING_FOUNDATION_CONTENT,
 };
 
 // ============================================================
