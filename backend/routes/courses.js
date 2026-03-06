@@ -34,7 +34,13 @@ router.get('/', async (req, res) => {
       order: [['created_at', 'DESC']]
     });
 
-    res.json({ success: true, courses });
+    // Add is_free flag: price === 0 means free course
+    const coursesWithFreeFlag = courses.map(c => ({
+      ...c.toJSON(),
+      is_free: parseFloat(c.price) === 0
+    }));
+
+    res.json({ success: true, courses: coursesWithFreeFlag });
   } catch (error) {
     console.error('Get courses error:', error);
     res.status(500).json({ success: false, message: 'Error fetching courses' });
