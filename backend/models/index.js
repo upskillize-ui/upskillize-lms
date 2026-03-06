@@ -15,7 +15,6 @@ const Result = require('./Result');
 const Notification = require('./Notification');
 const Payment = require('./Payment');
 
-// Define associations
 // User associations
 User.hasOne(Student, { foreignKey: 'user_id', onDelete: 'CASCADE' });
 Student.belongsTo(User, { foreignKey: 'user_id' });
@@ -25,6 +24,13 @@ Faculty.belongsTo(User, { foreignKey: 'user_id' });
 
 User.hasMany(Notification, { foreignKey: 'user_id', onDelete: 'CASCADE' });
 Notification.belongsTo(User, { foreignKey: 'user_id' });
+
+// ✅ Payment uses user_id — associate with User (NOT Student)
+User.hasMany(Payment, { foreignKey: 'user_id', onDelete: 'CASCADE' });
+Payment.belongsTo(User, { foreignKey: 'user_id' });
+
+Course.hasMany(Payment, { foreignKey: 'course_id' });
+Payment.belongsTo(Course, { foreignKey: 'course_id' });
 
 // Faculty and Course associations
 Faculty.hasMany(Course, { foreignKey: 'faculty_id' });
@@ -52,11 +58,11 @@ VideoWatchHistory.belongsTo(Student, { foreignKey: 'student_id' });
 Lesson.hasMany(VideoWatchHistory, { foreignKey: 'lesson_id', onDelete: 'CASCADE' });
 VideoWatchHistory.belongsTo(Lesson, { foreignKey: 'lesson_id' });
 
-// Exam and Course associations
+// Exam associations
 Course.hasMany(Exam, { foreignKey: 'course_id', onDelete: 'CASCADE' });
 Exam.belongsTo(Course, { foreignKey: 'course_id' });
 
-// Exam and Question associations
+// Question associations
 Exam.hasMany(Question, { foreignKey: 'exam_id', onDelete: 'CASCADE' });
 Question.belongsTo(Exam, { foreignKey: 'exam_id' });
 
@@ -66,16 +72,6 @@ Result.belongsTo(Student, { foreignKey: 'student_id' });
 
 Exam.hasMany(Result, { foreignKey: 'exam_id', onDelete: 'CASCADE' });
 Result.belongsTo(Exam, { foreignKey: 'exam_id' });
-
-// Payment associations
-Student.hasMany(Payment, { foreignKey: 'student_id', onDelete: 'CASCADE' });
-Payment.belongsTo(Student, { foreignKey: 'student_id' });
-
-Course.hasMany(Payment, { foreignKey: 'course_id' });
-Payment.belongsTo(Course, { foreignKey: 'course_id' });
-
-Enrollment.hasMany(Payment, { foreignKey: 'enrollment_id' });
-Payment.belongsTo(Enrollment, { foreignKey: 'enrollment_id' });
 
 // Export all models
 module.exports = {
