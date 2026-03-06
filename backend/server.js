@@ -11,7 +11,7 @@ const passport = require('passport');
 const { sequelize, testConnection } = require('./config/database');
 const app = express();
 
-// Trust Render's proxy (required for rate limiting on Render)
+// Trust Render's proxy (required for rate lAimiting on Render)
 app.set('trust proxy', 1);
 
 // ✅ FIX 1: Health check FIRST — before all middleware
@@ -31,12 +31,13 @@ app.use(helmet());
 app.use(cors({
   origin: function (origin, callback) {
     const allowedOrigins = [
-      'https://lms.upskillize.com',
-      'https://www.upskillize.com',
-      'https://upskillize.netlify.app',
-      'http://localhost:5173',
-      'http://localhost:3000',
-    ];
+  'https://lms.upskillize.com',
+  'https://www.upskillize.com',
+  'https://upskillize.netlify.app',
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://localhost:3000',
+];
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
