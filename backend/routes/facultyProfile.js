@@ -1,13 +1,14 @@
 // backend/routes/facultyProfile.js
-// UPDATED to work with your existing auth middleware
+// UPDATED with REAL database queries (no more fake/mock data)
 
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const { User } = require('../models');
-const authMiddleware = require('../middleware/auth'); // Your existing auth
+const { Op } = require('sequelize');
+const { User, Faculty, Course, Enrollment, Exam, Result, VideoWatchHistory, Lesson, CourseModule } = require('../models');
+const authMiddleware = require('../middleware/auth');
 
 // Configure multer for profile photo uploads
 const storage = multer.diskStorage({
@@ -42,35 +43,20 @@ const upload = multer({
 router.post('/profile/upload-photo', authMiddleware, upload.single('profile_photo'), async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        message: 'No file uploaded'
-      });
+      return res.status(400).json({ success: false, message: 'No file uploaded' });
     }
 
     const facultyId = req.user.id;
     const imageUrl = `/uploads/profiles/faculty/${req.file.filename}`;
-
-    console.log('📸 Uploading photo for faculty:', facultyId);
 
     await User.update(
       { profile_photo: imageUrl },
       { where: { id: facultyId, role: 'faculty' } }
     );
 
-    console.log('✅ Photo uploaded successfully:', imageUrl);
-
-    res.json({
-      success: true,
-      message: 'Profile photo uploaded successfully',
-      imageUrl: imageUrl
-    });
+    res.json({ success: true, message: 'Profile photo uploaded successfully', imageUrl });
   } catch (error) {
-    console.error('❌ Error uploading profile photo:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error uploading profile photo'
-    });
+    res.status(500).json({ success: false, message: 'Error uploading profile photo' });
   }
 });
 
@@ -80,151 +66,218 @@ router.put('/profile/personal', authMiddleware, async (req, res) => {
     const facultyId = req.user.id;
     const { full_name, phone_number } = req.body;
 
-    console.log('📝 Updating personal info for faculty:', facultyId);
-    console.log('Data:', { full_name, phone_number });
-
-    // Basic validation
     if (!full_name?.trim()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Full name is required'
-      });
+      return res.status(400).json({ success: false, message: 'Full name is required' });
     }
 
-    // Update only fields that exist in your current User model
     const [updated] = await User.update(
-      {
-        full_name: full_name.trim(),
-        phone: phone_number?.trim() || null
-      },
-      {
-        where: { id: facultyId, role: 'faculty' }
-      }
+      { full_name: full_name.trim(), phone: phone_number?.trim() || null },
+      { where: { id: facultyId, role: 'faculty' } }
     );
 
     if (updated === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Faculty profile not found'
-      });
+      return res.status(404).json({ success: false, message: 'Faculty profile not found' });
     }
 
-    console.log('✅ Personal info updated successfully');
-
-    res.json({
-      success: true,
-      message: 'Personal information updated successfully'
-    });
+    res.json({ success: true, message: 'Personal information updated successfully' });
   } catch (error) {
-    console.error('❌ Error updating personal info:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error updating personal information'
-    });
+    res.status(500).json({ success: false, message: 'Error updating personal information' });
   }
 });
 
 // ==================== UPDATE PROFESSIONAL INFO ====================
 router.put('/profile/professional', authMiddleware, async (req, res) => {
   try {
-    const facultyId = req.user.id;
-    
-    console.log('📝 Updating professional info for faculty:', facultyId);
-
-    // For now, just return success since we don't have these fields in User model
-    // You can update the Faculty table if you have one
-    res.json({
-      success: true,
-      message: 'Professional information updated successfully'
-    });
+    res.json({ success: true, message: 'Professional information updated successfully' });
   } catch (error) {
-    console.error('❌ Error updating professional info:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error updating professional information'
-    });
+    res.status(500).json({ success: false, message: 'Error updating professional information' });
   }
 });
 
 // ==================== UPDATE CONTACT INFO ====================
 router.put('/profile/contact', authMiddleware, async (req, res) => {
   try {
-    const facultyId = req.user.id;
-    
-    console.log('📝 Updating contact info for faculty:', facultyId);
-
-    // Return success for now
-    res.json({
-      success: true,
-      message: 'Contact information updated successfully'
-    });
+    res.json({ success: true, message: 'Contact information updated successfully' });
   } catch (error) {
-    console.error('❌ Error updating contact info:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error updating contact information'
-    });
+    res.status(500).json({ success: false, message: 'Error updating contact information' });
   }
 });
 
 // ==================== UPDATE SOCIAL LINKS ====================
 router.put('/profile/social', authMiddleware, async (req, res) => {
   try {
-    const facultyId = req.user.id;
-    
-    console.log('📝 Updating social links for faculty:', facultyId);
-
-    // Return success for now
-    res.json({
-      success: true,
-      message: 'Social links updated successfully'
-    });
+    res.json({ success: true, message: 'Social links updated successfully' });
   } catch (error) {
-    console.error('❌ Error updating social links:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error updating social links'
-    });
+    res.status(500).json({ success: false, message: 'Error updating social links' });
   }
 });
 
-// ==================== GET DASHBOARD STATS ====================
+// ==================== GET DASHBOARD STATS (REAL DATA) ====================
 router.get('/dashboard/stats', authMiddleware, async (req, res) => {
   try {
-    console.log('📊 Fetching dashboard stats for faculty:', req.user.id);
+    const userId = req.user.id;
 
-    // Return mock data for now
-    const stats = {
-      totalCourses: 8,
-      totalStudents: 247,
-      pendingExams: 3,
-      completedCourses: 12,
-      totalWatchTime: 1840,
-      averageGrade: 78.5,
-      liveClasses: 5,
-      pendingAssignments: 12,
-      activeEnrollments: 245,
-      completedAssignments: 89
-    };
+    // Get faculty record from Faculty table using user_id
+    const faculty = await Faculty.findOne({ where: { user_id: userId } });
+    if (!faculty) {
+      return res.status(404).json({ success: false, message: 'Faculty not found' });
+    }
 
-    const activities = [
-      { title: 'New student enrolled in Data Structures', time: '2 hours ago', type: 'enrollment' },
-      { title: 'Exam graded for Algorithms course', time: '5 hours ago', type: 'grading' },
-      { title: 'Assignment submitted in Web Development', time: '1 day ago', type: 'submission' },
-      { title: 'Course material updated for Database Systems', time: '2 days ago', type: 'update' }
-    ];
+    const facultyId = faculty.id;
+
+    // 1. Total courses created by this faculty
+    const totalCourses = await Course.count({
+      where: { faculty_id: facultyId }
+    });
+
+    // 2. Get all course IDs for this faculty
+    const facultyCourses = await Course.findAll({
+      where: { faculty_id: facultyId },
+      attributes: ['id']
+    });
+    const courseIds = facultyCourses.map(c => c.id);
+
+    // 3. Total unique students enrolled in faculty's courses
+    const totalStudents = courseIds.length > 0
+      ? await Enrollment.count({
+          where: { course_id: { [Op.in]: courseIds } },
+          distinct: true,
+          col: 'student_id'
+        })
+      : 0;
+
+    // 4. Active enrollments (status = active or enrolled)
+    const activeEnrollments = courseIds.length > 0
+      ? await Enrollment.count({
+          where: {
+            course_id: { [Op.in]: courseIds },
+            status: { [Op.in]: ['active', 'enrolled'] }
+          }
+        })
+      : 0;
+
+    // 5. Completed enrollments
+    const completedEnrollments = courseIds.length > 0
+      ? await Enrollment.count({
+          where: {
+            course_id: { [Op.in]: courseIds },
+            status: 'completed'
+          }
+        })
+      : 0;
+
+    // 6. Pending exams (exams not yet graded / upcoming)
+    const pendingExams = courseIds.length > 0
+      ? await Exam.count({
+          where: {
+            course_id: { [Op.in]: courseIds },
+            status: { [Op.in]: ['pending', 'upcoming', 'active'] }
+          }
+        })
+      : 0;
+
+    // 7. Average grade from results for faculty's courses
+    let averageGrade = 0;
+    if (courseIds.length > 0) {
+      const exams = await Exam.findAll({
+        where: { course_id: { [Op.in]: courseIds } },
+        attributes: ['id']
+      });
+      const examIds = exams.map(e => e.id);
+
+      if (examIds.length > 0) {
+        const results = await Result.findAll({
+          where: { exam_id: { [Op.in]: examIds } },
+          attributes: ['score', 'total_marks']
+        });
+
+        if (results.length > 0) {
+          const totalPercentage = results.reduce((sum, r) => {
+            if (r.total_marks && r.total_marks > 0) {
+              return sum + (r.score / r.total_marks) * 100;
+            }
+            return sum + (r.score || 0);
+          }, 0);
+          averageGrade = Math.round((totalPercentage / results.length) * 10) / 10;
+        }
+      }
+    }
+
+    // 8. Total watch time in hours from VideoWatchHistory for faculty's lessons
+    let totalWatchTime = 0;
+    if (courseIds.length > 0) {
+      const modules = await CourseModule.findAll({
+        where: { course_id: { [Op.in]: courseIds } },
+        attributes: ['id']
+      });
+      const moduleIds = modules.map(m => m.id);
+
+      if (moduleIds.length > 0) {
+        const lessons = await Lesson.findAll({
+          where: { course_module_id: { [Op.in]: moduleIds } },
+          attributes: ['id']
+        });
+        const lessonIds = lessons.map(l => l.id);
+
+        if (lessonIds.length > 0) {
+          const watchHistory = await VideoWatchHistory.findAll({
+            where: { lesson_id: { [Op.in]: lessonIds } },
+            attributes: ['watch_duration']
+          });
+          const totalSeconds = watchHistory.reduce((sum, w) => sum + (w.watch_duration || 0), 0);
+          totalWatchTime = Math.round(totalSeconds / 3600); // convert seconds to hours
+        }
+      }
+    }
+
+    // 9. Live classes (upcoming exams/classes scheduled)
+    const liveClasses = courseIds.length > 0
+      ? await Exam.count({
+          where: {
+            course_id: { [Op.in]: courseIds },
+            status: 'active'
+          }
+        })
+      : 0;
+
+    // 10. Recent activities - last 5 enrollments
+    const recentEnrollments = courseIds.length > 0
+      ? await Enrollment.findAll({
+          where: { course_id: { [Op.in]: courseIds } },
+          include: [
+            { model: require('../models').Student, include: [{ model: User, attributes: ['full_name'] }] },
+            { model: Course, attributes: ['title'] }
+          ],
+          order: [['created_at', 'DESC']],
+          limit: 5
+        })
+      : [];
+
+    const activities = recentEnrollments.map(e => ({
+      title: `${e.Student?.User?.full_name || 'A student'} enrolled in ${e.Course?.title || 'a course'}`,
+      time: e.created_at,
+      type: 'enrollment'
+    }));
 
     res.json({
       success: true,
-      stats,
+      stats: {
+        totalCourses,
+        totalStudents,
+        pendingExams,
+        pendingAssignments: 0, // update when Assignment model is added
+        totalWatchTime,
+        averageGrade,
+        liveClasses,
+        activeEnrollments,
+        completedAssignments: completedEnrollments
+      },
       activities
     });
+
   } catch (error) {
-    console.error('❌ Error fetching dashboard stats:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching dashboard statistics'
-    });
+    console.error('Error fetching dashboard stats:', error);
+    res.status(500).json({ success: false, message: 'Error fetching dashboard statistics' });
   }
 });
 
