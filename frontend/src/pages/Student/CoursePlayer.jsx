@@ -597,7 +597,7 @@ export default function CoursePlayer() {
           <div className="bg-white rounded-xl shadow-md p-6">
             <div className="flex items-center gap-2 mb-4">
               <Youtube size={20} className="text-red-500" />
-              <h3 className="text-lg font-bold">Banking Foundation Playlist</h3>
+              <h3 className="text-lg font-bold">{courseContent.courseName} Playlist</h3>
               <span className="text-xs bg-green-100 text-green-700 font-bold px-2 py-0.5 rounded-full ml-auto">
                 FREE
               </span>
