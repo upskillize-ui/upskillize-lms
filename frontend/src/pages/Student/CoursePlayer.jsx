@@ -91,44 +91,55 @@ const BANKING_FOUNDATION_CONTENT = {
 // Add all sub-course IDs that belong to Banking Foundation here
 // PAYMENTS & CARDS — 3 YouTube Videos
 const PAYMENTS_CARDS_CONTENT = {
+  courseName: 'Payments & Cards',
   title: 'Payments & Cards',
+  isFree: true,
   modules: [
     {
       id: 1,
       title: 'Module 1: Payment Systems',
+      duration: '~60 min',
       lessons: [
         {
           id: 1,
           title: 'Payment Systems - Full Video',
           type: 'youtube',
           youtubeId: 'cG1kVkzS2pE',
+          videoUrl: toEmbedUrl('cG1kVkzS2pE'),
           duration: '~60 min',
+          description: 'Overview of payment systems, infrastructure and how money moves globally.'
         }
       ]
     },
     {
       id: 2,
       title: 'Module 2: Digital Payments',
+      duration: '~60 min',
       lessons: [
         {
           id: 2,
           title: 'Digital Payments - Full Video',
           type: 'youtube',
           youtubeId: 'hwwYU0R9gb8',
+          videoUrl: toEmbedUrl('hwwYU0R9gb8'),
           duration: '~60 min',
+          description: 'Digital payment methods, mobile wallets, UPI and the future of cashless transactions.'
         }
       ]
     },
     {
       id: 3,
       title: 'Module 3: Card Products',
+      duration: '~60 min',
       lessons: [
         {
           id: 3,
           title: 'Card Products - Full Video',
           type: 'youtube',
           youtubeId: 'ixl5eY5Y4PA',
+          videoUrl: toEmbedUrl('ixl5eY5Y4PA'),
           duration: '~60 min',
+          description: 'Credit cards, debit cards, prepaid cards and the card payment ecosystem explained.'
         }
       ]
     },
@@ -144,8 +155,9 @@ const COURSE_CONTENT_MAP = {
   12: { ...BANKING_FOUNDATION_CONTENT, modules: [BANKING_FOUNDATION_CONTENT.modules[1]] },
   13: { ...BANKING_FOUNDATION_CONTENT, modules: [BANKING_FOUNDATION_CONTENT.modules[2]] },
   14: { ...BANKING_FOUNDATION_CONTENT, modules: [BANKING_FOUNDATION_CONTENT.modules[3]] },
-  // Payments & Cards — DB id 42
+  // Payments & Cards — DB id 42 and 6
   42: PAYMENTS_CARDS_CONTENT,
+   6: PAYMENTS_CARDS_CONTENT,
 };
 
 // ============================================================
