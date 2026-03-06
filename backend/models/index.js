@@ -25,7 +25,7 @@ Faculty.belongsTo(User, { foreignKey: 'user_id' });
 User.hasMany(Notification, { foreignKey: 'user_id', onDelete: 'CASCADE' });
 Notification.belongsTo(User, { foreignKey: 'user_id' });
 
-// ✅ Payment uses user_id — associate with User (NOT Student)
+// Payment uses user_id (not student_id) — associate with User
 User.hasMany(Payment, { foreignKey: 'user_id', onDelete: 'CASCADE' });
 Payment.belongsTo(User, { foreignKey: 'user_id' });
 
@@ -58,11 +58,11 @@ VideoWatchHistory.belongsTo(Student, { foreignKey: 'student_id' });
 Lesson.hasMany(VideoWatchHistory, { foreignKey: 'lesson_id', onDelete: 'CASCADE' });
 VideoWatchHistory.belongsTo(Lesson, { foreignKey: 'lesson_id' });
 
-// Exam associations
+// Exam and Course associations
 Course.hasMany(Exam, { foreignKey: 'course_id', onDelete: 'CASCADE' });
 Exam.belongsTo(Course, { foreignKey: 'course_id' });
 
-// Question associations
+// Exam and Question associations
 Exam.hasMany(Question, { foreignKey: 'exam_id', onDelete: 'CASCADE' });
 Question.belongsTo(Exam, { foreignKey: 'exam_id' });
 

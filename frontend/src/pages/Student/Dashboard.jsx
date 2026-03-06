@@ -277,13 +277,15 @@ function MyCourses() {
   const [openVideo, setOpenVideo] = useState(null);
 
    const COURSE_VIDEOS = {
-    // Banking Foundation
+    // ── PRODUCTION IDs ──
+    1: 'https://www.youtube.com/embed/y3HKCaLPqtU?rel=0&modestbranding=1',  // Banking Foundation
+    6: 'https://www.youtube.com/embed/cG1kVkzS2pE?rel=0&modestbranding=1',  // Payments & Cards
+    // ── LOCAL IDs ──
     37: 'https://www.youtube.com/embed/y3HKCaLPqtU?rel=0&modestbranding=1',
     38: 'https://www.youtube.com/embed/y3HKCaLPqtU?rel=0&modestbranding=1',
     39: 'https://www.youtube.com/embed/cPHKvABl9s4?rel=0&modestbranding=1',
     40: 'https://www.youtube.com/embed/BM9ShEKAgVY?rel=0&modestbranding=1',
     41: 'https://www.youtube.com/embed/Ap7Gk2Nj52c?rel=0&modestbranding=1',
-    // Payments & Cards — id 42
     42: 'https://www.youtube.com/embed/cG1kVkzS2pE?rel=0&modestbranding=1',
   };
   const isYouTube = (url) => url?.includes('youtube.com/embed');
