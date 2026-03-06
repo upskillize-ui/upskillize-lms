@@ -67,6 +67,43 @@ router.get('/my-enrollments', authMiddleware, rbac(['student']), async (req, res
   }
 });
 
+// Update lesson progress
+router.patch('/:id/progress', authMiddleware, rbac(['student']), async (req, res) => {
+  try {
+    const enrollment = await Enrollment.findOne({
+      where: { id: req.params.id, student_id: req.user.roleDataId }
+    });
+
+    if (!enrollment) {
+      return res.status(404).json({ success: false, message: 'Enrollment not found' });
+    }
+
+    const { completed_lessons, total_lessons } = req.body;
+
+    // Calculate progress percentage
+    const progress = total_lessons > 0
+      ? Math.round((completed_lessons / total_lessons) * 100)
+      : 0;
+
+    enrollment.progress = progress;
+
+    // Mark as completed if 100%
+    if (progress === 100) {
+      enrollment.completion_status = 'completed';
+      enrollment.completion_date = new Date();
+    } else if (progress > 0) {
+      enrollment.completion_status = 'in_progress';
+    }
+
+    await enrollment.save();
+
+    res.json({ success: true, message: 'Progress updated', enrollment });
+  } catch (error) {
+    console.error('Progress update error:', error);
+    res.status(500).json({ success: false, message: 'Error updating progress' });
+  }
+});
+
 // Withdraw from course
 router.delete('/:id', authMiddleware, rbac(['student']), async (req, res) => {
   try {
