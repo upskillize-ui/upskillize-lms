@@ -155,6 +155,36 @@ router.get('/seed-videos', async (req, res) => {
   }
 });
 
+
+// ============================================================
+// TEMP SEED ROUTE — DELETE AFTER USE
+// Visit: /api/courses/seed-payments ONCE to add Payments & Cards
+// ============================================================
+router.get('/seed-payments', async (req, res) => {
+  try {
+    const existing = await Course.findOne({ where: { course_code: 'PAY-CARDS-001' } });
+    if (existing) {
+      // Make sure it's active
+      await existing.update({ is_active: true, price: 0.00 });
+      return res.json({ success: true, message: 'Payments & Cards already exists! Set to active.', id: existing.id });
+    }
+    const course = await Course.create({
+      course_name: 'Payments & Cards',
+      course_code: 'PAY-CARDS-001',
+      description: '3-part video course covering payment systems, digital payments and card products.',
+      category: 'Banking & Finance',
+      duration_hours: 3,
+      price: 0.00,
+      is_active: true,
+      difficulty_level: 'beginner',
+      language: 'English'
+    });
+    res.json({ success: true, message: 'Payments & Cards added!', id: course.id });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Get course by ID with modules and lessons
 router.get('/:id', async (req, res) => {
   try {
