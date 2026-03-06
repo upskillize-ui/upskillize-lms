@@ -277,11 +277,14 @@ function MyCourses() {
   const [openVideo, setOpenVideo] = useState(null);
 
    const COURSE_VIDEOS = {
+    // Banking Foundation
     37: 'https://www.youtube.com/embed/y3HKCaLPqtU?rel=0&modestbranding=1',
     38: 'https://www.youtube.com/embed/y3HKCaLPqtU?rel=0&modestbranding=1',
     39: 'https://www.youtube.com/embed/cPHKvABl9s4?rel=0&modestbranding=1',
     40: 'https://www.youtube.com/embed/BM9ShEKAgVY?rel=0&modestbranding=1',
     41: 'https://www.youtube.com/embed/Ap7Gk2Nj52c?rel=0&modestbranding=1',
+    // Payments & Cards — id 42
+    42: 'https://www.youtube.com/embed/cG1kVkzS2pE?rel=0&modestbranding=1',
   };
   const isYouTube = (url) => url?.includes('youtube.com/embed');
   const getYouTubeId = (url) => url?.split('/embed/')[1]?.split('?')[0];
@@ -1439,12 +1442,12 @@ export default function StudentDashboard() {
     { path: '/student',              label: 'Overview',       icon: BarChart3,     free: true },
     { path: '/student/courses',      label: 'My Courses',     icon: BookOpen,      free: true },
     { path: '/student/browse',       label: 'Browse Courses', icon: ShoppingBag,   free: true },
-    { path: '/student/certificates', label: 'Certificates',   icon: Award,         free: false },
-    { path: '/student/progress',     label: 'Progress',       icon: TrendingUp,    free: false },
-    { path: '/student/discussion-forum', label: 'Discussion', icon: MessageSquare, free: false },
+    { path: '/student/certificates', label: 'Certificates',   icon: Award,         free: true },
+    { path: '/student/progress',     label: 'Progress',       icon: TrendingUp,    free: true },
+    { path: '/student/discussion-forum', label: 'Discussion', icon: MessageSquare, free: true },
     { path: '/student/notifications',label: 'Notifications',  icon: Bell,          free: true },
     { path: '/student/help',         label: 'Help & Support', icon: HelpCircle,    free: true },
-    { path: '/student/payments',     label: 'Payments',       icon: CreditCard,    free: false },
+    { path: '/student/payments',     label: 'Payments',       icon: CreditCard,    free: true },
     { path: '/student/profile',      label: 'Profile',        icon: User,          free: true },
     { path: '/student/settings',     label: 'Settings',       icon: Settings,      free: true },
   ];

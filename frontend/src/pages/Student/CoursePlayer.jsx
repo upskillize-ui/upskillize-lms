@@ -157,6 +157,36 @@ export default function CoursePlayer() {
           e => (e.Course?.id || e.course?.id) === parseInt(courseId)
         );
         setEnrollment(found);
+
+        // ── Restore completed lessons from saved progress_percentage ──
+        if (found?.progress_percentage > 0) {
+          const content = COURSE_CONTENT_MAP[parseInt(courseId)] || BANKING_FOUNDATION_CONTENT;
+          const total = content.modules.reduce((acc, mod) => acc + mod.lessons.length, 0);
+          const completedCount = Math.round((found.progress_percentage / 100) * total);
+          const restored = new Set();
+          let count = 0;
+          outer: for (let m = 0; m < content.modules.length; m++) {
+            for (let l = 0; l < content.modules[m].lessons.length; l++) {
+              if (count >= completedCount) break outer;
+              restored.add(`${m}-${l}`);
+              count++;
+            }
+          }
+          setCompletedLessons(restored);
+          // Resume on first incomplete lesson
+          let resumed = false;
+          for (let m = 0; m < content.modules.length; m++) {
+            for (let l = 0; l < content.modules[m].lessons.length; l++) {
+              if (!restored.has(`${m}-${l}`)) {
+                setCurrentModule(m);
+                setCurrentLesson(l);
+                resumed = true;
+                break;
+              }
+            }
+            if (resumed) break;
+          }
+        }
       }
     } catch (err) {
       console.error('Error fetching course:', err);
@@ -176,27 +206,34 @@ export default function CoursePlayer() {
     return total ? Math.round((completedLessons.size / total) * 100) : 0;
   };
 
+  // ── Save progress to DB ─────────────────────────────────
+  const saveProgressToDb = async (updatedSet) => {
+    try {
+      const total = courseContent.modules.reduce((acc, mod) => acc + mod.lessons.length, 0);
+      const pct = Math.round((updatedSet.size / total) * 100);
+      await api.put(`/enrollments/${enrollment?.id}/progress`, { progress_percentage: pct });
+    } catch (err) {
+      console.error('Progress update error:', err);
+    }
+  };
+
   const handleLessonComplete = async () => {
     const key = `${currentModule}-${currentLesson}`;
     const updated = new Set([...completedLessons, key]);
     setCompletedLessons(updated);
-
-    try {
-      const total = courseContent.modules.reduce(
-        (acc, mod) => acc + mod.lessons.length, 0
-      );
-      const pct = Math.round((updated.size / total) * 100);
-      await api.put(`/enrollments/${enrollment?.id}/progress`, {
-        progress_percentage: pct
-      });
-    } catch (err) {
-      console.error('Progress update error:', err);
-    }
-
+    await saveProgressToDb(updated);
     handleNextLesson();
   };
 
-  const handleNextLesson = () => {
+  const handleNextLesson = async () => {
+    // Auto-mark current lesson as complete when clicking Next
+    const key = `${currentModule}-${currentLesson}`;
+    let updated = completedLessons;
+    if (!completedLessons.has(key)) {
+      updated = new Set([...completedLessons, key]);
+      setCompletedLessons(updated);
+      await saveProgressToDb(updated);
+    }
     const modLessons = courseContent.modules[currentModule].lessons;
     if (currentLesson < modLessons.length - 1) {
       setCurrentLesson(l => l + 1);
@@ -204,6 +241,18 @@ export default function CoursePlayer() {
       setCurrentModule(m => m + 1);
       setCurrentLesson(0);
     }
+  };
+
+  const handleSelectLesson = async (modIdx, lesIdx) => {
+    // Auto-mark current lesson complete when jumping to another lesson
+    const key = `${currentModule}-${currentLesson}`;
+    if (!completedLessons.has(key)) {
+      const updated = new Set([...completedLessons, key]);
+      setCompletedLessons(updated);
+      await saveProgressToDb(updated);
+    }
+    setCurrentModule(modIdx);
+    setCurrentLesson(lesIdx);
   };
 
   const handlePreviousLesson = () => {
@@ -304,6 +353,7 @@ export default function CoursePlayer() {
               {/* Module Title */}
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-2">
                 <h4 className="font-semibold text-sm text-gray-900">{module.title}</h4>
+
                 <p className="text-xs text-gray-500 mt-0.5">{module.duration}</p>
               </div>
 
@@ -316,7 +366,7 @@ export default function CoursePlayer() {
                   return (
                     <button
                       key={lesIdx}
-                      onClick={() => { setCurrentModule(modIdx); setCurrentLesson(lesIdx); }}
+                      onClick={() => handleSelectLesson(modIdx, lesIdx)}
                       className={`
                         w-full text-left p-3 rounded-lg transition flex items-start gap-3
                         ${isActive
@@ -496,7 +546,7 @@ export default function CoursePlayer() {
                   return (
                     <button
                       key={`${modIdx}-${lesIdx}`}
-                      onClick={() => { setCurrentModule(modIdx); setCurrentLesson(lesIdx); }}
+                      onClick={() => handleSelectLesson(modIdx, lesIdx)}
                       className={`flex items-center gap-3 p-3 rounded-xl border-2 text-left transition
                         ${isActive    ? 'border-blue-500 bg-blue-50'   :
                           isCompleted ? 'border-green-300 bg-green-50' :
