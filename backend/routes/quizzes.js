@@ -110,6 +110,29 @@ router.post('/:quiz_id/questions', authMiddleware, rbac(['faculty', 'admin']), a
   }
 });
 
+// ── STUDENT: Get own quiz attempts ────────────────────────────
+router.get('/my-attempts', authMiddleware, async (req, res) => {
+  try {
+    const student = await Student.findOne({ where: { user_id: req.user.id } });
+    if (!student) return res.json({ success: true, attempts: [] });
+
+    const attempts = await QuizAttempt.findAll({
+      where: { student_id: student.id },
+      include: [{
+        model: Quiz,
+        attributes: ['id', 'title', 'pass_percentage'],
+        include: [{ model: Course, attributes: ['course_name'] }]
+      }],
+      order: [['submitted_at', 'DESC']]
+    });
+
+    res.json({ success: true, attempts });
+  } catch (error) {
+    console.error('Get my attempts error:', error);
+    res.status(500).json({ success: false, message: 'Error fetching attempts' });
+  }
+});
+
 // ── Get single quiz with questions ────────────────────────────
 router.get('/:id', authMiddleware, async (req, res) => {
   try {

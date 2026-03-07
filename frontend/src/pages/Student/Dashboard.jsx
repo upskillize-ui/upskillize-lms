@@ -46,6 +46,62 @@ function CircularProgress({ percentage, size = 120, strokeWidth = 8 }) {
   );
 }
 
+// ==================== RECENT QUIZ ATTEMPTS (Overview widget) ====================
+function RecentQuizAttempts() {
+  const [attempts, setAttempts] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.get('/quizzes/my-attempts')
+      .then(r => setAttempts((r.data.attempts || []).slice(0, 5)))
+      .catch(() => setAttempts([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return null;
+  if (attempts.length === 0) return null;
+
+  return (
+    <div className="bg-white rounded-xl shadow-md p-6">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-bold text-gray-800">Recent Quiz Attempts</h3>
+        <Link to="/student/quizzes" className="text-sm text-purple-600 hover:text-purple-800 font-semibold flex items-center gap-1">
+          View All <ChevronRight size={14} />
+        </Link>
+      </div>
+      <div className="space-y-3">
+        {attempts.map((a, i) => {
+          const pct = a.total_marks > 0 ? Math.round(a.score / a.total_marks * 100) : 0;
+          const timeTaken = a.time_taken_seconds;
+          const mins = Math.floor(timeTaken / 60), secs = timeTaken % 60;
+          const timeStr = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+          return (
+            <div key={i} className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${a.passed ? 'bg-green-100' : 'bg-red-100'}`}>
+                <Trophy size={18} className={a.passed ? 'text-green-600' : 'text-red-500'} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-sm text-gray-800 truncate">{a.Quiz?.title || 'Quiz'}</p>
+                <p className="text-xs text-gray-400">{a.Quiz?.Course?.course_name || ''}</p>
+              </div>
+              <div className="text-right flex-shrink-0">
+                <p className={`font-bold text-sm ${a.passed ? 'text-green-600' : 'text-red-500'}`}>{pct}%</p>
+                <p className="text-xs text-gray-400">{timeStr}</p>
+              </div>
+              <span className={`px-2 py-1 rounded-full text-xs font-semibold flex-shrink-0 ${a.passed ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
+                {a.passed ? 'Passed' : 'Failed'}
+              </span>
+              <p className="text-xs text-gray-400 flex-shrink-0 hidden md:block">
+                {a.submitted_at ? new Date(a.submitted_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : ''}
+              </p>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ==================== OVERVIEW ====================
 function Overview() {
   const { user } = useAuth();
@@ -264,6 +320,9 @@ function Overview() {
           )}
         </div>
       </div>
+
+      {/* Recent Quiz Attempts */}
+      <RecentQuizAttempts />
     </div>
   );
 }
@@ -1481,6 +1540,7 @@ function SystemSettings() {
 function StudentQuizzes() {
   const [enrollments, setEnrollments] = useState([]);
   const [quizzesByCourse, setQuizzesByCourse] = useState({});
+  const [attempts, setAttempts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeQuiz, setActiveQuiz] = useState(null);
   const [answers, setAnswers] = useState({});
@@ -1489,6 +1549,7 @@ function StudentQuizzes() {
   const [submitting, setSubmitting] = useState(false);
   const [timeLeft, setTimeLeft] = useState(null);
   const [startTime, setStartTime] = useState(null);
+  const [activeTab, setActiveTab] = useState('available');
 
   useEffect(() => { fetchData(); }, []);
 
@@ -1514,6 +1575,11 @@ function StudentQuizzes() {
       const map = {};
       results.forEach(r => { map[r.courseId] = r.quizzes; });
       setQuizzesByCourse(map);
+      // fetch student's own attempts
+      try {
+        const attRes = await api.get('/quizzes/my-attempts');
+        setAttempts(attRes.data.attempts || []);
+      } catch { setAttempts([]); }
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
   };
@@ -1537,6 +1603,8 @@ function StudentQuizzes() {
       const timeTaken = Math.round((Date.now() - startTime) / 1000);
       const res = await api.post(`/quizzes/${activeQuiz.id}/submit`, { answers, time_taken_seconds: timeTaken });
       setResult(res.data.result);
+      // refresh attempts list
+      try { const attRes = await api.get('/quizzes/my-attempts'); setAttempts(attRes.data.attempts || []); } catch {}
     } catch { alert('Error submitting quiz'); }
     finally { setSubmitting(false); }
   };
@@ -1636,39 +1704,114 @@ function StudentQuizzes() {
   // ── Quiz List View ──
   const allQuizzes = enrollments.flatMap(e => (quizzesByCourse[e.Course?.id] || []).map(q => ({ ...q, courseName: e.Course?.course_name })));
 
+  const formatDuration = (s) => {
+    if (!s) return '—';
+    const m = Math.floor(s / 60), sec = s % 60;
+    return m > 0 ? `${m}m ${sec}s` : `${sec}s`;
+  };
+
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-gray-900">My Quizzes</h2>
-      {allQuizzes.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-xl shadow-md">
-          <ClipboardList className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-          <p className="text-gray-500 text-lg">No quizzes available yet</p>
-          <p className="text-gray-400 text-sm mt-1">Your instructor hasn't assigned any quizzes</p>
-        </div>
-      ) : (
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {allQuizzes.map(quiz => (
-            <div key={quiz.id} className="bg-white rounded-xl shadow-md hover:shadow-xl transition overflow-hidden">
-              <div className="h-1.5 bg-gradient-to-r from-purple-400 to-purple-600" />
-              <div className="p-6">
-                <p className="text-xs text-purple-600 font-semibold uppercase mb-1">{quiz.courseName}</p>
-                <h3 className="text-lg font-bold text-gray-800 mb-2">{quiz.title}</h3>
-                {quiz.description && <p className="text-sm text-gray-500 line-clamp-2 mb-4">{quiz.description}</p>}
-                <div className="flex items-center gap-4 text-xs text-gray-500 mb-4">
-                  <span className="flex items-center gap-1"><Timer size={13} /> {quiz.time_limit_minutes} min</span>
-                  <span className="flex items-center gap-1"><ClipboardList size={13} /> {quiz.question_count} questions</span>
-                  <span className="flex items-center gap-1"><Target size={13} /> Pass: {quiz.pass_percentage}%</span>
-                </div>
-                <button
-                  onClick={() => startQuiz(quiz)}
-                  className="w-full bg-gradient-to-r from-purple-500 to-purple-700 hover:from-purple-600 hover:to-purple-800 text-white py-2.5 rounded-lg font-semibold transition flex items-center justify-center gap-2"
-                >
-                  <PlayCircle size={16} /> Start Quiz
-                </button>
-              </div>
-            </div>
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-gray-900">My Quizzes</h2>
+        <div className="flex gap-2">
+          {[['available', 'Available'], ['history', 'Attempt History']].map(([val, label]) => (
+            <button key={val} onClick={() => setActiveTab(val)}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${activeTab === val ? 'bg-purple-600 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}>
+              {label} {val === 'history' && attempts.length > 0 && <span className="ml-1 bg-white/30 text-xs px-1.5 py-0.5 rounded-full">{attempts.length}</span>}
+            </button>
           ))}
         </div>
+      </div>
+
+      {/* ── Available Quizzes Tab ── */}
+      {activeTab === 'available' && (
+        allQuizzes.length === 0 ? (
+          <div className="text-center py-16 bg-white rounded-xl shadow-md">
+            <ClipboardList className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+            <p className="text-gray-500 text-lg">No quizzes available yet</p>
+            <p className="text-gray-400 text-sm mt-1">Your instructor hasn't assigned any quizzes</p>
+          </div>
+        ) : (
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {allQuizzes.map(quiz => {
+              const myAttempts = attempts.filter(a => a.quiz_id === quiz.id);
+              const best = myAttempts.length > 0 ? Math.max(...myAttempts.map(a => a.score / a.total_marks * 100)) : null;
+              return (
+                <div key={quiz.id} className="bg-white rounded-xl shadow-md hover:shadow-xl transition overflow-hidden">
+                  <div className="h-1.5 bg-gradient-to-r from-purple-400 to-purple-600" />
+                  <div className="p-6">
+                    <p className="text-xs text-purple-600 font-semibold uppercase mb-1">{quiz.courseName}</p>
+                    <h3 className="text-lg font-bold text-gray-800 mb-2">{quiz.title}</h3>
+                    {quiz.description && <p className="text-sm text-gray-500 line-clamp-2 mb-3">{quiz.description}</p>}
+                    <div className="flex flex-wrap gap-3 text-xs text-gray-500 mb-3">
+                      <span className="flex items-center gap-1"><Timer size={13} /> {quiz.time_limit_minutes} min</span>
+                      <span className="flex items-center gap-1"><ClipboardList size={13} /> {quiz.question_count} Qs</span>
+                      <span className="flex items-center gap-1"><Target size={13} /> Pass: {quiz.pass_percentage}%</span>
+                    </div>
+                    {best !== null && (
+                      <div className={`text-xs font-semibold px-2 py-1 rounded-full inline-flex items-center gap-1 mb-3 ${best >= quiz.pass_percentage ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
+                        <Trophy size={11} /> Best: {Math.round(best)}% · {myAttempts.length} attempt{myAttempts.length > 1 ? 's' : ''}
+                      </div>
+                    )}
+                    <button onClick={() => startQuiz(quiz)}
+                      className="w-full bg-gradient-to-r from-purple-500 to-purple-700 hover:from-purple-600 hover:to-purple-800 text-white py-2.5 rounded-lg font-semibold transition flex items-center justify-center gap-2">
+                      <PlayCircle size={16} /> {myAttempts.length > 0 ? 'Retake Quiz' : 'Start Quiz'}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )
+      )}
+
+      {/* ── Attempt History Tab ── */}
+      {activeTab === 'history' && (
+        attempts.length === 0 ? (
+          <div className="text-center py-16 bg-white rounded-xl shadow-md">
+            <Trophy className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+            <p className="text-gray-500 text-lg">No attempts yet</p>
+            <p className="text-gray-400 text-sm mt-1">Take a quiz to see your history here</p>
+            <button onClick={() => setActiveTab('available')} className="mt-4 bg-purple-600 hover:bg-purple-700 text-white px-5 py-2 rounded-lg font-semibold text-sm">View Available Quizzes</button>
+          </div>
+        ) : (
+          <div className="bg-white rounded-xl shadow-md overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b">
+                <tr>
+                  {['Quiz', 'Course', 'Score', 'Time Taken', 'Status', 'Date'].map(h => (
+                    <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {attempts.map((a, i) => (
+                  <tr key={i} className="hover:bg-gray-50 transition">
+                    <td className="px-4 py-3 font-medium text-gray-800">{a.Quiz?.title || '—'}</td>
+                    <td className="px-4 py-3 text-gray-500">{a.Quiz?.Course?.course_name || '—'}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-16 bg-gray-200 rounded-full h-1.5">
+                          <div className={`h-1.5 rounded-full ${a.passed ? 'bg-green-500' : 'bg-red-400'}`} style={{ width: `${a.total_marks > 0 ? Math.round(a.score / a.total_marks * 100) : 0}%` }} />
+                        </div>
+                        <span className="font-semibold">{a.total_marks > 0 ? Math.round(a.score / a.total_marks * 100) : 0}%</span>
+                        <span className="text-gray-400 text-xs">({a.score}/{a.total_marks})</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-gray-500">{formatDuration(a.time_taken_seconds)}</td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${a.passed ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
+                        {a.passed ? '✓ Passed' : '✗ Failed'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-gray-400 text-xs">{a.submitted_at ? new Date(a.submitted_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
       )}
     </div>
   );
