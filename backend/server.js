@@ -97,6 +97,7 @@ app.use('/api/admin', require('./routes/admin'));
 app.use('/api/student', require('./routes/student'));
 app.use('/api/admin/dashboard', require('./routes/adminDashboard'));
 app.use('/api/faculty', facultyRoutes);
+app.use('/api/quizzes', require('./routes/quizzes'));
 
 // 404 handler
 app.use((req, res) => {
@@ -113,7 +114,6 @@ app.use((err, req, res, next) => {
   });
 });
 
-app.use('/api/quizzes', require('./routes/quizzes'));
 
 // ✅ FIX 6: Don't run sequelize.sync() on every start in production
 // It checks every table schema — very slow with many models
