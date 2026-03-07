@@ -441,4 +441,129 @@ router.get('/certificates/:id/download', ...studentOnly, async (req, res) => {
   }
 });
 
+// ============================================================
+// ASSIGNMENTS
+// ============================================================
+router.get('/assignments', ...studentOnly, async (req, res) => {
+  try {
+    const { sequelize } = require('../config/database');
+    const studentRecord = await Student.findOne({ where: { user_id: req.user.id } });
+    if (!studentRecord) return res.json({ success: true, assignments: [] });
+
+    // Get enrolled course IDs
+    const enrollments = await Enrollment.findAll({
+      where: { student_id: studentRecord.id },
+      attributes: ['course_id']
+    });
+    const courseIds = enrollments.map(e => e.course_id);
+    if (!courseIds.length) return res.json({ success: true, assignments: [] });
+
+    // Create tables if missing
+    await sequelize.query(`CREATE TABLE IF NOT EXISTS assignments (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      title VARCHAR(255), description TEXT,
+      course_id INT, faculty_id INT,
+      due_date DATE, total_marks INT DEFAULT 100,
+      rubric JSON, status VARCHAR(50) DEFAULT 'active',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )`);
+    await sequelize.query(`CREATE TABLE IF NOT EXISTS assignment_submissions (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      assignment_id INT, student_id INT,
+      file_path VARCHAR(500), file_name VARCHAR(255),
+      notes TEXT, grade INT, feedback TEXT,
+      status VARCHAR(50) DEFAULT 'submitted',
+      submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`);
+
+    // Fetch assignments for enrolled courses
+    const placeholders = courseIds.map(() => '?').join(',');
+    const [assignments] = await sequelize.query(
+      `SELECT a.*, c.course_name
+       FROM assignments a
+       LEFT JOIN courses c ON c.id = a.course_id
+       WHERE a.course_id IN (${placeholders}) AND a.status = 'active'
+       ORDER BY a.due_date ASC`,
+      { replacements: courseIds }
+    );
+
+    // Fetch this student's submissions
+    const assignmentIds = assignments.map(a => a.id);
+    let submissions = [];
+    if (assignmentIds.length) {
+      const subPlaceholders = assignmentIds.map(() => '?').join(',');
+      [submissions] = await sequelize.query(
+        `SELECT * FROM assignment_submissions
+         WHERE student_id = ? AND assignment_id IN (${subPlaceholders})`,
+        { replacements: [studentRecord.id, ...assignmentIds] }
+      );
+    }
+
+    const subMap = {};
+    submissions.forEach(s => { subMap[s.assignment_id] = s; });
+
+    const result = assignments.map(a => {
+      const sub = subMap[a.id];
+      return {
+        id:           a.id,
+        title:        a.title,
+        description:  a.description,
+        course_name:  a.course_name || 'Unknown Course',
+        due_date:     a.due_date,
+        total_marks:  a.total_marks,
+        rubric:       a.rubric ? (typeof a.rubric === 'string' ? JSON.parse(a.rubric) : a.rubric) : null,
+        status:       sub ? sub.status : 'pending',
+        grade:        sub?.grade ?? null,
+        feedback:     sub?.feedback ?? null,
+        submitted_at: sub?.submitted_at ?? null,
+        file_name:    sub?.file_name ?? null,
+      };
+    });
+
+    res.json({ success: true, assignments: result });
+  } catch (e) {
+    console.error('GET /student/assignments error:', e);
+    res.json({ success: true, assignments: [] });
+  }
+});
+
+router.post('/assignments/:id/submit', ...studentOnly, async (req, res) => {
+  try {
+    const { sequelize } = require('../config/database');
+    const studentRecord = await Student.findOne({ where: { user_id: req.user.id } });
+    if (!studentRecord) return res.status(403).json({ success: false, message: 'Student not found' });
+
+    const assignmentId = parseInt(req.params.id);
+    const { notes, file_name } = req.body;
+
+    // Check if already submitted
+    const [existing] = await sequelize.query(
+      `SELECT id FROM assignment_submissions WHERE assignment_id = ? AND student_id = ? LIMIT 1`,
+      { replacements: [assignmentId, studentRecord.id] }
+    );
+
+    if (existing.length > 0) {
+      // Resubmit — reset grade
+      await sequelize.query(
+        `UPDATE assignment_submissions
+         SET notes=?, file_name=?, status='submitted', submitted_at=NOW(), grade=NULL, feedback=NULL
+         WHERE assignment_id=? AND student_id=?`,
+        { replacements: [notes || null, file_name || null, assignmentId, studentRecord.id] }
+      );
+    } else {
+      await sequelize.query(
+        `INSERT INTO assignment_submissions (assignment_id, student_id, notes, file_name, status, submitted_at)
+         VALUES (?, ?, ?, ?, 'submitted', NOW())`,
+        { replacements: [assignmentId, studentRecord.id, notes || null, file_name || null] }
+      );
+    }
+
+    res.json({ success: true, message: 'Assignment submitted successfully' });
+  } catch (e) {
+    console.error('POST /student/assignments/:id/submit error:', e);
+    res.status(500).json({ success: false, message: 'Submission failed' });
+  }
+});
+
 module.exports = router;
