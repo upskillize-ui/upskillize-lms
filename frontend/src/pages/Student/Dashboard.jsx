@@ -18,7 +18,7 @@ import {
   Github, Linkedin, Twitter, Link as LinkIcon, Menu,
   ShoppingBag, ThumbsUp, GraduationCap, ChevronDown,
   RefreshCw, Users, Zap, Home, TrendingDown, BookMarked,
-  CheckSquare, PlaySquare, MonitorPlay, Layers
+  CheckSquare, PlaySquare, MonitorPlay, Layers, ClipboardList, Timer, Trophy
 } from 'lucide-react';
 
 // ==================== CIRCULAR PROGRESS ====================
@@ -1477,6 +1477,203 @@ function SystemSettings() {
 }
 
 // ==================== MAIN STUDENT DASHBOARD ====================
+// ==================== STUDENT QUIZZES ====================
+function StudentQuizzes() {
+  const [enrollments, setEnrollments] = useState([]);
+  const [quizzesByCourse, setQuizzesByCourse] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [activeQuiz, setActiveQuiz] = useState(null);
+  const [answers, setAnswers] = useState({});
+  const [currentQ, setCurrentQ] = useState(0);
+  const [result, setResult] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(null);
+  const [startTime, setStartTime] = useState(null);
+
+  useEffect(() => { fetchData(); }, []);
+
+  useEffect(() => {
+    if (!activeQuiz || result) return;
+    const interval = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev <= 1) { clearInterval(interval); handleSubmit(true); return 0; }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [activeQuiz, result]);
+
+  const fetchData = async () => {
+    try {
+      const res = await api.get('/enrollments/my-enrollments');
+      const enr = res.data.enrollments || [];
+      setEnrollments(enr);
+      const results = await Promise.all(
+        enr.map(e => api.get(`/quizzes/course/${e.Course?.id}`).then(r => ({ courseId: e.Course?.id, quizzes: r.data.quizzes || [] })).catch(() => ({ courseId: e.Course?.id, quizzes: [] })))
+      );
+      const map = {};
+      results.forEach(r => { map[r.courseId] = r.quizzes; });
+      setQuizzesByCourse(map);
+    } catch (e) { console.error(e); }
+    finally { setLoading(false); }
+  };
+
+  const startQuiz = async (quiz) => {
+    try {
+      const res = await api.get(`/quizzes/${quiz.id}`);
+      setActiveQuiz(res.data.quiz);
+      setAnswers({});
+      setCurrentQ(0);
+      setResult(null);
+      setTimeLeft((res.data.quiz.time_limit_minutes || 30) * 60);
+      setStartTime(Date.now());
+    } catch { alert('Error loading quiz'); }
+  };
+
+  const handleSubmit = async (auto = false) => {
+    if (!auto && !window.confirm('Submit quiz?')) return;
+    setSubmitting(true);
+    try {
+      const timeTaken = Math.round((Date.now() - startTime) / 1000);
+      const res = await api.post(`/quizzes/${activeQuiz.id}/submit`, { answers, time_taken_seconds: timeTaken });
+      setResult(res.data.result);
+    } catch { alert('Error submitting quiz'); }
+    finally { setSubmitting(false); }
+  };
+
+  const formatTime = (s) => `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;
+
+  if (loading) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500" /></div>;
+
+  // ── Active Quiz View ──
+  if (activeQuiz && !result) {
+    const questions = activeQuiz.QuizQuestions || [];
+    const q = questions[currentQ];
+    const options = [
+      { key: 'a', label: q?.option_a },
+      { key: 'b', label: q?.option_b },
+      { key: 'c', label: q?.option_c },
+      { key: 'd', label: q?.option_d },
+    ];
+    return (
+      <div className="max-w-2xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="bg-white rounded-xl shadow-md p-4 flex items-center justify-between">
+          <div>
+            <h2 className="font-bold text-gray-800">{activeQuiz.title}</h2>
+            <p className="text-sm text-gray-500">Question {currentQ + 1} of {questions.length}</p>
+          </div>
+          <div className={`flex items-center gap-2 font-bold text-lg px-4 py-2 rounded-lg ${timeLeft < 60 ? 'bg-red-100 text-red-600' : 'bg-orange-100 text-orange-600'}`}>
+            <Timer size={18} /> {formatTime(timeLeft)}
+          </div>
+        </div>
+
+        {/* Progress bar */}
+        <div className="h-2 bg-gray-200 rounded-full">
+          <div className="h-2 bg-orange-500 rounded-full transition-all" style={{ width: `${((currentQ + 1) / questions.length) * 100}%` }} />
+        </div>
+
+        {/* Question */}
+        <div className="bg-white rounded-xl shadow-md p-6">
+          <p className="text-lg font-semibold text-gray-800 mb-6">{q?.question_text}</p>
+          <div className="space-y-3">
+            {options.map(opt => (
+              <button
+                key={opt.key}
+                onClick={() => setAnswers(prev => ({ ...prev, [q.id]: opt.key }))}
+                className={`w-full text-left px-4 py-3 rounded-lg border-2 transition font-medium ${
+                  answers[q.id] === opt.key
+                    ? 'border-orange-500 bg-orange-50 text-orange-700'
+                    : 'border-gray-200 hover:border-orange-300 hover:bg-orange-50'
+                }`}
+              >
+                <span className="font-bold mr-3">{opt.key.toUpperCase()}.</span>{opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Navigation */}
+        <div className="flex justify-between gap-3">
+          <button onClick={() => setCurrentQ(p => p - 1)} disabled={currentQ === 0} className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 rounded-lg font-semibold disabled:opacity-40">← Prev</button>
+          {currentQ < questions.length - 1
+            ? <button onClick={() => setCurrentQ(p => p + 1)} className="px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-semibold">Next →</button>
+            : <button onClick={() => handleSubmit()} disabled={submitting} className="px-5 py-2.5 bg-green-500 hover:bg-green-600 text-white rounded-lg font-semibold disabled:opacity-50">{submitting ? 'Submitting...' : '✓ Submit Quiz'}</button>
+          }
+        </div>
+      </div>
+    );
+  }
+
+  // ── Result View ──
+  if (result) {
+    return (
+      <div className="max-w-2xl mx-auto space-y-6">
+        <div className={`bg-white rounded-xl shadow-md p-8 text-center`}>
+          <div className={`w-24 h-24 rounded-full mx-auto flex items-center justify-center mb-4 ${result.passed ? 'bg-green-100' : 'bg-red-100'}`}>
+            <Trophy size={40} className={result.passed ? 'text-green-600' : 'text-red-500'} />
+          </div>
+          <h2 className="text-2xl font-bold mb-1">{result.passed ? '🎉 You Passed!' : 'Keep Practicing!'}</h2>
+          <p className="text-5xl font-bold my-4 text-orange-500">{result.percentage}%</p>
+          <p className="text-gray-500 mb-6">Score: {result.score}/{result.total_marks} · Pass: {result.pass_percentage}%</p>
+          <div className="space-y-3 text-left mb-6">
+            {result.result_details?.map((d, i) => (
+              <div key={i} className={`flex items-start gap-3 p-3 rounded-lg ${d.is_correct ? 'bg-green-50' : 'bg-red-50'}`}>
+                {d.is_correct ? <CheckCircle size={18} className="text-green-500 mt-0.5" /> : <XCircle size={18} className="text-red-500 mt-0.5" />}
+                <div>
+                  <p className="text-sm font-medium">{d.question_text}</p>
+                  {!d.is_correct && <p className="text-xs text-red-500">Your answer: {d.student_answer?.toUpperCase() || 'Not answered'} · Correct: {d.correct_option?.toUpperCase()}</p>}
+                </div>
+              </div>
+            ))}
+          </div>
+          <button onClick={() => { setActiveQuiz(null); setResult(null); }} className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-lg font-semibold">← Back to Quizzes</button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Quiz List View ──
+  const allQuizzes = enrollments.flatMap(e => (quizzesByCourse[e.Course?.id] || []).map(q => ({ ...q, courseName: e.Course?.course_name })));
+
+  return (
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold text-gray-900">My Quizzes</h2>
+      {allQuizzes.length === 0 ? (
+        <div className="text-center py-16 bg-white rounded-xl shadow-md">
+          <ClipboardList className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+          <p className="text-gray-500 text-lg">No quizzes available yet</p>
+          <p className="text-gray-400 text-sm mt-1">Your instructor hasn't assigned any quizzes</p>
+        </div>
+      ) : (
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {allQuizzes.map(quiz => (
+            <div key={quiz.id} className="bg-white rounded-xl shadow-md hover:shadow-xl transition overflow-hidden">
+              <div className="h-1.5 bg-gradient-to-r from-purple-400 to-purple-600" />
+              <div className="p-6">
+                <p className="text-xs text-purple-600 font-semibold uppercase mb-1">{quiz.courseName}</p>
+                <h3 className="text-lg font-bold text-gray-800 mb-2">{quiz.title}</h3>
+                {quiz.description && <p className="text-sm text-gray-500 line-clamp-2 mb-4">{quiz.description}</p>}
+                <div className="flex items-center gap-4 text-xs text-gray-500 mb-4">
+                  <span className="flex items-center gap-1"><Timer size={13} /> {quiz.time_limit_minutes} min</span>
+                  <span className="flex items-center gap-1"><ClipboardList size={13} /> {quiz.question_count} questions</span>
+                  <span className="flex items-center gap-1"><Target size={13} /> Pass: {quiz.pass_percentage}%</span>
+                </div>
+                <button
+                  onClick={() => startQuiz(quiz)}
+                  className="w-full bg-gradient-to-r from-purple-500 to-purple-700 hover:from-purple-600 hover:to-purple-800 text-white py-2.5 rounded-lg font-semibold transition flex items-center justify-center gap-2"
+                >
+                  <PlayCircle size={16} /> Start Quiz
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function StudentDashboard() {
   const location = useLocation();
   const { user, logout } = useAuth();
@@ -1498,6 +1695,7 @@ export default function StudentDashboard() {
     { path: '/student/browse',       label: 'Browse Courses', icon: ShoppingBag,   free: true },
     { path: '/student/certificates', label: 'Certificates',   icon: Award,         free: true },
     { path: '/student/progress',     label: 'Progress',       icon: TrendingUp,    free: true },
+    { path: '/student/quizzes',          label: 'Quizzes',    icon: ClipboardList, free: true },
     { path: '/student/discussion-forum', label: 'Discussion', icon: MessageSquare, free: true },
     { path: '/student/notifications',label: 'Notifications',  icon: Bell,          free: true },
     { path: '/student/help',         label: 'Help & Support', icon: HelpCircle,    free: true },
@@ -1700,6 +1898,7 @@ export default function StudentDashboard() {
               <Route path="/browse" element={<BrowseCourses />} />
               <Route path="/certificates" element={<Certificates />} />
               <Route path="/progress" element={<Progress />} />
+              <Route path="/quizzes" element={<StudentQuizzes />} />
               <Route path="/discussion-forum" element={<DiscussionForum />} />
               <Route path="/notifications" element={<Notifications />} />
               <Route path="/help" element={<HelpSupport />} />
