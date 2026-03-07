@@ -9,7 +9,7 @@ const { Op } = require('sequelize');
 const rbac = require('../middleware/rbac');
 const { User, Faculty, Course, Enrollment, Student, Exam, Result,
         VideoWatchHistory, Lesson, CourseModule, Quiz, QuizQuestion,
-        Notification } = require('../models'); // ✅ add Notification here
+        Notification } = require('../models');
 const authMiddleware = require('../middleware/auth');
 
 const storage = multer.diskStorage({
@@ -145,7 +145,6 @@ router.get('/dashboard/stats', authMiddleware, async (req, res) => {
       ? await Exam.count({ where: { course_id: { [Op.in]: courseIds }, is_active: true } })
       : 0;
 
-    // ✅ Fixed: use Student from top-level import, not inline require()
     const recentEnrollments = courseIds.length > 0
       ? await Enrollment.findAll({
           where: { course_id: { [Op.in]: courseIds } },
@@ -228,7 +227,32 @@ router.get('/courses', authMiddleware, async (req, res) => {
   }
 });
 
-// ── NOTIFICATIONS ──────────────────────────────────────────
+// ── ANNOUNCEMENTS GET ──────────────────────────────────────
+router.get('/announcements', authMiddleware, async (req, res) => {
+  try {
+    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
+    if (!faculty) return res.json({ success: true, announcements: [] });
+    const { sequelize } = require('../config/database');
+    await sequelize.query(`CREATE TABLE IF NOT EXISTS announcements (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      title VARCHAR(255), message TEXT,
+      course VARCHAR(255), priority VARCHAR(50) DEFAULT 'Medium',
+      faculty_id INT, views INT DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`);
+    const [rows] = await sequelize.query(
+      `SELECT *, DATE_FORMAT(created_at,'%d %b %Y') as date
+       FROM announcements WHERE faculty_id = ? ORDER BY created_at DESC`,
+      { replacements: [faculty.id] }
+    );
+    res.json({ success: true, announcements: rows });
+  } catch (e) {
+    console.error(e);
+    res.json({ success: true, announcements: [] });
+  }
+});
+
+// ── ANNOUNCEMENTS POST (with student notifications) ────────
 router.post('/announcements', authMiddleware, async (req, res) => {
   try {
     const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
@@ -271,9 +295,6 @@ router.post('/announcements', authMiddleware, async (req, res) => {
       console.log('👥 userIds to notify:', userIds);
 
       if (userIds.length > 0) {
-        const { Notification } = require('../models');
-        console.log('🔔 Notification model:', typeof Notification);
-
         await Notification.bulkCreate(
           userIds.map(user_id => ({
             user_id,
@@ -300,51 +321,7 @@ router.post('/announcements', authMiddleware, async (req, res) => {
   }
 });
 
-// ── MESSAGES ───────────────────────────────────────────────
-router.get('/messages', authMiddleware, async (req, res) => {
-  res.json({ success: true, messages: [] });
-});
-
-// ── ANNOUNCEMENTS ──────────────────────────────────────────
-router.get('/announcements', authMiddleware, async (req, res) => {
-  try {
-    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
-    if (!faculty) return res.json({ success: true, announcements: [] });
-    const { sequelize } = require('../config/database');
-    await sequelize.query(`CREATE TABLE IF NOT EXISTS announcements (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      title VARCHAR(255), message TEXT,
-      course VARCHAR(255), priority VARCHAR(50) DEFAULT 'Medium',
-      faculty_id INT, views INT DEFAULT 0,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )`);
-    const [rows] = await sequelize.query(
-      `SELECT *, DATE_FORMAT(created_at,'%d %b %Y') as date
-       FROM announcements WHERE faculty_id = ? ORDER BY created_at DESC`,
-      { replacements: [faculty.id] }
-    );
-    res.json({ success: true, announcements: rows });
-  } catch (e) {
-    console.error(e);
-    res.json({ success: true, announcements: [] });
-  }
-});
-
-router.post('/announcements', authMiddleware, async (req, res) => {
-  try {
-    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
-    const { title, message, course, priority } = req.body;
-    const { sequelize } = require('../config/database');
-    const [result] = await sequelize.query(
-      `INSERT INTO announcements (title, message, course, priority, faculty_id) VALUES (?,?,?,?,?)`,
-      { replacements: [title, message, course || 'All', priority || 'Medium', faculty.id] }
-    );
-    res.json({ success: true, announcement: { id: result, title, message, course, priority, date: new Date().toLocaleDateString(), views: 0 } });
-  } catch (e) {
-    res.status(500).json({ success: false, message: e.message });
-  }
-});
-
+// ── ANNOUNCEMENTS DELETE ───────────────────────────────────
 router.delete('/announcements/:id', authMiddleware, async (req, res) => {
   try {
     const { sequelize } = require('../config/database');
@@ -357,6 +334,11 @@ router.delete('/announcements/:id', authMiddleware, async (req, res) => {
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });
   }
+});
+
+// ── MESSAGES ───────────────────────────────────────────────
+router.get('/messages', authMiddleware, async (req, res) => {
+  res.json({ success: true, messages: [] });
 });
 
 // ── ASSIGNMENTS ────────────────────────────────────────────
@@ -464,41 +446,20 @@ router.post('/assignments/:id/grade', authMiddleware, async (req, res) => {
 
 router.delete('/assignments/:id', [authMiddleware, rbac(['faculty','admin'])], async (req, res) => {
   try {
-
     const { sequelize } = require('../config/database');
-
-    const faculty = await Faculty.findOne({
-      where: { user_id: req.user.id }
-    });
-
+    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
     if (!faculty) {
-      return res.status(404).json({
-        success:false,
-        message:"Faculty not found"
-      });
+      return res.status(404).json({ success: false, message: 'Faculty not found' });
     }
-
     await sequelize.query(
       `DELETE FROM assignments WHERE id = ? AND faculty_id = ?`,
-      {
-        replacements: [req.params.id, faculty.id]
-      }
+      { replacements: [req.params.id, faculty.id] }
     );
-
-    res.json({
-      success:true,
-      message:"Assignment deleted successfully"
-    });
-
+    res.json({ success: true, message: 'Assignment deleted successfully' });
   } catch (error) {
-
-    console.error("Delete assignment error:", error);
-
-    res.status(500).json({
-      success:false,
-      message:"Server error"
-    });
-
+    console.error('Delete assignment error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 });
+
 module.exports = router;
