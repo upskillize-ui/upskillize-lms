@@ -1,12 +1,14 @@
 const express = require('express');
 const router = express.Router();
-const { Quiz, QuizQuestion, QuizAttempt, Course, Student, User, Faculty } = require('../models');
+const { Quiz, QuizQuestion, QuizAttempt, Course, Student, User } = require('../models');
+const { Faculty } = require('../models');
 const authMiddleware = require('../middleware/auth');
 const rbac = require('../middleware/rbac');
 
 // ── FACULTY: Get all quizzes for faculty's courses ─────────────
 router.get('/', authMiddleware, rbac(['faculty', 'admin']), async (req, res) => {
   try {
+    const Faculty = require('../models').Faculty;
     const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
     const facultyId = faculty ? faculty.id : req.user.roleDataId;
 
