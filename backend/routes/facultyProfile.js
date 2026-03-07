@@ -392,7 +392,7 @@ router.post('/assignments/:id/grade', authMiddleware, async (req, res) => {
   }
 });
 
-router.delete('/assignments/:id', facultyOnly, async (req, res) => {
+router.delete('/assignments/:id', [authMiddleware, rbac(['faculty', 'admin'])], async (req, res) => {
   try {
     const db = require('../config/database');
     const [result] = await db.query(
