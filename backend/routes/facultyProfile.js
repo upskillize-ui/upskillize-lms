@@ -225,4 +225,171 @@ router.get('/courses', authMiddleware, async (req, res) => {
   }
 });
 
+// ── NOTIFICATIONS ──────────────────────────────────────────
+router.get('/notifications', authMiddleware, async (req, res) => {
+  res.json({ success: true, notifications: [] });
+});
+
+// ── MESSAGES ───────────────────────────────────────────────
+router.get('/messages', authMiddleware, async (req, res) => {
+  res.json({ success: true, messages: [] });
+});
+
+// ── ANNOUNCEMENTS ──────────────────────────────────────────
+router.get('/announcements', authMiddleware, async (req, res) => {
+  try {
+    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
+    if (!faculty) return res.json({ success: true, announcements: [] });
+    const { sequelize } = require('../config/database');
+    await sequelize.query(`CREATE TABLE IF NOT EXISTS announcements (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      title VARCHAR(255), message TEXT,
+      course VARCHAR(255), priority VARCHAR(50) DEFAULT 'Medium',
+      faculty_id INT, views INT DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`);
+    const [rows] = await sequelize.query(
+      `SELECT *, DATE_FORMAT(created_at,'%d %b %Y') as date
+       FROM announcements WHERE faculty_id = ? ORDER BY created_at DESC`,
+      { replacements: [faculty.id] }
+    );
+    res.json({ success: true, announcements: rows });
+  } catch (e) {
+    console.error(e);
+    res.json({ success: true, announcements: [] });
+  }
+});
+
+router.post('/announcements', authMiddleware, async (req, res) => {
+  try {
+    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
+    const { title, message, course, priority } = req.body;
+    const { sequelize } = require('../config/database');
+    const [result] = await sequelize.query(
+      `INSERT INTO announcements (title, message, course, priority, faculty_id) VALUES (?,?,?,?,?)`,
+      { replacements: [title, message, course || 'All', priority || 'Medium', faculty.id] }
+    );
+    res.json({ success: true, announcement: { id: result, title, message, course, priority, date: new Date().toLocaleDateString(), views: 0 } });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.delete('/announcements/:id', authMiddleware, async (req, res) => {
+  try {
+    const { sequelize } = require('../config/database');
+    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
+    await sequelize.query(
+      `DELETE FROM announcements WHERE id = ? AND faculty_id = ?`,
+      { replacements: [req.params.id, faculty.id] }
+    );
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// ── ASSIGNMENTS ────────────────────────────────────────────
+router.get('/assignments', authMiddleware, async (req, res) => {
+  try {
+    const { sequelize } = require('../config/database');
+    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
+    if (!faculty) return res.json({ success: true, assignments: [] });
+
+    await sequelize.query(`CREATE TABLE IF NOT EXISTS assignments (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      title VARCHAR(255), description TEXT,
+      course_id INT, faculty_id INT,
+      due_date DATE, total_marks INT DEFAULT 100,
+      rubric JSON, status VARCHAR(50) DEFAULT 'active',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )`);
+    await sequelize.query(`CREATE TABLE IF NOT EXISTS assignment_submissions (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      assignment_id INT, student_id INT,
+      file_path VARCHAR(500), file_name VARCHAR(255),
+      notes TEXT, grade INT, feedback TEXT,
+      status VARCHAR(50) DEFAULT 'submitted',
+      submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`);
+
+    const [rows] = await sequelize.query(`
+      SELECT a.*,
+        COALESCE(c.course_name, 'Unknown') as course,
+        (SELECT COUNT(*) FROM enrollments e WHERE e.course_id = a.course_id) as totalStudents,
+        (SELECT COUNT(*) FROM assignment_submissions s WHERE s.assignment_id = a.id) as submissions,
+        (SELECT COUNT(*) FROM assignment_submissions s WHERE s.assignment_id = a.id AND s.status='graded') as graded
+      FROM assignments a
+      LEFT JOIN courses c ON c.id = a.course_id
+      WHERE a.faculty_id = ?
+      ORDER BY a.created_at DESC`,
+      { replacements: [faculty.id] }
+    );
+
+    res.json({
+      success: true,
+      assignments: rows.map(r => ({
+        ...r,
+        dueDate: r.due_date,
+        rubric: r.rubric ? (typeof r.rubric === 'string' ? JSON.parse(r.rubric) : r.rubric) : null
+      }))
+    });
+  } catch (e) {
+    console.error(e);
+    res.json({ success: true, assignments: [] });
+  }
+});
+
+router.post('/assignments', authMiddleware, async (req, res) => {
+  try {
+    const { sequelize } = require('../config/database');
+    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
+    const { title, description, course, dueDate, totalMarks, rubric } = req.body;
+    const [result] = await sequelize.query(
+      `INSERT INTO assignments (title, description, course_id, faculty_id, due_date, total_marks, rubric)
+       VALUES (?,?,?,?,?,?,?)`,
+      { replacements: [title, description, course, faculty.id, dueDate, totalMarks || 100, JSON.stringify(rubric || {})] }
+    );
+    res.json({
+      success: true,
+      assignment: { id: result, title, description, course, dueDate, totalMarks, rubric, status: 'active', submissions: 0, graded: 0, totalStudents: 0 }
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.get('/assignments/:id/submissions', authMiddleware, async (req, res) => {
+  try {
+    const { sequelize } = require('../config/database');
+    const [rows] = await sequelize.query(`
+      SELECT s.*, u.full_name as studentName, s.submitted_at as submittedDate
+      FROM assignment_submissions s
+      JOIN students st ON st.id = s.student_id
+      JOIN users u ON u.id = st.user_id
+      WHERE s.assignment_id = ?`,
+      { replacements: [req.params.id] }
+    );
+    res.json({ success: true, submissions: rows });
+  } catch (e) {
+    res.json({ success: true, submissions: [] });
+  }
+});
+
+router.post('/assignments/:id/grade', authMiddleware, async (req, res) => {
+  try {
+    const { sequelize } = require('../config/database');
+    const { studentId, grade, feedback } = req.body;
+    await sequelize.query(
+      `UPDATE assignment_submissions SET grade=?, feedback=?, status='graded'
+       WHERE assignment_id=? AND student_id=?`,
+      { replacements: [grade, feedback, req.params.id, studentId] }
+    );
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
 module.exports = router;
