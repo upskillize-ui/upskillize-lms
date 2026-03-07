@@ -235,25 +235,29 @@ router.post('/announcements', authMiddleware, async (req, res) => {
     const { title, message, course, priority } = req.body;
     const { sequelize } = require('../config/database');
 
-    // 1. Save announcement as before
+    // Save announcement
     const [result] = await sequelize.query(
       `INSERT INTO announcements (title, message, course, priority, faculty_id) VALUES (?,?,?,?,?)`,
       { replacements: [title, message, course || 'All', priority || 'Medium', faculty.id] }
     );
 
-    // 2. Find which students to notify
+    console.log('✅ Announcement saved, id:', result);
+    console.log('📋 course value received:', course);
+
+    // Find course IDs
     let courseIds = [];
     if (course && course !== 'All') {
-      // Specific course selected — notify only enrolled students
       const courseRecord = await Course.findOne({ where: { id: course, faculty_id: faculty.id } });
+      console.log('📚 courseRecord found:', courseRecord?.id);
       if (courseRecord) courseIds = [courseRecord.id];
     } else {
-      // "All" — notify students from ALL faculty courses
       const allCourses = await Course.findAll({ where: { faculty_id: faculty.id }, attributes: ['id'] });
       courseIds = allCourses.map(c => c.id);
+      console.log('📚 all courseIds:', courseIds);
     }
 
-    // 3. Get unique student user_ids from enrollments
+    console.log('📚 Final courseIds:', courseIds);
+
     if (courseIds.length > 0) {
       const enrollments = await Enrollment.findAll({
         where: { course_id: courseIds },
@@ -261,32 +265,37 @@ router.post('/announcements', authMiddleware, async (req, res) => {
         attributes: ['student_id']
       });
 
-      // Deduplicate user_ids
-      const userIds = [...new Set(enrollments.map(e => e.Student?.user_id).filter(Boolean))];
+      console.log('👥 Enrollments found:', enrollments.length);
 
-      // 4. Bulk insert into notifications table
+      const userIds = [...new Set(enrollments.map(e => e.Student?.user_id).filter(Boolean))];
+      console.log('👥 userIds to notify:', userIds);
+
       if (userIds.length > 0) {
         const { Notification } = require('../models');
+        console.log('🔔 Notification model:', typeof Notification);
+
         await Notification.bulkCreate(
-  userIds.map(user_id => ({
-    user_id,
-    title,
-    message,
-    type: 'announcement',
-    is_read: false,
-    created_at: new Date(),
-    updated_at: new Date()
-  }))
-);
+          userIds.map(user_id => ({
+            user_id,
+            title,
+            message,
+            type: 'announcement',
+            is_read: false,
+            created_at: new Date(),
+            updated_at: new Date()
+          }))
+        );
+        console.log('✅ Notifications inserted for userIds:', userIds);
+      } else {
+        console.log('⚠️ No userIds found — no notifications inserted');
       }
+    } else {
+      console.log('⚠️ No courseIds found — no notifications inserted');
     }
 
-    res.json({
-      success: true,
-      announcement: { id: result, title, message, course, priority, date: new Date().toLocaleDateString(), views: 0 }
-    });
+    res.json({ success: true, announcement: { id: result, title, message, course, priority, date: new Date().toLocaleDateString(), views: 0 } });
   } catch (e) {
-    console.error('Announcement error:', e);
+    console.error('❌ FULL ERROR:', e);
     res.status(500).json({ success: false, message: e.message });
   }
 });
