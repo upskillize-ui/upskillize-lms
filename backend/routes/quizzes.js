@@ -1,22 +1,28 @@
 const express = require('express');
 const router = express.Router();
-const { Quiz, QuizQuestion, QuizAttempt, Course, Student, User } = require('../models');
-const { Faculty } = require('../models');
+const { Quiz, QuizQuestion, QuizAttempt, Course, Student, User, Faculty } = require('../models');
 const authMiddleware = require('../middleware/auth');
 const rbac = require('../middleware/rbac');
+
+// Helper: get correct faculty.id from user_id
+async function getFacultyId(userId, fallback) {
+  try {
+    const faculty = await Faculty.findOne({ where: { user_id: userId } });
+    return faculty ? faculty.id : fallback;
+  } catch (e) {
+    return fallback;
+  }
+}
 
 // ── FACULTY: Get all quizzes for faculty's courses ─────────────
 router.get('/', authMiddleware, rbac(['faculty', 'admin']), async (req, res) => {
   try {
-    const Faculty = require('../models').Faculty;
-    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
-    const facultyId = faculty ? faculty.id : req.user.roleDataId;
-
+    const facultyId = await getFacultyId(req.user.id, req.user.roleDataId);
     const courses = await Course.findAll({ where: { faculty_id: facultyId } });
     const courseIds = courses.map(c => c.id);
 
     const quizzes = await Quiz.findAll({
-      where: { course_id: courseIds },
+      where: courseIds.length > 0 ? { course_id: courseIds } : { id: -1 },
       include: [
         { model: Course, attributes: ['course_name'] },
         { model: QuizQuestion, attributes: ['id'] }
@@ -60,23 +66,20 @@ router.post('/', authMiddleware, rbac(['faculty', 'admin']), async (req, res) =>
   try {
     const { course_id, title, description, time_limit_minutes, pass_percentage } = req.body;
 
-    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
-    const facultyId = faculty ? faculty.id : req.user.roleDataId;
+    if (!course_id || !title) {
+      return res.status(400).json({ success: false, message: 'Course and title are required' });
+    }
 
     const course = await Course.findByPk(course_id);
     if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
 
-    // Verify faculty owns this course
-    if (req.user.role === 'faculty' && course.faculty_id !== facultyId) {
-      return res.status(403).json({ success: false, message: 'Not authorized for this course' });
-    }
-
     const quiz = await Quiz.create({
       course_id,
       title,
-      description,
+      description: description || '',
       time_limit_minutes: time_limit_minutes || 30,
-      pass_percentage: pass_percentage || 60
+      pass_percentage: pass_percentage || 60,
+      is_active: false
     });
 
     res.status(201).json({ success: true, message: 'Quiz created', quiz });
@@ -97,6 +100,8 @@ router.post('/:quiz_id/questions', authMiddleware, rbac(['faculty', 'admin']), a
     const created = await QuizQuestion.bulkCreate(
       questions.map((q, i) => ({ ...q, quiz_id: quiz.id, sequence_order: i + 1 }))
     );
+
+    await quiz.update({ is_active: true });
 
     res.status(201).json({ success: true, message: 'Questions added', questions: created });
   } catch (error) {
@@ -139,7 +144,6 @@ router.post('/:id/submit', authMiddleware, rbac(['student']), async (req, res) =
     const student = await Student.findOne({ where: { user_id: req.user.id } });
     if (!student) return res.status(404).json({ success: false, message: 'Student not found' });
 
-    // Calculate score
     let score = 0;
     let total_marks = 0;
     const result_details = quiz.QuizQuestions.map(q => {
