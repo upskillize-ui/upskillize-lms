@@ -207,4 +207,22 @@ router.get('/quizzes', authMiddleware, async (req, res) => {
   }
 });
 
+router.get('/courses', authMiddleware, async (req, res) => {
+  try {
+    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
+    if (!faculty) return res.status(404).json({ success: false, message: 'Faculty not found' });
+
+    const courses = await Course.findAll({
+      where: { faculty_id: faculty.id, is_active: true },
+      attributes: ['id', 'course_name', 'course_code'],
+      order: [['course_name', 'ASC']]
+    });
+
+    res.json({ success: true, courses });
+  } catch (error) {
+    console.error('Get faculty courses error:', error);
+    res.status(500).json({ success: false, message: 'Error fetching courses' });
+  }
+});
+
 module.exports = router;
