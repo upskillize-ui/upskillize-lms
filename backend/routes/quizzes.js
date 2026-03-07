@@ -1,13 +1,16 @@
 const express = require('express');
 const router = express.Router();
-const { Quiz, QuizQuestion, QuizAttempt, Course, Student, User } = require('../models');
+const { Quiz, QuizQuestion, QuizAttempt, Course, Student, User, Faculty } = require('../models');
 const authMiddleware = require('../middleware/auth');
 const rbac = require('../middleware/rbac');
 
 // ── FACULTY: Get all quizzes for faculty's courses ─────────────
 router.get('/', authMiddleware, rbac(['faculty', 'admin']), async (req, res) => {
   try {
-    const courses = await Course.findAll({ where: { faculty_id: req.user.roleDataId } });
+    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
+    const facultyId = faculty ? faculty.id : req.user.roleDataId;
+
+    const courses = await Course.findAll({ where: { faculty_id: facultyId } });
     const courseIds = courses.map(c => c.id);
 
     const quizzes = await Quiz.findAll({
@@ -55,8 +58,16 @@ router.post('/', authMiddleware, rbac(['faculty', 'admin']), async (req, res) =>
   try {
     const { course_id, title, description, time_limit_minutes, pass_percentage } = req.body;
 
+    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
+    const facultyId = faculty ? faculty.id : req.user.roleDataId;
+
     const course = await Course.findByPk(course_id);
     if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
+
+    // Verify faculty owns this course
+    if (req.user.role === 'faculty' && course.faculty_id !== facultyId) {
+      return res.status(403).json({ success: false, message: 'Not authorized for this course' });
+    }
 
     const quiz = await Quiz.create({
       course_id,
