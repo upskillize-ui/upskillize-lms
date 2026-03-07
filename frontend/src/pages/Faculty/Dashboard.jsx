@@ -1151,37 +1151,24 @@ function AssignmentManagement() {
 
 // ==================== QUIZ/EXAM MANAGEMENT COMPONENT ====================
 function QuizExamManagement() {
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showQuestionModal, setShowQuestionModal] = useState(false);
-  const [selectedQuiz, setSelectedQuiz] = useState(null);
+  const [view, setView] = useState('list');
   const [quizzes, setQuizzes] = useState([]);
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [selectedQuiz, setSelectedQuiz] = useState(null);
+  const [results, setResults] = useState([]);
+  const [loadingResults, setLoadingResults] = useState(false);
 
   const [quizForm, setQuizForm] = useState({
-    title: '',
-    course: '',
-    date: '',
-    duration: '',
-    totalMarks: '',
-    instructions: ''
+    course_id: '', title: '', description: '',
+    time_limit_minutes: 30, pass_percentage: 60
   });
 
-  const [questionForm, setQuestionForm] = useState({
-    type: 'mcq',
-    question: '',
-    options: ['', '', '', ''],
-    correctAnswer: '',
-    points: ''
-  });
-
-  const questionTypes = [
-    { value: 'mcq', label: 'Multiple Choice', icon: '☑️' },
-    { value: 'trueFalse', label: 'True/False', icon: '✓✗' },
-    { value: 'shortAnswer', label: 'Short Answer', icon: '📝' },
-    { value: 'essay', label: 'Essay', icon: '📄' },
-    { value: 'fillBlanks', label: 'Fill in the Blanks', icon: '___' }
-  ];
+  const [questions, setQuestions] = useState([
+    { question_text: '', option_a: '', option_b: '', option_c: '',
+      option_d: '', correct_option: 'a', marks: 1 }
+  ]);
 
   useEffect(() => {
     fetchQuizzes();
@@ -1190,259 +1177,459 @@ function QuizExamManagement() {
 
   const fetchQuizzes = async () => {
     try {
-      const response = await api.get('/faculty/quizzes');
-      if (response.data.success) {
-        setQuizzes(response.data.quizzes || []);
-      }
-    } catch (error) {
-      console.error('Error fetching quizzes:', error);
-    } finally {
-      setLoading(false);
-    }
+      const res = await api.get('/faculty/quizzes');
+      if (res.data.success) setQuizzes(res.data.quizzes || []);
+    } catch (e) { console.error(e); }
+    finally { setLoading(false); }
   };
 
   const fetchCourses = async () => {
     try {
-      const response = await api.get('/faculty/courses');
-      if (response.data.success) {
-        setCourses(response.data.courses || []);
-      }
-    } catch (error) {
-      console.error('Error fetching courses:', error);
-    }
+      const res = await api.get('/faculty/courses');
+      if (res.data.success) setCourses(res.data.courses || []);
+    } catch (e) { console.error(e); }
+  };
+
+  const fetchResults = async (quizId) => {
+    setLoadingResults(true);
+    try {
+      const res = await api.get(`/quizzes/${quizId}/results`);
+      if (res.data.success) setResults(res.data.attempts || []);
+    } catch (e) { console.error(e); }
+    finally { setLoadingResults(false); }
   };
 
   const handleCreateQuiz = async () => {
-    try {
-      const response = await api.post('/faculty/quizzes', {
-        ...quizForm,
-        duration: parseInt(quizForm.duration),
-        totalMarks: parseInt(quizForm.totalMarks)
-      });
-      if (response.data.success) {
-        setQuizzes([...quizzes, response.data.quiz]);
-        setShowCreateModal(false);
-        setQuizForm({ title: '', course: '', date: '', duration: '', totalMarks: '', instructions: '' });
-      }
-    } catch (error) {
-      console.error('Error creating quiz:', error);
-      alert('Failed to create quiz.');
+    if (!quizForm.course_id || !quizForm.title) {
+      alert('Course and title are required');
+      return;
     }
+    setSaving(true);
+    try {
+      const res = await api.post('/quizzes', quizForm);
+      if (res.data.success) {
+        setSelectedQuiz(res.data.quiz);
+        setView('questions');
+      }
+    } catch (e) { alert(e.response?.data?.message || 'Error creating quiz'); }
+    finally { setSaving(false); }
   };
 
-  if (loading) {
+  const handleSaveQuestions = async () => {
+    const invalid = questions.some(q => !q.question_text || !q.option_a || !q.option_b);
+    if (invalid) {
+      alert('Each question needs text, Option A and Option B');
+      return;
+    }
+    setSaving(true);
+    try {
+      await api.post(`/quizzes/${selectedQuiz.id}/questions`, { questions });
+      await fetchQuizzes();
+      setView('list');
+      setQuizForm({ course_id: '', title: '', description: '',
+        time_limit_minutes: 30, pass_percentage: 60 });
+      setQuestions([{ question_text: '', option_a: '', option_b: '',
+        option_c: '', option_d: '', correct_option: 'a', marks: 1 }]);
+      alert('✅ Quiz published! Students can now see it.');
+    } catch (e) { alert(e.response?.data?.message || 'Error saving questions'); }
+    finally { setSaving(false); }
+  };
+
+  const handleDeleteQuiz = async (quizId) => {
+    if (!window.confirm('Delete this quiz?')) return;
+    try {
+      await api.delete(`/quizzes/${quizId}`);
+      setQuizzes(quizzes.filter(q => q.id !== quizId));
+    } catch (e) { alert('Error deleting quiz'); }
+  };
+
+  const addQuestion = () => {
+    setQuestions([...questions, {
+      question_text: '', option_a: '', option_b: '',
+      option_c: '', option_d: '', correct_option: 'a', marks: 1
+    }]);
+  };
+
+  const removeQuestion = (idx) => {
+    if (questions.length === 1) return;
+    setQuestions(questions.filter((_, i) => i !== idx));
+  };
+
+  const updateQuestion = (idx, field, value) => {
+    const updated = [...questions];
+    updated[idx][field] = value;
+    setQuestions(updated);
+  };
+
+  // ── RESULTS VIEW ──────────────────────────────────────────────
+  if (view === 'results' && selectedQuiz) {
+    const passCount = results.filter(r => r.passed).length;
+    const avgScore = results.length
+      ? Math.round(results.reduce((s, r) =>
+          s + (r.score / r.total_marks * 100), 0) / results.length)
+      : 0;
+
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent"></div>
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <button onClick={() => setView('list')}
+            className="text-gray-500 hover:text-gray-800 flex items-center gap-1">
+            <ChevronRight size={20} className="rotate-180" /> Back
+          </button>
+          <div>
+            <h2 className="text-2xl font-bold text-primary">Quiz Results</h2>
+            <p className="text-sm text-gray-500">{selectedQuiz.title}</p>
+          </div>
+        </div>
+
+        <div className="grid md:grid-cols-3 gap-4">
+          <div className="bg-white p-5 rounded-xl shadow-md flex items-center gap-4">
+            <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+              <Users size={22} className="text-blue-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-gray-800">{results.length}</p>
+              <p className="text-sm text-gray-500">Total Attempts</p>
+            </div>
+          </div>
+          <div className="bg-white p-5 rounded-xl shadow-md flex items-center gap-4">
+            <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
+              <CheckCircle size={22} className="text-green-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-gray-800">{passCount}</p>
+              <p className="text-sm text-gray-500">
+                Passed ({results.length > 0
+                  ? Math.round(passCount / results.length * 100) : 0}%)
+              </p>
+            </div>
+          </div>
+          <div className="bg-white p-5 rounded-xl shadow-md flex items-center gap-4">
+            <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center">
+              <TrendingUp size={22} className="text-orange-500" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-gray-800">{avgScore}%</p>
+              <p className="text-sm text-gray-500">Average Score</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-md overflow-hidden">
+          {loadingResults ? (
+            <div className="flex items-center justify-center py-16">
+              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-accent" />
+            </div>
+          ) : results.length === 0 ? (
+            <div className="text-center py-16 text-gray-400">
+              <Users size={48} className="mx-auto mb-3 opacity-30" />
+              <p>No attempts yet</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 text-gray-600 font-semibold">
+                  <tr>
+                    <th className="px-6 py-3 text-left">#</th>
+                    <th className="px-6 py-3 text-left">Student</th>
+                    <th className="px-6 py-3 text-left">Score</th>
+                    <th className="px-6 py-3 text-left">Percentage</th>
+                    <th className="px-6 py-3 text-left">Time</th>
+                    <th className="px-6 py-3 text-left">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {results.map((attempt, idx) => {
+                    const pct = Math.round(
+                      (attempt.score / attempt.total_marks) * 100);
+                    const mins = Math.floor(
+                      (attempt.time_taken_seconds || 0) / 60);
+                    const secs = (attempt.time_taken_seconds || 0) % 60;
+                    return (
+                      <tr key={attempt.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 text-gray-400">{idx + 1}</td>
+                        <td className="px-6 py-4">
+                          <p className="font-semibold text-gray-800">
+                            {attempt.Student?.User?.full_name || 'Unknown'}
+                          </p>
+                          <p className="text-gray-400 text-xs">
+                            {attempt.Student?.User?.email}
+                          </p>
+                        </td>
+                        <td className="px-6 py-4 font-semibold">
+                          {attempt.score}/{attempt.total_marks}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2">
+                            <div className="w-16 h-2 bg-gray-100 rounded-full overflow-hidden">
+                              <div className={`h-2 rounded-full ${pct >= 60 ? 'bg-green-500' : 'bg-red-400'}`}
+                                style={{ width: `${pct}%` }} />
+                            </div>
+                            <span className="font-semibold">{pct}%</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-gray-600">
+                          {mins}m {secs}s
+                        </td>
+                        <td className="px-6 py-4">
+                          {attempt.passed
+                            ? <span className="text-green-600 font-semibold text-xs flex items-center gap-1">
+                                <CheckCircle size={14} /> Passed
+                              </span>
+                            : <span className="text-red-500 font-semibold text-xs flex items-center gap-1">
+                                <XCircle size={14} /> Failed
+                              </span>
+                          }
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
     );
   }
+
+  // ── ADD QUESTIONS VIEW ────────────────────────────────────────
+  if (view === 'questions') {
+    return (
+      <div className="space-y-5">
+        <div className="flex items-center gap-4">
+          <button onClick={() => setView('list')}
+            className="text-gray-500 hover:text-gray-800 flex items-center gap-1">
+            <ChevronRight size={20} className="rotate-180" /> Back
+          </button>
+          <div>
+            <h2 className="text-2xl font-bold text-primary">Add Questions</h2>
+            <p className="text-sm text-gray-500">Quiz: {selectedQuiz?.title}</p>
+          </div>
+          <span className="ml-auto text-sm text-gray-500">
+            {questions.length} question(s)
+          </span>
+        </div>
+
+        {questions.map((q, idx) => (
+          <div key={idx} className="bg-white rounded-xl p-6 shadow-md">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-gray-700">Question {idx + 1}</h3>
+              <button onClick={() => removeQuestion(idx)}
+                disabled={questions.length === 1}
+                className="text-red-400 hover:text-red-600 disabled:opacity-30">
+                <Trash2 size={18} />
+              </button>
+            </div>
+
+            <textarea value={q.question_text}
+              onChange={e => updateQuestion(idx, 'question_text', e.target.value)}
+              placeholder="Enter your question here..." rows={2}
+              className="w-full border border-gray-300 rounded-lg px-4 py-2.5 mb-4 focus:ring-2 focus:ring-accent" />
+
+            <div className="grid md:grid-cols-2 gap-3 mb-4">
+              {['a', 'b', 'c', 'd'].map(opt => (
+                <div key={opt} className={`flex items-center gap-2 border-2 rounded-lg px-3 py-2
+                  ${q.correct_option === opt
+                    ? 'border-green-400 bg-green-50'
+                    : 'border-gray-200'}`}>
+                  <span onClick={() => updateQuestion(idx, 'correct_option', opt)}
+                    className={`w-7 h-7 rounded-full text-xs font-bold flex items-center
+                      justify-center flex-shrink-0 cursor-pointer
+                      ${q.correct_option === opt
+                        ? 'bg-green-500 text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                    {opt.toUpperCase()}
+                  </span>
+                  <input value={q[`option_${opt}`]}
+                    onChange={e => updateQuestion(idx, `option_${opt}`, e.target.value)}
+                    placeholder={`Option ${opt.toUpperCase()}${opt === 'a' || opt === 'b' ? ' *' : ''}`}
+                    className="flex-1 bg-transparent outline-none text-sm" />
+                </div>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-semibold text-gray-600">
+                  Correct Answer:
+                </label>
+                <select value={q.correct_option}
+                  onChange={e => updateQuestion(idx, 'correct_option', e.target.value)}
+                  className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-accent">
+                  <option value="a">Option A</option>
+                  <option value="b">Option B</option>
+                  <option value="c">Option C</option>
+                  <option value="d">Option D</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-semibold text-gray-600">Marks:</label>
+                <input type="number" value={q.marks} min={1} max={10}
+                  onChange={e => updateQuestion(idx, 'marks', parseInt(e.target.value))}
+                  className="w-16 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-accent" />
+              </div>
+            </div>
+          </div>
+        ))}
+
+        <button onClick={addQuestion}
+          className="w-full border-2 border-dashed border-blue-300 text-accent py-3
+            rounded-xl font-semibold hover:bg-blue-50 transition flex items-center justify-center gap-2">
+          <Plus size={18} /> Add Another Question
+        </button>
+
+        <button onClick={handleSaveQuestions} disabled={saving}
+          className="w-full bg-accent hover:bg-blue-700 text-white py-3 rounded-xl
+            font-bold text-lg transition disabled:opacity-50 flex items-center justify-center gap-2">
+          {saving ? 'Publishing...' : '🚀 Publish Quiz to Students'}
+        </button>
+      </div>
+    );
+  }
+
+  // ── CREATE QUIZ VIEW ──────────────────────────────────────────
+  if (view === 'create') {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <button onClick={() => setView('list')}
+            className="text-gray-500 hover:text-gray-800 flex items-center gap-1">
+            <ChevronRight size={20} className="rotate-180" /> Back
+          </button>
+          <h2 className="text-2xl font-bold text-primary">Create New Quiz</h2>
+        </div>
+
+        <div className="bg-white rounded-xl p-8 shadow-md max-w-2xl">
+          <div className="space-y-5">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Select Course *
+              </label>
+              <select value={quizForm.course_id}
+                onChange={e => setQuizForm({ ...quizForm, course_id: e.target.value })}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent">
+                <option value="">-- Select a course --</option>
+                {courses.map(c => (
+                  <option key={c.id} value={c.id}>{c.course_name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Quiz Title *
+              </label>
+              <input value={quizForm.title}
+                onChange={e => setQuizForm({ ...quizForm, title: e.target.value })}
+                placeholder="e.g. Module 1 Assessment"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent" />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Description
+              </label>
+              <textarea value={quizForm.description}
+                onChange={e => setQuizForm({ ...quizForm, description: e.target.value })}
+                rows={3} placeholder="Brief description..."
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent" />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Time Limit (minutes)
+                </label>
+                <input type="number" value={quizForm.time_limit_minutes}
+                  min={1} max={180}
+                  onChange={e => setQuizForm({ ...quizForm, time_limit_minutes: e.target.value })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent" />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Pass Percentage (%)
+                </label>
+                <input type="number" value={quizForm.pass_percentage}
+                  min={1} max={100}
+                  onChange={e => setQuizForm({ ...quizForm, pass_percentage: e.target.value })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent" />
+              </div>
+            </div>
+          </div>
+
+          <button onClick={handleCreateQuiz} disabled={saving}
+            className="mt-8 w-full bg-accent hover:bg-blue-700 text-white py-3
+              rounded-xl font-bold text-lg transition disabled:opacity-50">
+            {saving ? 'Creating...' : 'Next: Add Questions →'}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── QUIZ LIST VIEW ────────────────────────────────────────────
+  if (loading) return (
+    <div className="flex items-center justify-center h-64">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent" />
+    </div>
+  );
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-primary">Quiz & Exam Management</h2>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg hover:bg-blue-700 transition"
-        >
-          <Plus className="h-4 w-4" />
-          Create Quiz/Exam
+        <button onClick={() => setView('create')}
+          className="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg hover:bg-blue-700 transition">
+          <Plus size={16} /> Create Quiz
         </button>
       </div>
 
       {quizzes.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-xl shadow-md">
           <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-600">No quizzes or exams found.</p>
+          <p className="text-gray-600 mb-4">No quizzes yet.</p>
+          <button onClick={() => setView('create')}
+            className="bg-accent text-white px-6 py-2.5 rounded-lg font-semibold hover:bg-blue-700 transition">
+            Create Your First Quiz
+          </button>
         </div>
       ) : (
         <div className="space-y-4">
-          {quizzes.map((quiz) => (
+          {quizzes.map(quiz => (
             <div key={quiz.id} className="bg-white p-6 rounded-xl shadow-md">
-              <div className="flex justify-between items-start mb-4">
+              <div className="flex justify-between items-start mb-3">
                 <div>
-                  <h3 className="text-xl font-bold text-gray-800">{quiz.title}</h3>
-                  <p className="text-sm text-gray-500">{quiz.course}</p>
+                  <h3 className="text-lg font-bold text-gray-800">{quiz.title}</h3>
+                  <p className="text-sm text-gray-500">
+                    {quiz.Course?.course_name} • {quiz.time_limit_minutes} min •
+                    Pass: {quiz.pass_percentage}% • {quiz.question_count} questions
+                  </p>
                 </div>
-                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                  quiz.status === 'Scheduled' ? 'bg-blue-100 text-blue-800' :
-                  quiz.status === 'Active' ? 'bg-green-100 text-green-800' :
-                  'bg-gray-100 text-gray-800'
-                }`}>
-                  {quiz.status}
+                <span className={`px-3 py-1 rounded-full text-xs font-semibold
+                  ${quiz.is_active
+                    ? 'bg-green-100 text-green-800'
+                    : 'bg-gray-100 text-gray-600'}`}>
+                  {quiz.is_active ? '🟢 Active' : 'Inactive'}
                 </span>
               </div>
 
-              {quiz.questionTypes && (
-                <div className="grid md:grid-cols-5 gap-4 mb-4">
-                  <div className="text-center p-3 bg-purple-50 rounded-lg">
-                    <p className="text-xs text-gray-600 mb-1">MCQ</p>
-                    <p className="text-lg font-bold text-purple-600">{quiz.questionTypes.mcq}</p>
-                  </div>
-                  <div className="text-center p-3 bg-blue-50 rounded-lg">
-                    <p className="text-xs text-gray-600 mb-1">True/False</p>
-                    <p className="text-lg font-bold text-blue-600">{quiz.questionTypes.trueFalse}</p>
-                  </div>
-                  <div className="text-center p-3 bg-green-50 rounded-lg">
-                    <p className="text-xs text-gray-600 mb-1">Short Answer</p>
-                    <p className="text-lg font-bold text-green-600">{quiz.questionTypes.shortAnswer}</p>
-                  </div>
-                  <div className="text-center p-3 bg-yellow-50 rounded-lg">
-                    <p className="text-xs text-gray-600 mb-1">Essay</p>
-                    <p className="text-lg font-bold text-yellow-600">{quiz.questionTypes.essay}</p>
-                  </div>
-                  <div className="text-center p-3 bg-red-50 rounded-lg">
-                    <p className="text-xs text-gray-600 mb-1">Fill Blanks</p>
-                    <p className="text-lg font-bold text-red-600">{quiz.questionTypes.fillBlanks}</p>
-                  </div>
-                </div>
-              )}
-
-              <div className="flex gap-2">
-                <button
-                  onClick={() => { setSelectedQuiz(quiz); setShowQuestionModal(true); }}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm font-semibold"
-                >
-                  <Plus size={16} className="inline mr-1" />
-                  Add Questions
+              <div className="flex gap-2 flex-wrap">
+                <button onClick={() => { setSelectedQuiz(quiz); setView('questions'); }}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm font-semibold flex items-center gap-1">
+                  <Plus size={15} /> Add Questions
                 </button>
-                <button className="px-4 py-2 bg-accent text-white rounded-lg hover:bg-blue-700 transition text-sm font-semibold">
-                  <Eye size={16} className="inline mr-1" />
-                  View Questions
+                <button onClick={() => { setSelectedQuiz(quiz); fetchResults(quiz.id); setView('results'); }}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition text-sm font-semibold flex items-center gap-1">
+                  <BarChart3 size={15} /> View Results
                 </button>
-                <button className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition text-sm font-semibold">
-                  <BarChart3 size={16} className="inline mr-1" />
-                  View Results
+                <button onClick={() => handleDeleteQuiz(quiz.id)}
+                  className="px-4 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition text-sm font-semibold flex items-center gap-1">
+                  <Trash2 size={15} /> Delete
                 </button>
               </div>
             </div>
           ))}
-        </div>
-      )}
-
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-8 max-w-2xl w-full mx-4 shadow-2xl">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-2xl font-bold text-primary">Create New Quiz/Exam</h3>
-              <button onClick={() => setShowCreateModal(false)}>
-                <X className="h-6 w-6" />
-              </button>
-            </div>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Title *</label>
-                <input type="text" value={quizForm.title} onChange={(e) => setQuizForm({...quizForm, title: e.target.value})}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent" placeholder="Quiz/Exam title" />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Course *</label>
-                <select value={quizForm.course} onChange={(e) => setQuizForm({...quizForm, course: e.target.value})}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent">
-                  <option value="">Select Course</option>
-                  {courses.map(course => (
-                    <option key={course.id} value={course.id}>{course.code} - {course.course_name}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Date</label>
-                  <input type="date" value={quizForm.date} onChange={(e) => setQuizForm({...quizForm, date: e.target.value})}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent" />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Duration (min)</label>
-                  <input type="number" value={quizForm.duration} onChange={(e) => setQuizForm({...quizForm, duration: e.target.value})}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent" placeholder="60" />
-                </div>
-              </div>
-            </div>
-            <button onClick={handleCreateQuiz}
-              className="w-full mt-6 px-4 py-3 bg-accent text-white rounded-lg hover:bg-blue-700 transition font-semibold">
-              Create Quiz
-            </button>
-          </div>
-        </div>
-      )}
-
-      {showQuestionModal && selectedQuiz && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
-          <div className="bg-white rounded-xl p-8 max-w-3xl w-full mx-4 my-8 shadow-2xl">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-2xl font-bold text-primary">Add Question to {selectedQuiz.title}</h3>
-              <button onClick={() => setShowQuestionModal(false)}>
-                <X className="h-6 w-6" />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Question Type</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {questionTypes.map(type => (
-                    <button
-                      key={type.value}
-                      onClick={() => setQuestionForm({...questionForm, type: type.value})}
-                      className={`p-3 rounded-lg border-2 transition ${
-                        questionForm.type === type.value ? 'border-accent bg-blue-50' : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                    >
-                      <div className="text-2xl mb-1">{type.icon}</div>
-                      <div className="text-xs font-semibold">{type.label}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Question Text</label>
-                <textarea
-                  value={questionForm.question}
-                  onChange={(e) => setQuestionForm({...questionForm, question: e.target.value})}
-                  rows="3"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent"
-                  placeholder="Enter your question..."
-                />
-              </div>
-
-              {questionForm.type === 'mcq' && (
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Options</label>
-                  {questionForm.options.map((option, idx) => (
-                    <input
-                      key={idx}
-                      type="text"
-                      value={option}
-                      onChange={(e) => {
-                        const newOptions = [...questionForm.options];
-                        newOptions[idx] = e.target.value;
-                        setQuestionForm({...questionForm, options: newOptions});
-                      }}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-2 focus:ring-2 focus:ring-accent"
-                      placeholder={`Option ${idx + 1}`}
-                    />
-                  ))}
-                </div>
-              )}
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Points</label>
-                <input
-                  type="number"
-                  value={questionForm.points}
-                  onChange={(e) => setQuestionForm({...questionForm, points: e.target.value})}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent"
-                  placeholder="Points for this question"
-                />
-              </div>
-            </div>
-
-            <button className="w-full mt-6 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold">
-              Add Question
-            </button>
-          </div>
         </div>
       )}
     </div>

@@ -14,6 +14,9 @@ const Question = require('./Question');
 const Result = require('./Result');
 const Notification = require('./Notification');
 const Payment = require('./Payment');
+const Quiz = require('./Quiz');
+const QuizQuestion = require('./QuizQuestion');
+const QuizAttempt = require('./QuizAttempt');
 
 // User associations
 User.hasOne(Student, { foreignKey: 'user_id', onDelete: 'CASCADE' });
@@ -73,6 +76,19 @@ Result.belongsTo(Student, { foreignKey: 'student_id' });
 Exam.hasMany(Result, { foreignKey: 'exam_id', onDelete: 'CASCADE' });
 Result.belongsTo(Exam, { foreignKey: 'exam_id' });
 
+// Quiz associations
+Course.hasMany(Quiz, { foreignKey: 'course_id', onDelete: 'CASCADE' });
+Quiz.belongsTo(Course, { foreignKey: 'course_id' });
+
+Quiz.hasMany(QuizQuestion, { foreignKey: 'quiz_id', onDelete: 'CASCADE' });
+QuizQuestion.belongsTo(Quiz, { foreignKey: 'quiz_id' });
+
+Quiz.hasMany(QuizAttempt, { foreignKey: 'quiz_id', onDelete: 'CASCADE' });
+QuizAttempt.belongsTo(Quiz, { foreignKey: 'quiz_id' });
+
+Student.hasMany(QuizAttempt, { foreignKey: 'student_id', onDelete: 'CASCADE' });
+QuizAttempt.belongsTo(Student, { foreignKey: 'student_id' });
+
 // Export all models
 module.exports = {
   sequelize,
@@ -88,5 +104,8 @@ module.exports = {
   Question,
   Result,
   Notification,
-  Payment
+  Payment,
+  Quiz,           // 👈 add this
+  QuizQuestion,   // 👈 add this
+  QuizAttempt
 };

@@ -113,6 +113,8 @@ app.use((err, req, res, next) => {
   });
 });
 
+app.use('/api/quizzes', require('./routes/quizzes'));
+
 // ✅ FIX 6: Don't run sequelize.sync() on every start in production
 // It checks every table schema — very slow with many models
 const PORT = process.env.PORT || 5000;

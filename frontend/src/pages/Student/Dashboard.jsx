@@ -276,7 +276,7 @@ function MyCourses() {
   const [withdrawing, setWithdrawing] = useState(null);
   const [openVideo, setOpenVideo] = useState(null);
 
-   const COURSE_VIDEOS = {
+  const COURSE_VIDEOS = {
     // ── PRODUCTION IDs ──
     1: 'https://www.youtube.com/embed/y3HKCaLPqtU?rel=0&modestbranding=1',  // Banking Foundation
     6: 'https://www.youtube.com/embed/cG1kVkzS2pE?rel=0&modestbranding=1',  // Payments & Cards
@@ -288,6 +288,7 @@ function MyCourses() {
     41: 'https://www.youtube.com/embed/Ap7Gk2Nj52c?rel=0&modestbranding=1',
     42: 'https://www.youtube.com/embed/cG1kVkzS2pE?rel=0&modestbranding=1',
   };
+
   const isYouTube = (url) => url?.includes('youtube.com/embed');
   const getYouTubeId = (url) => url?.split('/embed/')[1]?.split('?')[0];
 
@@ -331,42 +332,69 @@ function MyCourses() {
 
   return (
     <div className="space-y-6">
+
+      {/* ── Header + Filter Tabs ── */}
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-900">My Courses</h2>
         <div className="flex gap-2">
           {['all', 'in-progress', 'completed'].map(f => (
-            <button key={f} onClick={() => setFilter(f)}
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
               className={`px-4 py-2 rounded-lg transition capitalize text-sm font-medium ${
-                filter === f ? 'bg-orange-500 text-white' : 'bg-gray-100 hover:bg-gray-200'
-              }`}>
+                filter === f
+                  ? 'bg-orange-500 text-white'
+                  : 'bg-gray-100 hover:bg-gray-200'
+              }`}
+            >
               {f.replace('-', ' ')}
             </button>
           ))}
         </div>
       </div>
 
+      {/* ── Empty State ── */}
       {filtered.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-xl shadow-md">
           <BookOpen className="h-16 w-16 text-gray-300 mx-auto mb-4" />
           <p className="text-gray-500 mb-4 text-lg">
-            {filter === 'all' ? "You haven't enrolled in any courses yet" : `No ${filter.replace('-', ' ')} courses`}
+            {filter === 'all'
+              ? "You haven't enrolled in any courses yet"
+              : `No ${filter.replace('-', ' ')} courses`}
           </p>
-          <Link to="/student/browse" className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-lg transition font-semibold">
+          <Link
+            to="/student/browse"
+            className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-lg transition font-semibold"
+          >
             Browse Courses
           </Link>
         </div>
+
       ) : (
+
+        /* ── Course Cards Grid ── */
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filtered.map((enrollment) => {
-            const course = enrollment.Course || {};
-            const progress = enrollment.progress_percentage || 0;
-            const videoSrc = COURSE_VIDEOS[course.id];
+            const course      = enrollment.Course || {};
+            const progress    = enrollment.progress_percentage || 0;
+            const videoSrc    = COURSE_VIDEOS[course.id];
             const isVideoOpen = openVideo === enrollment.id;
+
             return (
-              <div key={enrollment.id} className="bg-white rounded-xl shadow-md hover:shadow-xl transition overflow-hidden">
+              <div
+                key={enrollment.id}
+                className="bg-white rounded-xl shadow-md hover:shadow-xl transition overflow-hidden"
+              >
+
+                {/* ── Top Progress Bar ── */}
                 <div className="h-1.5 bg-gray-100">
-                  <div className="h-1.5 bg-gradient-to-r from-orange-400 to-orange-600 transition-all" style={{ width: `${progress}%` }} />
+                  <div
+                    className="h-1.5 bg-gradient-to-r from-orange-400 to-orange-600 transition-all"
+                    style={{ width: `${progress}%` }}
+                  />
                 </div>
+
+                {/* ── Video Section ── */}
                 {videoSrc && (
                   <div className="bg-gray-900">
                     {isVideoOpen ? (
@@ -380,11 +408,18 @@ function MyCourses() {
                           allowFullScreen
                           title={course.course_name}
                         />
-                        <button onClick={() => setOpenVideo(null)} className="absolute top-2 right-2 w-8 h-8 bg-black/70 text-white rounded-full flex items-center justify-center">✕</button>
+                        <button
+                          onClick={() => setOpenVideo(null)}
+                          className="absolute top-2 right-2 w-8 h-8 bg-black/70 text-white rounded-full flex items-center justify-center"
+                        >
+                          ✕
+                        </button>
                       </div>
                     ) : (
-                      <button onClick={() => setOpenVideo(enrollment.id)}
-                        className="w-full flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-blue-900 to-blue-700 text-white hover:from-blue-800 hover:to-blue-600 transition">
+                      <button
+                        onClick={() => setOpenVideo(enrollment.id)}
+                        className="w-full flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-blue-900 to-blue-700 text-white hover:from-blue-800 hover:to-blue-600 transition"
+                      >
                         <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
                           <PlayCircle size={22} className="text-white" />
                         </div>
@@ -397,31 +432,49 @@ function MyCourses() {
                     )}
                   </div>
                 )}
+
+                {/* ── Card Body ── */}
                 <div className="p-6">
                   <h3 className="text-lg font-bold text-gray-800 mb-2">{course.course_name}</h3>
                   <p className="text-sm text-gray-500 line-clamp-2 mb-4">{course.description}</p>
+
+                  {/* Circular Progress */}
                   <div className="flex items-center justify-center mb-4">
                     <CircularProgress percentage={progress} size={90} strokeWidth={7} />
                   </div>
+
+                  {/* Meta Info */}
                   <div className="flex items-center justify-between text-xs text-gray-500 mb-4">
-                    <span className="flex items-center gap-1"><Clock size={13} /> {course.duration_hours}h</span>
-                    <span className="flex items-center gap-1"><Calendar size={13} /> {new Date(enrollment.created_at).toLocaleDateString()}</span>
+                    <span className="flex items-center gap-1">
+                      <Clock size={13} /> {course.duration_hours}h
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Calendar size={13} /> {new Date(enrollment.created_at).toLocaleDateString()}
+                    </span>
                   </div>
+
+                  {/* Actions */}
                   <div className="flex gap-2">
-                    <Link to={`/student/course/${course.id}`}
-                      className="flex-1 bg-orange-500 hover:bg-orange-600 text-white text-center py-2.5 rounded-lg font-semibold transition text-sm flex items-center justify-center gap-2">
+                    <Link
+                      to={`/student/course/${course.id}`}
+                      className="flex-1 bg-orange-500 hover:bg-orange-600 text-white text-center py-2.5 rounded-lg font-semibold transition text-sm flex items-center justify-center gap-2"
+                    >
                       <PlayCircle size={16} />
                       {progress === 100 ? 'Review' : 'Continue'}
                     </Link>
+
                     {progress < 100 && (
-                      <button onClick={() => handleWithdraw(enrollment.id, course.course_name)}
+                      <button
+                        onClick={() => handleWithdraw(enrollment.id, course.course_name)}
                         disabled={withdrawing === enrollment.id}
-                        className="px-3 bg-red-100 hover:bg-red-500 hover:text-white text-red-500 rounded-lg transition disabled:opacity-50 text-sm">
+                        className="px-3 bg-red-100 hover:bg-red-500 hover:text-white text-red-500 rounded-lg transition disabled:opacity-50 text-sm"
+                      >
                         {withdrawing === enrollment.id ? '...' : <X size={16} />}
                       </button>
                     )}
                   </div>
                 </div>
+
               </div>
             );
           })}
@@ -430,7 +483,6 @@ function MyCourses() {
     </div>
   );
 }
-
 // ==================== CERTIFICATES ====================
 function Certificates() {
   const [certificates, setCertificates] = useState([]);

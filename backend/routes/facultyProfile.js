@@ -5,7 +5,8 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { Op } = require('sequelize');
-const { User, Faculty, Course, Enrollment, Student, Exam, Result, VideoWatchHistory, Lesson, CourseModule } = require('../models');
+const { User, Faculty, Course, Enrollment, Student, Exam, Result, 
+        VideoWatchHistory, Lesson, CourseModule, Quiz, QuizQuestion } = require('../models');
 const authMiddleware = require('../middleware/auth');
 
 const storage = multer.diskStorage({
@@ -173,6 +174,36 @@ router.get('/dashboard/stats', authMiddleware, async (req, res) => {
   } catch (error) {
     console.error('Error fetching dashboard stats:', error);
     res.status(500).json({ success: false, message: 'Error fetching dashboard statistics' });
+  }
+});
+
+router.get('/quizzes', authMiddleware, async (req, res) => {
+  try {
+    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
+    if (!faculty) return res.status(404).json({ success: false, message: 'Faculty not found' });
+
+    const courses = await Course.findAll({ where: { faculty_id: faculty.id }, attributes: ['id'] });
+    const courseIds = courses.map(c => c.id);
+
+    const quizzes = await Quiz.findAll({
+      where: { course_id: courseIds },
+      include: [
+        { model: Course, attributes: ['course_name'] },
+        { model: QuizQuestion, attributes: ['id'] }
+      ],
+      order: [['created_at', 'DESC']]
+    });
+
+    res.json({
+      success: true,
+      quizzes: quizzes.map(q => ({
+        ...q.toJSON(),
+        question_count: q.QuizQuestions?.length || 0
+      }))
+    });
+  } catch (error) {
+    console.error('Get faculty quizzes error:', error);
+    res.status(500).json({ success: false, message: 'Error fetching quizzes' });
   }
 });
 
