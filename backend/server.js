@@ -98,6 +98,7 @@ app.use('/api/student', require('./routes/student'));
 app.use('/api/admin/dashboard', require('./routes/adminDashboard'));
 app.use('/api/faculty', facultyRoutes);
 app.use('/api/quizzes', require('./routes/quizzes'));
+app.use('/api/forum', require('./routes/forum'));
 
 // 404 handler
 app.use((req, res) => {
