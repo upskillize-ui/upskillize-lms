@@ -2257,6 +2257,7 @@ export default function StudentDashboard() {
     { path: '/student/browse',       label: 'Browse Courses', icon: ShoppingBag,   free: true },
     { path: '/student/certificates', label: 'Certificates',   icon: Award,         free: true },
     { path: '/student/progress',     label: 'Progress',       icon: TrendingUp,    free: true },
+    { path: '/student/assignments',     label: 'Progress',       icon: ClipboardList,    free: true },
     { path: '/student/quizzes',          label: 'Quizzes',    icon: ClipboardList, free: true },
     { path: '/student/discussion-forum', label: 'Discussion', icon: MessageSquare, free: true },
     { path: '/student/notifications',label: 'Notifications',  icon: Bell,          free: true },
@@ -2264,7 +2265,6 @@ export default function StudentDashboard() {
     { path: '/student/payments',     label: 'Payments',       icon: CreditCard,    free: true },
     { path: '/student/profile',      label: 'Profile',        icon: User,          free: true },
     { path: '/student/settings',     label: 'Settings',       icon: Settings,      free: true },
-    { path: '/student/assignments',  label: 'Assignments',    icon: ClipboardList },
   ];
 
   return (
