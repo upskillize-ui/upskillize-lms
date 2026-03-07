@@ -397,27 +397,25 @@ router.post('/assignments/:id/grade', authMiddleware, async (req, res) => {
 router.delete('/assignments/:id', [authMiddleware, rbac(['faculty','admin'])], async (req, res) => {
   try {
 
-    const assignmentId = req.params.id;
+    const { sequelize } = require('../config/database');
 
-    const facultyId = req.user?.id || req.user?.userId;
+    const faculty = await Faculty.findOne({
+      where: { user_id: req.user.id }
+    });
 
-    if (!facultyId) {
-      return res.status(401).json({
-        success:false,
-        message:"User not authenticated"
-      });
-    }
-
-    const assignment = await db.Assignment.findByPk(assignmentId);
-
-    if (!assignment) {
+    if (!faculty) {
       return res.status(404).json({
         success:false,
-        message:"Assignment not found"
+        message:"Faculty not found"
       });
     }
 
-    await assignment.destroy();
+    await sequelize.query(
+      `DELETE FROM assignments WHERE id = ? AND faculty_id = ?`,
+      {
+        replacements: [req.params.id, faculty.id]
+      }
+    );
 
     res.json({
       success:true,
@@ -432,5 +430,7 @@ router.delete('/assignments/:id', [authMiddleware, rbac(['faculty','admin'])], a
       success:false,
       message:"Server error"
     });
+
   }
 });
+module.exports = router;
