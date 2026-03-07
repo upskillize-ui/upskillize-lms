@@ -824,6 +824,17 @@ function AssignmentManagement() {
     setShowGradingModal(true);
   };
 
+  const handleDeleteAssignment = async (assignmentId) => {
+    if (!window.confirm('Are you sure you want to delete this assignment?')) return;
+    try {
+      await api.delete(`/faculty/assignments/${assignmentId}`);
+      setAssignments(assignments.filter(a => a.id !== assignmentId));
+    } catch (error) {
+      console.error('Error deleting assignment:', error);
+      alert('Failed to delete assignment.');
+    }
+  };
+
   const handleGradeSubmission = async () => {
     try {
       await api.post(`/faculty/assignments/${selectedAssignment.id}/grade`, gradingForm);
@@ -951,6 +962,13 @@ function AssignmentManagement() {
                 <Edit2 className="h-4 w-4 inline mr-1" />
                   Edit
             </button>
+             <button
+                  onClick={() => handleDeleteAssignment(assignment.id)}
+                  className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition text-sm font-semibold flex items-center gap-1"
+                >
+                  <Trash2 size={16} />
+                  Delete
+                </button>
               </div>
             </div>
           ))}

@@ -392,4 +392,21 @@ router.post('/assignments/:id/grade', authMiddleware, async (req, res) => {
   }
 });
 
+router.delete('/assignments/:id', facultyOnly, async (req, res) => {
+  try {
+    const db = require('../config/database');
+    const [result] = await db.query(
+      'DELETE FROM assignments WHERE id = ? AND faculty_id = ?',
+      [req.params.id, req.faculty.id]
+    );
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ success: false, message: 'Assignment not found' });
+    }
+    res.json({ success: true, message: 'Assignment deleted' });
+  } catch (error) {
+    console.error('Delete assignment error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 module.exports = router;
