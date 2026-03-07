@@ -5,6 +5,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { Op } = require('sequelize');
+const rbac = require('../middleware/rbac');
 const { User, Faculty, Course, Enrollment, Student, Exam, Result, 
         VideoWatchHistory, Lesson, CourseModule, Quiz, QuizQuestion } = require('../models');
 const authMiddleware = require('../middleware/auth');
