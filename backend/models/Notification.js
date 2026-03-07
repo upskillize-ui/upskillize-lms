@@ -37,7 +37,8 @@ const Notification = sequelize.define('Notification', {
   }
 }, {
   tableName: 'notifications',
-  timestamps: true
+  timestamps: true,
+  underscored: true  // ✅ this one line fixes everything — maps createdAt → created_at
 });
 
 module.exports = Notification;

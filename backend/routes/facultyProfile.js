@@ -268,15 +268,16 @@ router.post('/announcements', authMiddleware, async (req, res) => {
       if (userIds.length > 0) {
         const { Notification } = require('../models');
         await Notification.bulkCreate(
-          userIds.map(user_id => ({
-            user_id,
-            title,
-            message,
-            type: 'announcement',
-            is_read: false,
-            created_at: new Date()
-          }))
-        );
+  userIds.map(user_id => ({
+    user_id,
+    title,
+    message,
+    type: 'announcement',
+    is_read: false,
+    created_at: new Date(),
+    updated_at: new Date()
+  }))
+);
       }
     }
 
