@@ -16,7 +16,7 @@ import {
   Flag, AlertTriangle, FilePlus, Video, ExternalLink, Grid3X3,
   HelpCircle, User, Menu, ChevronDown, Home, HardDrive, ClipboardList,
   MonitorPlay, Megaphone, Target, MessageCircle, MessageSquare, Send, PlayCircle,
-  Lightbulb, Layers, ShoppingBag, Percent, FileVideo, CalendarDays
+  Lightbulb, Layers, ShoppingBag, Percent, FileVideo, CalendarDays, Trophy
 } from 'lucide-react';
 
 // ==================== OVERVIEW COMPONENT ====================
@@ -3056,6 +3056,212 @@ function DoubtClearing() {
   );
 }
 
+// ==================== DISCUSSION FORUM ====================
+function DiscussionForum() {
+  const { user } = useAuth();
+  const [threads, setThreads] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showNewThread, setShowNewThread] = useState(false);
+  const [selectedThread, setSelectedThread] = useState(null);
+  const [replyContent, setReplyContent] = useState('');
+  const [submittingReply, setSubmittingReply] = useState(false);
+  const [filterCourse, setFilterCourse] = useState('');
+  const [courses, setCourses] = useState([]);
+  const [newThread, setNewThread] = useState({ title: '', content: '', course: 'General' });
+  const [posting, setPosting] = useState(false);
+
+  useEffect(() => { fetchData(); }, []);
+
+  const fetchData = async () => {
+    try {
+      const [threadsRes, coursesRes] = await Promise.all([
+        api.get('/forum/threads'),
+        api.get('/faculty/courses').catch(() => ({ data: { courses: [] } }))
+      ]);
+      if (threadsRes.data.success) setThreads(threadsRes.data.threads || []);
+      const enrolled = coursesRes.data.courses || [];
+      setCourses([{ id: 'general', course_name: 'General' }, ...enrolled]);
+    } catch (e) { console.error(e); }
+    finally { setLoading(false); }
+  };
+
+  const handleCreateThread = async (e) => {
+    e.preventDefault();
+    setPosting(true);
+    try {
+      const res = await api.post('/forum/threads', newThread);
+      setThreads([res.data.thread, ...threads]);
+      setShowNewThread(false);
+      setNewThread({ title: '', content: '', course: 'General' });
+    } catch { alert('Error creating thread'); }
+    finally { setPosting(false); }
+  };
+
+  const openThread = async (thread) => {
+    try {
+      const res = await api.get(`/forum/threads/${thread.id}`);
+      setSelectedThread(res.data.thread);
+    } catch { setSelectedThread(thread); }
+  };
+
+  const handleReply = async () => {
+    if (!replyContent.trim()) return;
+    setSubmittingReply(true);
+    try {
+      await api.post(`/forum/threads/${selectedThread.id}/replies`, { content: replyContent });
+      setReplyContent('');
+      const res = await api.get(`/forum/threads/${selectedThread.id}`);
+      setSelectedThread(res.data.thread);
+      setThreads(prev => prev.map(t => t.id === selectedThread.id ? { ...t, replyCount: (t.replyCount || 0) + 1 } : t));
+    } catch { alert('Error posting reply'); }
+    finally { setSubmittingReply(false); }
+  };
+
+  const handleMarkAnswer = async (replyId) => {
+    try {
+      await api.patch(`/forum/replies/${replyId}/mark-answer`);
+      const res = await api.get(`/forum/threads/${selectedThread.id}`);
+      setSelectedThread(res.data.thread);
+      setThreads(prev => prev.map(t => t.id === selectedThread.id ? { ...t, hasAnswer: true } : t));
+    } catch { alert('Error marking answer'); }
+  };
+
+  const filtered = threads.filter(t => !filterCourse || t.course === filterCourse);
+
+  if (loading) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500" /></div>;
+
+  if (selectedThread) {
+    const replies = selectedThread.replies || [];
+    return (
+      <div className="space-y-6">
+        <button onClick={() => setSelectedThread(null)} className="flex items-center gap-2 text-blue-600 hover:text-blue-800 font-semibold">← Back to Forum</button>
+        <div className="bg-white rounded-xl shadow-md p-6">
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-semibold mb-2 inline-block">{selectedThread.course}</span>
+              <h2 className="text-2xl font-bold text-gray-800">{selectedThread.title}</h2>
+              <p className="text-sm text-gray-500 mt-1">By {selectedThread.author_name || selectedThread.author} · {selectedThread.created_at ? new Date(selectedThread.created_at).toLocaleDateString() : ''}</p>
+            </div>
+            {selectedThread.has_answer && <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-semibold flex items-center gap-1"><CheckCircle size={14} /> Answered</span>}
+          </div>
+          <p className="text-gray-700 leading-relaxed bg-gray-50 rounded-lg p-4">{selectedThread.content}</p>
+        </div>
+        <div className="space-y-4">
+          <h3 className="font-bold text-gray-800 text-lg">{replies.length} {replies.length === 1 ? 'Reply' : 'Replies'}</h3>
+          {replies.map((reply, i) => (
+            <div key={i} className={`bg-white rounded-xl shadow-sm p-5 border-l-4 ${reply.is_answer ? 'border-green-500' : 'border-gray-200'}`}>
+              <div className="flex justify-between items-start mb-2">
+                <div>
+                  <span className="font-semibold text-gray-800">{reply.author_name}</span>
+                  <span className="text-xs text-gray-400 ml-2">{reply.created_at ? new Date(reply.created_at).toLocaleDateString() : ''}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {reply.is_answer && <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-semibold">✓ Answer</span>}
+                  {!reply.is_answer && (
+                    <button onClick={() => handleMarkAnswer(reply.id)} className="text-xs text-gray-400 hover:text-green-600 border border-gray-200 hover:border-green-400 px-2 py-1 rounded-lg transition">Mark as Answer</button>
+                  )}
+                </div>
+              </div>
+              <p className="text-gray-700">{reply.content}</p>
+            </div>
+          ))}
+        </div>
+        <div className="bg-white rounded-xl shadow-md p-6">
+          <h4 className="font-bold text-gray-800 mb-3">Post a Reply</h4>
+          <textarea value={replyContent} onChange={e => setReplyContent(e.target.value)} rows={4}
+            placeholder="Write your reply..." className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400 resize-none" />
+          <button onClick={handleReply} disabled={submittingReply || !replyContent.trim()}
+            className="mt-3 bg-orange-500 hover:bg-orange-600 text-white px-6 py-2.5 rounded-lg font-semibold disabled:opacity-50 flex items-center gap-2">
+            <Send size={16} /> {submittingReply ? 'Posting...' : 'Post Reply'}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold text-gray-900">Discussion Forum</h2>
+        <button onClick={() => setShowNewThread(true)} className="bg-orange-500 hover:bg-orange-600 text-white px-5 py-2.5 rounded-lg flex items-center gap-2 font-semibold transition shadow">
+          <Plus size={18} /> New Thread
+        </button>
+      </div>
+      <div className="flex gap-3 flex-wrap">
+        <button onClick={() => setFilterCourse('')} className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${!filterCourse ? 'bg-orange-500 text-white' : 'bg-gray-100 hover:bg-gray-200'}`}>All</button>
+        {courses.map(c => (
+          <button key={c.id} onClick={() => setFilterCourse(c.course_name)} className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${filterCourse === c.course_name ? 'bg-orange-500 text-white' : 'bg-gray-100 hover:bg-gray-200'}`}>{c.course_name}</button>
+        ))}
+      </div>
+      {filtered.length === 0 ? (
+        <div className="text-center py-16 bg-white rounded-xl shadow-md">
+          <MessageSquare className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+          <p className="text-gray-500 text-lg">No discussions yet</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {filtered.map(thread => (
+            <div key={thread.id} onClick={() => openThread(thread)} className="bg-white rounded-xl shadow-md hover:shadow-lg transition p-5 cursor-pointer border border-transparent hover:border-orange-200">
+              <div className="flex items-start justify-between">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                    <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">{thread.course}</span>
+                    {thread.hasAnswer && <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-semibold flex items-center gap-1"><CheckCircle size={10} /> Answered</span>}
+                  </div>
+                  <h3 className="font-bold text-gray-800 text-lg truncate">{thread.title}</h3>
+                  <p className="text-sm text-gray-500 line-clamp-2 mt-1">{thread.content}</p>
+                </div>
+                <ChevronRight size={20} className="text-gray-400 flex-shrink-0 ml-4" />
+              </div>
+              <div className="flex items-center gap-4 mt-3 text-xs text-gray-400">
+                <span className="flex items-center gap-1"><User size={12} /> {thread.author}</span>
+                <span className="flex items-center gap-1"><MessageCircle size={12} /> {thread.replyCount || 0} replies</span>
+                <span className="flex items-center gap-1"><Clock size={12} /> {thread.createdAt ? new Date(thread.createdAt).toLocaleDateString() : ''}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {showNewThread && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 max-w-2xl w-full shadow-2xl">
+            <div className="flex justify-between items-center mb-5">
+              <h3 className="text-xl font-bold">Create New Thread</h3>
+              <button onClick={() => setShowNewThread(false)}><X size={24} /></button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Course</label>
+                <select value={newThread.course} onChange={e => setNewThread({ ...newThread, course: e.target.value })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white">
+                  {courses.map(c => <option key={c.id} value={c.course_name}>{c.course_name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Title</label>
+                <input value={newThread.title} onChange={e => setNewThread({ ...newThread, title: e.target.value })}
+                  placeholder="Your question or topic..." className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400" />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Content</label>
+                <textarea value={newThread.content} onChange={e => setNewThread({ ...newThread, content: e.target.value })}
+                  rows={5} placeholder="Describe in detail..." className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400 resize-none" />
+              </div>
+              <div className="flex gap-3">
+                <button onClick={handleCreateThread} disabled={posting || !newThread.title || !newThread.content}
+                  className="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-lg font-semibold disabled:opacity-50">
+                  {posting ? 'Posting...' : 'Post Thread'}
+                </button>
+                <button onClick={() => setShowNewThread(false)} className="px-6 bg-gray-200 hover:bg-gray-300 text-gray-700 py-3 rounded-lg font-semibold">Cancel</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ==================== SYSTEM SETTINGS COMPONENT ====================
 function SystemSettings() {
   const { user } = useAuth();
@@ -3644,6 +3850,7 @@ export default function FacultyDashboard() {
     { path: '/faculty/announcements', label: 'Announcements', icon: Megaphone },
     { path: '/faculty/batches', label: 'Batches', icon: Layers },
     { path: '/faculty/doubts', label: 'Doubts', icon: MessageCircle },
+    { path: '/faculty/discussion', label: 'Discussion', icon: MessageSquare },
     { path: '/faculty/analytics', label: 'Analytics', icon: TrendingUp },
     { path: '/faculty/settings', label: 'Settings', icon: Settings }
   ];
@@ -3873,6 +4080,7 @@ export default function FacultyDashboard() {
               <Route path="/announcements" element={<AnnouncementManagement />} />
               <Route path="/batches" element={<BatchManagement />} />
               <Route path="/doubts" element={<DoubtClearing />} />
+              <Route path="/discussion" element={<DiscussionForum />} />
               <Route path="/analytics" element={<PerformanceAnalytics />} />
               <Route path="/settings" element={<SystemSettings />} />
               <Route path="/profile" element={<Profile />} />
