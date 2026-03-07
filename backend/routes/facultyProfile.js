@@ -7,8 +7,9 @@ const fs = require('fs');
 const db = require("../models");
 const { Op } = require('sequelize');
 const rbac = require('../middleware/rbac');
-const { User, Faculty, Course, Enrollment, Student, Exam, Result, 
-        VideoWatchHistory, Lesson, CourseModule, Quiz, QuizQuestion } = require('../models');
+const { User, Faculty, Course, Enrollment, Student, Exam, Result,
+        VideoWatchHistory, Lesson, CourseModule, Quiz, QuizQuestion,
+        Notification } = require('../models'); // ✅ add Notification here
 const authMiddleware = require('../middleware/auth');
 
 const storage = multer.diskStorage({
@@ -228,8 +229,65 @@ router.get('/courses', authMiddleware, async (req, res) => {
 });
 
 // ── NOTIFICATIONS ──────────────────────────────────────────
-router.get('/notifications', authMiddleware, async (req, res) => {
-  res.json({ success: true, notifications: [] });
+router.post('/announcements', authMiddleware, async (req, res) => {
+  try {
+    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
+    const { title, message, course, priority } = req.body;
+    const { sequelize } = require('../config/database');
+
+    // 1. Save announcement as before
+    const [result] = await sequelize.query(
+      `INSERT INTO announcements (title, message, course, priority, faculty_id) VALUES (?,?,?,?,?)`,
+      { replacements: [title, message, course || 'All', priority || 'Medium', faculty.id] }
+    );
+
+    // 2. Find which students to notify
+    let courseIds = [];
+    if (course && course !== 'All') {
+      // Specific course selected — notify only enrolled students
+      const courseRecord = await Course.findOne({ where: { id: course, faculty_id: faculty.id } });
+      if (courseRecord) courseIds = [courseRecord.id];
+    } else {
+      // "All" — notify students from ALL faculty courses
+      const allCourses = await Course.findAll({ where: { faculty_id: faculty.id }, attributes: ['id'] });
+      courseIds = allCourses.map(c => c.id);
+    }
+
+    // 3. Get unique student user_ids from enrollments
+    if (courseIds.length > 0) {
+      const enrollments = await Enrollment.findAll({
+        where: { course_id: courseIds },
+        include: [{ model: Student, attributes: ['user_id'] }],
+        attributes: ['student_id']
+      });
+
+      // Deduplicate user_ids
+      const userIds = [...new Set(enrollments.map(e => e.Student?.user_id).filter(Boolean))];
+
+      // 4. Bulk insert into notifications table
+      if (userIds.length > 0) {
+        const { Notification } = require('../models');
+        await Notification.bulkCreate(
+          userIds.map(user_id => ({
+            user_id,
+            title,
+            message,
+            type: 'announcement',
+            is_read: false,
+            created_at: new Date()
+          }))
+        );
+      }
+    }
+
+    res.json({
+      success: true,
+      announcement: { id: result, title, message, course, priority, date: new Date().toLocaleDateString(), views: 0 }
+    });
+  } catch (e) {
+    console.error('Announcement error:', e);
+    res.status(500).json({ success: false, message: e.message });
+  }
 });
 
 // ── MESSAGES ───────────────────────────────────────────────
