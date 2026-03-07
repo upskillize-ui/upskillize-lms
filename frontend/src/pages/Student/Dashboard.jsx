@@ -18,7 +18,7 @@ import {
   Github, Linkedin, Twitter, Link as LinkIcon, Menu,
   ShoppingBag, ThumbsUp, GraduationCap, ChevronDown,
   RefreshCw, Users, Zap, Home, TrendingDown, BookMarked,
-  CheckSquare, PlaySquare, MonitorPlay, Layers, ClipboardList, Timer, Trophy
+  CheckSquare, PlaySquare, MonitorPlay, Layers, ClipboardList, Timer, Trophy, FilePen 
 } from 'lucide-react';
 
 // ==================== CIRCULAR PROGRESS ====================
@@ -2257,7 +2257,7 @@ export default function StudentDashboard() {
     { path: '/student/browse',       label: 'Browse Courses', icon: ShoppingBag,   free: true },
     { path: '/student/certificates', label: 'Certificates',   icon: Award,         free: true },
     { path: '/student/progress',     label: 'Progress',       icon: TrendingUp,    free: true },
-    { path: '/student/assignments',     label: 'Assignments',       icon: ClipboardList,    free: true },
+    { path: '/student/assignments',  label: 'Assignments',    icon: FilePen ,      free: true },
     { path: '/student/quizzes',          label: 'Quizzes',    icon: ClipboardList, free: true },
     { path: '/student/discussion-forum', label: 'Discussion', icon: MessageSquare, free: true },
     { path: '/student/notifications',label: 'Notifications',  icon: Bell,          free: true },
