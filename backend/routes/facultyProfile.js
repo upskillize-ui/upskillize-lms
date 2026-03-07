@@ -394,50 +394,43 @@ router.post('/assignments/:id/grade', authMiddleware, async (req, res) => {
   }
 });
 
-router.delete(
-  "/assignments/:id",
-  authMiddleware,
-  async (req, res) => {
-    try {
-      const assignmentId = req.params.id;
+router.delete('/assignments/:id', [authMiddleware, rbac(['faculty','admin'])], async (req, res) => {
+  try {
 
-      // Get logged in user
-      const userId = req.user?.id || req.user?.userId;
+    const assignmentId = req.params.id;
 
-      if (!userId) {
-        return res.status(401).json({
-          success: false,
-          message: "User not authenticated"
-        });
-      }
+    const facultyId = req.user?.id || req.user?.userId;
 
-      // Find assignment
-      const assignment = await db.Assignment.findByPk(assignmentId);
-
-      if (!assignment) {
-        return res.status(404).json({
-          success: false,
-          message: "Assignment not found"
-        });
-      }
-
-      // Delete assignment
-      await assignment.destroy();
-
-      return res.json({
-        success: true,
-        message: "Assignment deleted successfully"
-      });
-
-    } catch (error) {
-      console.error("Delete assignment error:", error);
-
-      return res.status(500).json({
-        success: false,
-        message: "Server error while deleting assignment"
+    if (!facultyId) {
+      return res.status(401).json({
+        success:false,
+        message:"User not authenticated"
       });
     }
-  }
-);
 
-module.exports = router;
+    const assignment = await db.Assignment.findByPk(assignmentId);
+
+    if (!assignment) {
+      return res.status(404).json({
+        success:false,
+        message:"Assignment not found"
+      });
+    }
+
+    await assignment.destroy();
+
+    res.json({
+      success:true,
+      message:"Assignment deleted successfully"
+    });
+
+  } catch (error) {
+
+    console.error("Delete assignment error:", error);
+
+    res.status(500).json({
+      success:false,
+      message:"Server error"
+    });
+  }
+});
