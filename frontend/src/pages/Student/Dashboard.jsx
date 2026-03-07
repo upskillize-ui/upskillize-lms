@@ -686,16 +686,22 @@ function DiscussionForum() {
 
   useEffect(() => {
     const fetch = async () => {
+      // Fetch threads and enrollments independently so one failure doesn't block the other
       try {
-        const [threadsRes, enrollRes] = await Promise.all([
-          api.get('/forum/threads'),
-          api.get('/enrollments/my-enrollments')
-        ]);
-        if (threadsRes.data.success) setThreads(threadsRes.data.threads || []);
+        const res = await api.get('/forum/threads');
+        if (res.data.success) setThreads(res.data.threads || []);
+      } catch { }
+
+      try {
+        const enrollRes = await api.get('/enrollments/my-enrollments');
         const enrolled = (enrollRes.data.enrollments || []).map(e => e.Course).filter(Boolean);
-        // Add "General" option at top
         setEnrollments([{ id: 'general', course_name: 'General' }, ...enrolled]);
-      } catch { } finally { setLoading(false); }
+      } catch (e) {
+        console.error('Enrollments fetch failed:', e);
+        setEnrollments([{ id: 'general', course_name: 'General' }]);
+      }
+
+      setLoading(false);
     };
     fetch();
   }, []);
@@ -732,7 +738,6 @@ function DiscussionForum() {
             <form onSubmit={handleCreateThread} className="space-y-4">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Course</label>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Course</label>
                 <select
                   value={newThread.course}
                   onChange={(e) => setNewThread({...newThread, course: e.target.value})}
