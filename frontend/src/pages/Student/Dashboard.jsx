@@ -2260,7 +2260,6 @@ export default function StudentDashboard() {
     { path: '/student/assignments',  label: 'Assignments',    icon: FilePen ,      free: true },
     { path: '/student/quizzes',          label: 'Quizzes',    icon: ClipboardList, free: true },
     { path: '/student/discussion-forum', label: 'Discussion', icon: MessageSquare, free: true },
-    { path: '/student/notifications',label: 'Notifications',  icon: Bell,          free: true },
     { path: '/student/help',         label: 'Help & Support', icon: HelpCircle,    free: true },
     { path: '/student/payments',     label: 'Payments',       icon: CreditCard,    free: true },
     { path: '/student/profile',      label: 'Profile',        icon: User,          free: true },
