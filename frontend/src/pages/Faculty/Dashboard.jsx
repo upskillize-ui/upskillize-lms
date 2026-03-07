@@ -934,23 +934,23 @@ function AssignmentManagement() {
                   View All Submissions
                 </button>
                 <button 
-  onClick={() => {
-    setAssignmentForm({
-      title: assignment.title,
-      course: assignment.course_id || assignment.course,
-      dueDate: assignment.due_date || assignment.dueDate,
-      totalMarks: assignment.total_marks || assignment.totalMarks,
-      description: assignment.description || '',
-      rubricCategories: assignment.rubric?.categories || [{ name: '', points: '' }]
-    });
-    setEditingId(assignment.id);
-    setShowCreateModal(true);
-  }}
-  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition text-sm font-semibold"
->
-  <Edit2 className="h-4 w-4 inline mr-1" />
-  Edit
-</button>
+                  onClick={() => {
+                  setAssignmentForm({
+                  title: assignment.title,
+                  course: assignment.course_id || assignment.course,
+                  dueDate: assignment.due_date || assignment.dueDate,
+                  totalMarks: assignment.total_marks || assignment.totalMarks,
+                  description: assignment.description || '',
+                  rubricCategories: assignment.rubric?.categories || [{ name: '', points: '' }]
+                });
+                setEditingId(assignment.id);
+                setShowCreateModal(true);
+              }}
+              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition text-sm font-semibold"
+              >
+                <Edit2 className="h-4 w-4 inline mr-1" />
+                  Edit
+            </button>
               </div>
             </div>
           ))}
