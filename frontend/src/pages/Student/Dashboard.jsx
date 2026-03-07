@@ -18,7 +18,7 @@ import {
   Github, Linkedin, Twitter, Link as LinkIcon, Menu,
   ShoppingBag, ThumbsUp, GraduationCap, ChevronDown,
   RefreshCw, Users, Zap, Home, TrendingDown, BookMarked,
-  CheckSquare, PlaySquare, MonitorPlay, Layers, ClipboardList, Timer, Trophy, FilePen 
+  CheckSquare, PlaySquare, MonitorPlay, Layers, ClipboardList, Timer, Trophy, FilePen, Upload 
 } from 'lucide-react';
 
 // ==================== CIRCULAR PROGRESS ====================
