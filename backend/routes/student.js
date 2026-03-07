@@ -4,6 +4,7 @@ const { Op } = require('sequelize');
 const { User, Student, Course, Enrollment, Payment } = require('../models');
 const authMiddleware = require('../middleware/auth');
 const rbac = require('../middleware/rbac');
+const multer = require('multer');
 
 const studentOnly = [authMiddleware, rbac(['student', 'admin'])];
 
