@@ -2613,7 +2613,10 @@ function LiveClassScheduling() {
               </div>
               <div className="flex gap-2">
                 <button className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm font-semibold">Start Class</button>
-                <button className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition text-sm font-semibold">Edit</button>
+                <button className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition text-sm font-semibold">
+                  <Edit2 className="h-4 w-4 inline mr-1" />
+                    Edit
+                </button>
               </div>
             </div>
           ))}
