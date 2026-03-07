@@ -680,14 +680,21 @@ function Progress() {
 function DiscussionForum() {
   const [threads, setThreads] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [enrollments, setEnrollments] = useState([]);
   const [showNewThread, setShowNewThread] = useState(false);
   const [newThread, setNewThread] = useState({ title: '', content: '', course: '' });
 
   useEffect(() => {
     const fetch = async () => {
       try {
-        const res = await api.get('/forum/threads');
-        if (res.data.success) setThreads(res.data.threads || []);
+        const [threadsRes, enrollRes] = await Promise.all([
+          api.get('/forum/threads'),
+          api.get('/enrollments/my-enrollments')
+        ]);
+        if (threadsRes.data.success) setThreads(threadsRes.data.threads || []);
+        const enrolled = (enrollRes.data.enrollments || []).map(e => e.Course).filter(Boolean);
+        // Add "General" option at top
+        setEnrollments([{ id: 'general', course_name: 'General' }, ...enrolled]);
       } catch { } finally { setLoading(false); }
     };
     fetch();
@@ -725,8 +732,18 @@ function DiscussionForum() {
             <form onSubmit={handleCreateThread} className="space-y-4">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Course</label>
-                <input type="text" value={newThread.course} onChange={(e) => setNewThread({...newThread, course: e.target.value})} required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400" placeholder="Course name" />
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Course</label>
+                <select
+                  value={newThread.course}
+                  onChange={(e) => setNewThread({...newThread, course: e.target.value})}
+                  required
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+                >
+                  <option value="">-- Select a course --</option>
+                  {enrollments.map(c => (
+                    <option key={c.id} value={c.course_name}>{c.course_name}</option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Title</label>
