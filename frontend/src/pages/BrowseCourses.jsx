@@ -36,6 +36,213 @@ function isFreeCourse(courseName = '', courseCode = '') {
   return FREE_COURSE_KEYWORDS.some(kw => name.includes(kw) || code.includes(kw));
 }
 
+// ─── Quiz Data (course DB id → questions) ────────────────────────
+const COURSE_QUIZZES = {
+  37: {
+    title: 'Banking Foundation Quiz',
+    questions: [
+      {
+        q: 'What is the primary function of a central bank?',
+        options: ['Provide retail loans', 'Regulate monetary policy & issue currency', 'Offer savings accounts', 'Finance businesses'],
+        answer: 1,
+      },
+      {
+        q: 'Which of the following is a liability for a commercial bank?',
+        options: ['Loans given to customers', 'Investments in securities', 'Customer deposits', 'Bank premises'],
+        answer: 2,
+      },
+      {
+        q: 'What does KYC stand for in banking?',
+        options: ['Know Your Currency', 'Keep Your Credit', 'Know Your Customer', 'Key Yield Calculation'],
+        answer: 2,
+      },
+      {
+        q: 'What is the CRR (Cash Reserve Ratio)?',
+        options: [
+          'Percentage of deposits banks must keep with the central bank',
+          'Rate at which banks lend to each other',
+          'Minimum capital banks must maintain',
+          'Interest rate on savings accounts',
+        ],
+        answer: 0,
+      },
+      {
+        q: 'Which document is NOT typically required to open a bank account?',
+        options: ['Aadhaar Card', 'PAN Card', 'Passport', 'Vehicle Registration'],
+        answer: 3,
+      },
+    ],
+  },
+  42: {
+    title: 'Payments & Cards Quiz',
+    questions: [
+      {
+        q: 'What does EMV stand for on a chip card?',
+        options: ['Electronic Money Vault', 'Europay Mastercard Visa', 'Enhanced Mobile Verification', 'Encrypted Message Validation'],
+        answer: 1,
+      },
+      {
+        q: 'Which payment rail is used for real-time gross settlement in India?',
+        options: ['NEFT', 'RTGS', 'IMPS', 'UPI'],
+        answer: 1,
+      },
+      {
+        q: 'What is a CVV number on a credit card used for?',
+        options: ['Identifying the card network', 'Card verification for online transactions', 'Storing reward points', 'Setting spending limits'],
+        answer: 1,
+      },
+      {
+        q: 'UPI transactions in India are processed through which system?',
+        options: ['SWIFT', 'NPCI', 'RBI Direct', 'SEBI'],
+        answer: 1,
+      },
+      {
+        q: 'What is the difference between a debit card and a credit card?',
+        options: [
+          'Debit cards are only for online use',
+          'Credit cards deduct money immediately from your account',
+          'Debit cards use your own funds; credit cards use borrowed money',
+          'There is no difference',
+        ],
+        answer: 2,
+      },
+    ],
+  },
+};
+
+// ─── Quiz Modal Component ─────────────────────────────────────────
+function QuizModal({ quizData, onClose }) {
+  const [current, setCurrent] = useState(0);
+  const [selected, setSelected] = useState(null);
+  const [answers, setAnswers] = useState([]);
+  const [submitted, setSubmitted] = useState(false);
+
+  const question = quizData.questions[current];
+  const total = quizData.questions.length;
+  const score = answers.filter((a, i) => a === quizData.questions[i].answer).length;
+
+  const handleNext = () => {
+    if (selected === null) return;
+    const newAnswers = [...answers, selected];
+    if (current + 1 < total) {
+      setAnswers(newAnswers);
+      setCurrent(current + 1);
+      setSelected(null);
+    } else {
+      setAnswers(newAnswers);
+      setSubmitted(true);
+    }
+  };
+
+  const handleRetry = () => {
+    setCurrent(0);
+    setSelected(null);
+    setAnswers([]);
+    setSubmitted(false);
+  };
+
+  const pct = Math.round((score / total) * 100);
+  const grade = pct >= 80 ? { label: 'Excellent! 🎉', color: 'text-green-600' }
+              : pct >= 60 ? { label: 'Good Job! 👍', color: 'text-blue-600' }
+              : { label: 'Keep Practicing 💪', color: 'text-orange-500' };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+
+        {/* Header */}
+        <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-5 flex items-center justify-between text-white">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide opacity-80">Quiz</p>
+            <h3 className="text-lg font-bold">{quizData.title}</h3>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 transition">
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="p-6">
+          {!submitted ? (
+            <>
+              {/* Progress */}
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs text-gray-500 font-medium">Question {current + 1} of {total}</span>
+                <span className="text-xs text-gray-500">{Math.round(((current) / total) * 100)}% done</span>
+              </div>
+              <div className="h-2 bg-gray-100 rounded-full mb-6">
+                <div className="h-2 bg-orange-500 rounded-full transition-all" style={{ width: `${((current) / total) * 100}%` }} />
+              </div>
+
+              {/* Question */}
+              <p className="text-gray-800 font-semibold text-base mb-5">{question.q}</p>
+
+              {/* Options */}
+              <div className="space-y-3 mb-6">
+                {question.options.map((opt, i) => (
+                  <button key={i} onClick={() => setSelected(i)}
+                    className={`w-full text-left px-4 py-3 rounded-xl border-2 transition font-medium text-sm ${
+                      selected === i
+                        ? 'border-orange-500 bg-orange-50 text-orange-700'
+                        : 'border-gray-200 hover:border-orange-300 hover:bg-orange-50 text-gray-700'
+                    }`}>
+                    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-gray-100 text-xs font-bold mr-3">
+                      {String.fromCharCode(65 + i)}
+                    </span>
+                    {opt}
+                  </button>
+                ))}
+              </div>
+
+              <button onClick={handleNext} disabled={selected === null}
+                className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-40 text-white py-3 rounded-xl font-bold transition">
+                {current + 1 === total ? 'Submit Quiz' : 'Next Question →'}
+              </button>
+            </>
+          ) : (
+            /* Results */
+            <div className="text-center py-4">
+              <div className="w-24 h-24 rounded-full bg-orange-50 flex items-center justify-center mx-auto mb-4">
+                <span className="text-3xl font-black text-orange-500">{pct}%</span>
+              </div>
+              <h4 className={`text-xl font-bold mb-1 ${grade.color}`}>{grade.label}</h4>
+              <p className="text-gray-500 text-sm mb-6">You scored <strong>{score}</strong> out of <strong>{total}</strong></p>
+
+              {/* Answer review */}
+              <div className="text-left space-y-3 mb-6 max-h-56 overflow-y-auto pr-1">
+                {quizData.questions.map((qs, i) => {
+                  const correct = answers[i] === qs.answer;
+                  return (
+                    <div key={i} className={`p-3 rounded-lg text-sm border ${correct ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                      <p className="font-semibold text-gray-700 mb-1">{i + 1}. {qs.q}</p>
+                      {!correct && (
+                        <p className="text-red-600 text-xs">Your answer: <em>{qs.options[answers[i]]}</em></p>
+                      )}
+                      <p className={`text-xs font-medium ${correct ? 'text-green-600' : 'text-green-700'}`}>
+                        ✓ Correct: {qs.options[qs.answer]}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="flex gap-3">
+                <button onClick={handleRetry}
+                  className="flex-1 border-2 border-orange-500 text-orange-500 hover:bg-orange-50 py-2.5 rounded-xl font-bold transition text-sm">
+                  Retry Quiz
+                </button>
+                <button onClick={onClose}
+                  className="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-2.5 rounded-xl font-bold transition text-sm">
+                  Done
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Circular Progress ───────────────────────────────────────────
 function CircularProgress({ percentage, size = 100, strokeWidth = 8 }) {
   const radius = (size - strokeWidth) / 2;
@@ -64,6 +271,7 @@ function MyCourses({ onSwitchToBrowse }) {
   const [filter, setFilter] = useState('all');
   const [withdrawing, setWithdrawing] = useState(null);
   const [openVideo, setOpenVideo] = useState(null);
+  const [activeQuiz, setActiveQuiz] = useState(null); // holds quiz data when open
 
   // uses COURSE_VIDEOS, YOUTUBE_THUMBNAILS, isYouTubeUrl defined at top of file
 
@@ -107,6 +315,9 @@ function MyCourses({ onSwitchToBrowse }) {
 
   return (
     <div className="space-y-6">
+      {/* Quiz Modal */}
+      {activeQuiz && <QuizModal quizData={activeQuiz} onClose={() => setActiveQuiz(null)} />}
+
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-900">My Courses</h2>
         <div className="flex gap-2">
@@ -224,6 +435,16 @@ function MyCourses({ onSwitchToBrowse }) {
                       </button>
                     )}
                   </div>
+
+                  {/* ── Take Quiz button (only for courses that have a quiz) ── */}
+                  {COURSE_QUIZZES[course.id] && (
+                    <button
+                      onClick={() => setActiveQuiz(COURSE_QUIZZES[course.id])}
+                      className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 rounded-lg font-semibold text-sm transition bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white shadow-sm">
+                      <CheckCircle size={15} />
+                      Take Quiz
+                    </button>
+                  )}
                 </div>
               </div>
             );
@@ -241,6 +462,7 @@ export default function BrowseCourses() {
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [enrolling, setEnrolling] = useState(null);
+  const [activeQuiz, setActiveQuiz] = useState(null);
   const navigate = useNavigate();
 
   const isPurchased = user?.is_purchased || user?.role === 'admin' || user?.role === 'faculty';
@@ -290,6 +512,8 @@ export default function BrowseCourses() {
 
   return (
     <div className="space-y-6">
+      {/* Quiz Modal */}
+      {activeQuiz && <QuizModal quizData={activeQuiz} onClose={() => setActiveQuiz(null)} />}
 
       {/* Tabs */}
       <div className="bg-white rounded-xl shadow-sm p-1 inline-flex gap-1 border border-gray-100">
@@ -435,6 +659,16 @@ export default function BrowseCourses() {
                         <p className="mt-3 text-xs text-center text-green-600 font-medium">
                           ✅ Free access • No payment required
                         </p>
+                      )}
+
+                      {/* Take Quiz button for free courses with quizzes */}
+                      {isFree && COURSE_QUIZZES[course.id] && (
+                        <button
+                          onClick={() => setActiveQuiz(COURSE_QUIZZES[course.id])}
+                          className="mt-2 w-full flex items-center justify-center gap-2 py-2.5 rounded-lg font-semibold text-sm transition bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white shadow-sm">
+                          <CheckCircle size={15} />
+                          Take Quiz
+                        </button>
                       )}
                     </div>
                   </div>
