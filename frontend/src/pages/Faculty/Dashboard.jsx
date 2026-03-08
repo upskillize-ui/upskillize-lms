@@ -64,7 +64,7 @@ function Overview() {
         setLastUpdated(new Date());
       }
     } catch (error) {
-      if (error?.response?.status !== 404) console.error('Error fetching dashboard data:', error);
+      console.error('Error fetching dashboard data:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -493,7 +493,7 @@ function ContentUpload() {
         setUploadedContent(response.data.content || []);
       }
     } catch (error) {
-      if (error?.response?.status !== 404) console.error('Error fetching content:', error);
+      console.error('Error fetching content:', error);
     } finally {
       setLoading(false);
     }
@@ -908,7 +908,15 @@ function AssignmentManagement() {
     try {
       const response = await api.get('/faculty/assignments');
       if (response.data.success) {
-        setAssignments(response.data.assignments || []);
+        // Normalize field names from backend
+        const normalized = (response.data.assignments || []).map(a => ({
+          ...a,
+          total_marks: a.total_marks ?? a.totalMarks ?? a.max_marks ?? a.maxMarks ?? 0,
+          graded: a.graded ?? a.graded_count ?? a.gradedCount ?? 0,
+          submissions: a.submissions ?? a.submission_count ?? a.submissionCount ?? 0,
+          totalStudents: a.totalStudents ?? a.total_students ?? a.studentCount ?? 0,
+        }));
+        setAssignments(normalized);
       }
     } catch (error) {
       if (error?.response?.status !== 404) console.error('Error fetching assignments:', error);
@@ -935,7 +943,7 @@ function AssignmentManagement() {
         setSubmissions(response.data.submissions || []);
       }
     } catch (error) {
-      if (error?.response?.status !== 404) console.error('Error fetching submissions:', error);
+      console.error('Error fetching submissions:', error);
     }
   };
 
@@ -1021,10 +1029,19 @@ function AssignmentManagement() {
         feedback: feedback.trim(),
         rubric_scores: rubricScores,
       });
-      // Update local state so the graded submission disappears from pending list
+      // Update submissions local state immediately
       setSubmissions(prev =>
-        prev.map(s => s.id === submission.id ? { ...s, grade: totalGrade, feedback } : s)
+        prev.map(s => s.id === submission.id
+          ? { ...s, grade: totalGrade, feedback: feedback.trim(), status: 'graded' }
+          : s)
       );
+      // Update assignments local state immediately so pending count refreshes
+      setAssignments(prev =>
+        prev.map(a => a.id === selectedAssignment.id
+          ? { ...a, graded: (a.graded || 0) + 1 }
+          : a)
+      );
+      // Also refetch from backend to sync
       fetchAssignments();
     } catch (error) {
       console.error('Error grading submission:', error);
@@ -2396,7 +2413,7 @@ function AnnouncementManagement() {
         setAnnouncements(response.data.announcements || []);
       }
     } catch (error) {
-      if (error?.response?.status !== 404) console.error('Error fetching announcements:', error);
+      console.error('Error fetching announcements:', error);
     } finally {
       setLoading(false);
     }
@@ -2581,7 +2598,7 @@ function BatchManagement() {
         setBatches(response.data.batches || []);
       }
     } catch (error) {
-      if (error?.response?.status !== 404) console.error('Error fetching batches:', error);
+      console.error('Error fetching batches:', error);
     } finally {
       setLoading(false);
     }
@@ -2594,7 +2611,7 @@ function BatchManagement() {
         setBatchStudents(response.data.students || []);
       }
     } catch (error) {
-      if (error?.response?.status !== 404) console.error('Error fetching batch students:', error);
+      console.error('Error fetching batch students:', error);
     }
   };
 
@@ -2920,7 +2937,7 @@ function LiveClassScheduling() {
         setLiveClasses(response.data.liveClasses || []);
       }
     } catch (error) {
-      if (error?.response?.status !== 404) console.error('Error fetching live classes:', error);
+      console.error('Error fetching live classes:', error);
     } finally {
       setLoading(false);
     }
@@ -3026,7 +3043,7 @@ function StudentManagement() {
         setStudents(response.data.students || []);
       }
     } catch (error) {
-      if (error?.response?.status !== 404) console.error('Error fetching students:', error);
+      console.error('Error fetching students:', error);
     } finally {
       setLoading(false);
     }
@@ -3281,7 +3298,7 @@ function DoubtClearing() {
         setDoubts(response.data.doubts || []);
       }
     } catch (error) {
-      if (error?.response?.status !== 404) console.error('Error fetching doubts:', error);
+      console.error('Error fetching doubts:', error);
     } finally {
       setLoading(false);
     }
@@ -4189,8 +4206,7 @@ export default function FacultyDashboard() {
         setMessages(response.data.messages || []);
       }
     } catch (error) {
-      if (error?.response?.status !== 404) console.error('Error fetching messages:', error);
-      setMessages([]);
+      console.error('Error fetching messages:', error);
     }
   };
 
