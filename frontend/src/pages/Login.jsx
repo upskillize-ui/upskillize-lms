@@ -217,7 +217,6 @@ export default function Login() {
           height: 52px;
           width: auto;
           object-fit: contain;
-          filter: brightness(0) invert(1);
         }
 
         .form-title {

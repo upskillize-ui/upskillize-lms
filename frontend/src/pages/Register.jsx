@@ -164,7 +164,6 @@ export default function Register() {
           height: 60px;
           width: auto;
           object-fit: contain;
-          filter: brightness(0) invert(1);
         }
 
         .reg-heading {
