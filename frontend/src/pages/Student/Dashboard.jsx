@@ -2246,7 +2246,21 @@ export default function StudentDashboard() {
   const [showMailbox, setShowMailbox] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
 
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      try {
+        const res = await api.get('/notifications');
+        if (res.data.success) {
+          setNotifications(res.data.notifications || []);
+          setUnreadCount((res.data.notifications || []).filter(n => !n.is_read).length);
+        }
+      } catch {}
+    };
+    fetchNotifications();
+  }, []);
   const handleLogout = () => { logout(); navigate('/login'); };
 
   const isPurchased = user?.is_purchased || user?.role === 'admin' || user?.role === 'faculty';
@@ -2354,24 +2368,41 @@ export default function StudentDashboard() {
               </div>
 
               {/* Notifications */}
-              <div className="relative">
-                <button onClick={() => { setShowNotifications(!showNotifications); setShowMailbox(false); setShowHelp(false); }}
-                  className="text-gray-600 hover:text-gray-900 hover:bg-gray-100 p-2 rounded-lg transition">
-                  <Bell size={20} />
-                </button>
-                {showNotifications && (
-                  <>
-                    <div className="absolute right-0 mt-2 w-72 bg-white rounded-lg shadow-xl border border-gray-200 z-50">
-                      <div className="p-4 border-b flex items-center justify-between">
-                        <h3 className="font-bold text-gray-900">Notifications</h3>
-                        <button onClick={() => setShowNotifications(false)}><X size={18} /></button>
-                      </div>
-                      <div className="p-6 text-center text-gray-500 text-sm">No new notifications</div>
-                    </div>
-                    <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)} />
-                  </>
-                )}
+<div className="relative">
+  <button onClick={() => { setShowNotifications(!showNotifications); setShowMailbox(false); setShowHelp(false); }}
+    className="relative text-gray-600 hover:text-gray-900 hover:bg-gray-100 p-2 rounded-lg transition">
+    <Bell size={20} />
+    {unreadCount > 0 && (
+      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">
+        {unreadCount}
+      </span>
+    )}
+  </button>
+  {showNotifications && (
+    <>
+      <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 z-50">
+        <div className="p-4 border-b flex items-center justify-between">
+          <h3 className="font-bold text-gray-900">Notifications</h3>
+          <button onClick={() => setShowNotifications(false)}><X size={18} /></button>
+        </div>
+        <div className="max-h-80 overflow-y-auto">
+          {notifications.length === 0 ? (
+            <div className="p-6 text-center text-gray-500 text-sm">No new notifications</div>
+          ) : (
+            notifications.slice(0, 5).map(n => (
+              <div key={n.id} className={`p-4 border-b hover:bg-gray-50 ${!n.is_read ? 'bg-orange-50' : ''}`}>
+                <p className="text-sm font-semibold text-gray-800">{n.title}</p>
+                <p className="text-xs text-gray-500 mt-1">{n.message}</p>
+                <p className="text-xs text-gray-400 mt-1">{new Date(n.created_at).toLocaleString()}</p>
               </div>
+            ))
+          )}
+        </div>
+      </div>
+      <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)} />
+    </>
+  )}
+</div>
 
               {/* Help */}
               <div className="relative">
