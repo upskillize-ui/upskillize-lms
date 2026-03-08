@@ -49,10 +49,10 @@ const COURSES = [
 ];
 
 const DIFFICULTIES = [
-  { value: "easy",   label: "Easy",   dot: "bg-green-500",   desc: "Basic concepts & definitions" },
-  { value: "medium", label: "Medium", dot: "bg-yellow-500",  desc: "Applied knowledge & analysis" },
-  { value: "hard",   label: "Hard",   dot: "bg-red-500",     desc: "Advanced problems & reasoning" },
-  { value: "mixed",  label: "Mixed",  dot: "bg-purple-500",  desc: "All levels combined" },
+  { value: "easy",   label: "Easy",   dotColor: "#22c55e", desc: "Basic concepts & definitions" },
+  { value: "medium", label: "Medium", dotColor: "#eab308", desc: "Applied knowledge & analysis" },
+  { value: "hard",   label: "Hard",   dotColor: "#ef4444", desc: "Advanced problems & reasoning" },
+  { value: "mixed",  label: "Mixed",  dotColor: "#a855f7", desc: "All levels combined" },
 ];
 
 const QUESTION_TYPES = [
@@ -71,58 +71,31 @@ const DURATIONS = [
 
 const COUNTS = [5, 10, 15, 20, 25, 30];
 
-// ─── ICONS (inline SVG) ──────────────────────────────────────────────────────
-const Icon = {
-  Brain:      () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2Z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2Z"/></svg>,
-  Check:      () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full"><polyline points="20 6 9 17 4 12"/></svg>,
-  X:          () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
-  ChevLeft:   () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full"><polyline points="15 18 9 12 15 6"/></svg>,
-  ChevRight:  () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full"><polyline points="9 18 15 12 9 6"/></svg>,
-  Clock:      () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
-  Flag:       () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>,
-  Trophy:     () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full"><polyline points="8 21 12 21 16 21"/><line x1="12" y1="17" x2="12" y2="21"/><path d="M7 4H17l-1 7a5 5 0 0 1-8 0Z"/><path d="M5 9H3a2 2 0 0 0 2 2"/><path d="M19 9h2a2 2 0 0 1-2 2"/></svg>,
-  Rotate:     () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.87"/></svg>,
-  Home:       () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
-  Sparkles:   () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>,
-  Book:       () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>,
-  Target:     () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>,
-  Layers:     () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>,
-  Arrow:      () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>,
-  Bar:        () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>,
-};
-
-function Ic({ name, size = 16 }) {
-  const C = Icon[name];
-  if (!C) return null;
-  return <span style={{ width: size, height: size, display: "inline-flex", flexShrink: 0 }}><C /></span>;
-}
-
 // ─── STEP INDICATOR ──────────────────────────────────────────────────────────
 function StepIndicator({ current }) {
   const steps = ["Topic", "Settings", "Review", "Test"];
   return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, marginBottom: 32 }}>
+    <div className="flex items-center justify-center gap-1 mb-8">
       {steps.map((s, i) => {
         const idx = i + 1;
         const done = current > idx;
         const active = current === idx;
         return (
-          <div key={s} style={{ display: "flex", alignItems: "center" }}>
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-              <div style={{
-                width: 36, height: 36, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
-                border: `2px solid ${done || active ? "#f97316" : "#d1d5db"}`,
-                background: done ? "#f97316" : active ? "#fff" : "#fff",
-                color: done ? "#fff" : active ? "#f97316" : "#9ca3af",
-                fontWeight: 700, fontSize: 14, transition: "all 0.3s",
-                boxShadow: active ? "0 2px 8px rgba(249,115,22,0.3)" : "none"
-              }}>
-                {done ? <Ic name="Check" size={16} /> : idx}
+          <div key={s} className="flex items-center">
+            <div className="flex flex-col items-center">
+              <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-all
+                ${done   ? 'bg-orange-500 border-orange-500 text-white'
+                : active ? 'bg-white border-orange-500 text-orange-500 shadow-md'
+                :          'bg-white border-gray-300 text-gray-400'}`}>
+                {done ? '✓' : idx}
               </div>
-              <span style={{ fontSize: 11, marginTop: 4, fontWeight: 600, color: active ? "#f97316" : done ? "#6b7280" : "#9ca3af" }}>{s}</span>
+              <span className={`text-xs mt-1 font-semibold
+                ${active ? 'text-orange-500' : done ? 'text-gray-600' : 'text-gray-400'}`}>
+                {s}
+              </span>
             </div>
             {i < steps.length - 1 && (
-              <div style={{ width: 48, height: 2, margin: "0 4px", marginBottom: 16, background: done ? "#f97316" : "#e5e7eb", transition: "background 0.4s" }} />
+              <div className={`w-12 h-0.5 mx-1 mb-4 transition-all ${done ? 'bg-orange-500' : 'bg-gray-200'}`} />
             )}
           </div>
         );
@@ -131,32 +104,30 @@ function StepIndicator({ current }) {
   );
 }
 
-// ─── TIMER ───────────────────────────────────────────────────────────────────
-function Timer({ totalSeconds, onTimeUp }) {
+// ─── COUNTDOWN TIMER ─────────────────────────────────────────────────────────
+function CountdownTimer({ totalSeconds, onTimeUp }) {
   const [rem, setRem] = useState(totalSeconds);
   const ref = useRef();
   useEffect(() => {
     ref.current = setInterval(() => {
-      setRem(p => { if (p <= 1) { clearInterval(ref.current); onTimeUp(); return 0; } return p - 1; });
+      setRem(p => {
+        if (p <= 1) { clearInterval(ref.current); onTimeUp(); return 0; }
+        return p - 1;
+      });
     }, 1000);
     return () => clearInterval(ref.current);
   }, []);
   const mins = Math.floor(rem / 60), secs = rem % 60;
-  const pct = (rem / totalSeconds) * 100;
+  const pct  = (rem / totalSeconds) * 100;
   const urgent = rem < 60;
   return (
-    <div style={{
-      display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", borderRadius: 12,
-      border: `2px solid ${urgent ? "#f87171" : "#fdba74"}`,
-      background: urgent ? "#fef2f2" : "#fff7ed",
-      color: urgent ? "#dc2626" : "#ea580c",
-      fontWeight: 700, fontSize: 16,
-      animation: urgent ? "pulse 1s infinite" : "none"
-    }}>
-      <Ic name="Clock" size={20} />
-      <span>{String(mins).padStart(2, "0")}:{String(secs).padStart(2, "0")}</span>
-      <div style={{ width: 72, height: 6, background: "#e5e7eb", borderRadius: 999, overflow: "hidden", marginLeft: 4 }}>
-        <div style={{ width: `${pct}%`, height: "100%", background: urgent ? "#ef4444" : "#f97316", borderRadius: 999, transition: "width 1s" }} />
+    <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border-2 font-bold text-base transition-all
+      ${urgent ? 'border-red-400 bg-red-50 text-red-600 animate-pulse' : 'border-orange-300 bg-orange-50 text-orange-600'}`}>
+      <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      <span>{String(mins).padStart(2,'0')}:{String(secs).padStart(2,'0')}</span>
+      <div className="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+        <div className={`h-full rounded-full transition-all duration-1000 ${urgent ? 'bg-red-500' : 'bg-orange-500'}`}
+          style={{ width: `${pct}%` }} />
       </div>
     </div>
   );
@@ -164,59 +135,67 @@ function Timer({ totalSeconds, onTimeUp }) {
 
 // ─── RESULT SCREEN ────────────────────────────────────────────────────────────
 function ResultScreen({ questions, answers, elapsed, config, onRetry, onHome }) {
-  const score = questions.filter((q, i) => answers[i] === q.correct_answer).length;
-  const total = questions.length;
-  const pct = Math.round((score / total) * 100);
+  const score  = questions.filter((q, i) => answers[i] === q.correct_answer).length;
+  const total  = questions.length;
+  const pct    = Math.round((score / total) * 100);
   const passed = pct >= 60;
-  const grade = pct >= 90 ? { l: "A+", c: "#16a34a", bg: "#f0fdf4" } : pct >= 80 ? { l: "A", c: "#22c55e", bg: "#f0fdf4" } : pct >= 70 ? { l: "B", c: "#2563eb", bg: "#eff6ff" } : pct >= 60 ? { l: "C", c: "#ca8a04", bg: "#fefce8" } : { l: "F", c: "#dc2626", bg: "#fef2f2" };
+  const grade  = pct >= 90 ? { l:'A+', c:'text-green-600', bg:'bg-green-50' }
+               : pct >= 80 ? { l:'A',  c:'text-green-500', bg:'bg-green-50' }
+               : pct >= 70 ? { l:'B',  c:'text-blue-600',  bg:'bg-blue-50'  }
+               : pct >= 60 ? { l:'C',  c:'text-yellow-600',bg:'bg-yellow-50'}
+               :              { l:'F',  c:'text-red-600',   bg:'bg-red-50'   };
   const mins = Math.floor(elapsed / 60), secs = elapsed % 60;
 
   return (
-    <div style={{ maxWidth: 680, margin: "0 auto" }}>
+    <div className="max-w-2xl mx-auto space-y-5">
       {/* Hero */}
-      <div style={{ borderRadius: 20, padding: 40, textAlign: "center", marginBottom: 20, border: `2px solid ${passed ? "#bbf7d0" : "#fecaca"}`, background: passed ? "linear-gradient(135deg,#f0fdf4,#fff)" : "linear-gradient(135deg,#fef2f2,#fff)" }}>
-        <div style={{ width: 96, height: 96, borderRadius: "50%", margin: "0 auto 16px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 40, fontWeight: 900, background: grade.bg, color: grade.c }}>
+      <div className={`rounded-2xl p-8 text-center border-2 ${passed ? 'border-green-200 bg-gradient-to-br from-green-50 to-white' : 'border-red-200 bg-gradient-to-br from-red-50 to-white'}`}>
+        <div className={`w-24 h-24 rounded-full mx-auto flex items-center justify-center text-4xl font-black mb-4 ${grade.bg} ${grade.c}`}>
           {grade.l}
         </div>
-        <h2 style={{ fontSize: 28, fontWeight: 900, color: passed ? "#15803d" : "#dc2626", margin: "0 0 6px" }}>{passed ? "🎉 Test Passed!" : "😓 Keep Practising"}</h2>
-        <p style={{ color: "#6b7280", fontSize: 13, margin: "0 0 24px" }}>{config.topic} · {config.difficulty} · {config.questionType}</p>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, maxWidth: 360, margin: "0 auto" }}>
+        <h2 className={`text-3xl font-black mb-1 ${passed ? 'text-green-700' : 'text-red-600'}`}>
+          {passed ? '🎉 Test Passed!' : '😓 Keep Practising'}
+        </h2>
+        <p className="text-gray-500 text-sm mb-6">{config.topic} · {config.difficulty} · {config.questionType}</p>
+        <div className="grid grid-cols-3 gap-3 max-w-xs mx-auto">
           {[
-            { label: "Score", value: `${score}/${total}`, icon: "Trophy", color: "#f97316" },
-            { label: "Accuracy", value: `${pct}%`, icon: "Target", color: "#3b82f6" },
-            { label: "Time", value: `${mins}m ${secs}s`, icon: "Clock", color: "#8b5cf6" },
+            { label:'Score',    value:`${score}/${total}`, color:'text-orange-500' },
+            { label:'Accuracy', value:`${pct}%`,           color:'text-blue-500'   },
+            { label:'Time',     value:`${mins}m ${secs}s`, color:'text-purple-500' },
           ].map(s => (
-            <div key={s.label} style={{ background: "#fff", borderRadius: 14, padding: 16, boxShadow: "0 1px 4px rgba(0,0,0,0.08)", border: "1px solid #f3f4f6", textAlign: "center" }}>
-              <span style={{ color: s.color, display: "block", marginBottom: 4 }}><Ic name={s.icon} size={20} /></span>
-              <div style={{ fontSize: 20, fontWeight: 900, color: "#1f2937" }}>{s.value}</div>
-              <div style={{ fontSize: 11, color: "#6b7280" }}>{s.label}</div>
+            <div key={s.label} className="bg-white rounded-xl p-3 shadow-sm border border-gray-100 text-center">
+              <div className={`text-xl font-black ${s.color}`}>{s.value}</div>
+              <div className="text-xs text-gray-500 mt-0.5">{s.label}</div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Review */}
-      <div style={{ background: "#fff", borderRadius: 20, border: "1px solid #f3f4f6", overflow: "hidden", marginBottom: 20, boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
-        <div style={{ padding: "16px 24px", borderBottom: "1px solid #f3f4f6", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <span style={{ fontWeight: 700, color: "#1f2937", display: "flex", alignItems: "center", gap: 8 }}><Ic name="Bar" size={18} /> Answer Review</span>
-          <span style={{ fontSize: 13, color: "#9ca3af" }}>{score} correct · {total - score} wrong</span>
+      {/* Answer Review */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+          <span className="font-bold text-gray-800 text-sm">Answer Review</span>
+          <span className="text-xs text-gray-400">{score} correct · {total - score} wrong</span>
         </div>
-        <div style={{ maxHeight: 380, overflowY: "auto" }}>
+        <div className="max-h-80 overflow-y-auto divide-y divide-gray-50">
           {questions.map((q, i) => {
             const ok = answers[i] === q.correct_answer;
             return (
-              <div key={i} style={{ padding: "16px 24px", borderBottom: "1px solid #f9fafb", background: ok ? "rgba(240,253,244,0.5)" : "rgba(254,242,242,0.5)" }}>
-                <div style={{ display: "flex", gap: 12 }}>
-                  <div style={{ width: 24, height: 24, borderRadius: "50%", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: ok ? "#dcfce7" : "#fee2e2", marginTop: 2 }}>
-                    <span style={{ color: ok ? "#16a34a" : "#ef4444" }}><Ic name={ok ? "Check" : "X"} size={13} /></span>
+              <div key={i} className={`px-5 py-3 ${ok ? 'bg-green-50/40' : 'bg-red-50/40'}`}>
+                <div className="flex gap-3">
+                  <div className={`w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center mt-0.5 text-xs font-bold
+                    ${ok ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-500'}`}>
+                    {ok ? '✓' : '✗'}
                   </div>
-                  <div>
-                    <p style={{ fontSize: 13, fontWeight: 600, color: "#1f2937", margin: "0 0 6px" }}>Q{i + 1}. {q.question}</p>
-                    {!ok && <div>
-                      <p style={{ fontSize: 11, color: "#ef4444", margin: "0 0 2px" }}>Your answer: <b>{answers[i] ?? "Not answered"}</b></p>
-                      <p style={{ fontSize: 11, color: "#16a34a", margin: 0 }}>Correct: <b>{q.correct_answer}</b></p>
-                    </div>}
-                    {q.explanation && <p style={{ fontSize: 11, color: "#9ca3af", marginTop: 4, fontStyle: "italic" }}>💡 {q.explanation}</p>}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-800 mb-1">Q{i+1}. {q.question}</p>
+                    {!ok && (
+                      <div>
+                        <p className="text-xs text-red-500">Your answer: <b>{answers[i] ?? 'Not answered'}</b></p>
+                        <p className="text-xs text-green-600">Correct: <b>{q.correct_answer}</b></p>
+                      </div>
+                    )}
+                    {q.explanation && <p className="text-xs text-gray-400 mt-1 italic">💡 {q.explanation}</p>}
                   </div>
                 </div>
               </div>
@@ -226,43 +205,42 @@ function ResultScreen({ questions, answers, elapsed, config, onRetry, onHome }) 
       </div>
 
       {/* Actions */}
-      <div style={{ display: "flex", gap: 12 }}>
-        <button onClick={onHome} style={{ flex: 1, padding: "14px", border: "2px solid #e5e7eb", borderRadius: 14, background: "#fff", color: "#374151", fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, fontSize: 14 }}>
-          <Ic name="Home" size={18} /> Back to Home
+      <div className="flex gap-3">
+        <button onClick={onHome}
+          className="flex-1 py-3 border-2 border-gray-200 text-gray-600 rounded-xl font-semibold hover:bg-gray-50 transition text-sm flex items-center justify-center gap-2">
+          ← Back to Dashboard
         </button>
-        <button onClick={onRetry} style={{ flex: 1, padding: "14px", border: "none", borderRadius: 14, background: "#f97316", color: "#fff", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, fontSize: 14, boxShadow: "0 4px 12px rgba(249,115,22,0.3)" }}>
-          <Ic name="Rotate" size={18} /> Try Again
+        <button onClick={onRetry}
+          className="flex-1 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-semibold transition shadow-md text-sm flex items-center justify-center gap-2">
+          ↺ Try Again
         </button>
       </div>
     </div>
   );
 }
 
-// ─── MAIN ─────────────────────────────────────────────────────────────────────
+// ─── MAIN TESTGEN COMPONENT ───────────────────────────────────────────────────
 export default function TestGen() {
-  const [step, setStep] = useState(1);
-  const [config, setConfig] = useState({ courseId: null, courseName: "", topic: "", customTopic: false, difficulty: "medium", questionType: "mcq", count: 10, duration: 20 });
+  const [step, setStep]         = useState(1);
+  const [config, setConfig]     = useState({ courseId: null, courseName: '', topic: '', customTopic: false, difficulty: 'medium', questionType: 'mcq', count: 10, duration: 20 });
   const [generating, setGenerating] = useState(false);
-  const [questions, setQuestions] = useState([]);
-  const [currentQ, setCurrentQ] = useState(0);
-  const [answers, setAnswers] = useState({});
-  const [flagged, setFlagged] = useState({});
-  const [startTime, setStartTime] = useState(null);
-  const [elapsed, setElapsed] = useState(0);
+  const [questions, setQuestions]   = useState([]);
+  const [currentQ, setCurrentQ]     = useState(0);
+  const [answers, setAnswers]       = useState({});
+  const [flagged, setFlagged]       = useState({});
+  const [startTime, setStartTime]   = useState(null);
+  const [elapsed, setElapsed]       = useState(0);
 
   const generateTest = () => {
     setGenerating(true);
     setTimeout(() => {
-      const pool = config.difficulty === "mixed"
+      const pool = config.difficulty === 'mixed'
         ? [...MOCK_QUESTIONS.easy, ...MOCK_QUESTIONS.medium, ...MOCK_QUESTIONS.hard]
         : MOCK_QUESTIONS[config.difficulty] || MOCK_QUESTIONS.medium;
-
       let filtered = pool;
-      if (config.questionType === "mcq") filtered = pool.filter(q => q.type === "mcq");
-      else if (config.questionType === "true_false") filtered = pool.filter(q => q.type === "true_false");
-
+      if (config.questionType === 'mcq')        filtered = pool.filter(q => q.type === 'mcq');
+      else if (config.questionType === 'true_false') filtered = pool.filter(q => q.type === 'true_false');
       if (filtered.length < config.count) filtered = pool;
-
       const shuffled = [...filtered].sort(() => Math.random() - 0.5).slice(0, config.count);
       setQuestions(shuffled);
       setAnswers({});
@@ -285,112 +263,118 @@ export default function TestGen() {
     setAnswers({});
     setFlagged({});
     setCurrentQ(0);
-    setConfig(c => ({ ...c, topic: "", customTopic: false }));
+    setConfig(c => ({ ...c, topic: '', customTopic: false }));
   };
 
-  const card = { background: "#fff", borderRadius: 20, padding: 24, boxShadow: "0 1px 4px rgba(0,0,0,0.06)", border: "1px solid #f3f4f6", marginBottom: 16 };
-  const btn = (active) => ({ padding: "14px 18px", borderRadius: 14, border: `2px solid ${active ? "#f97316" : "#e5e7eb"}`, background: active ? "#fff7ed" : "#fff", cursor: "pointer", textAlign: "left", transition: "all 0.2s" });
-  const orangeBtn = (disabled) => ({ width: "100%", padding: 16, borderRadius: 14, border: "none", background: disabled ? "#d1d5db" : "#f97316", color: disabled ? "#9ca3af" : "#fff", fontWeight: 700, fontSize: 15, cursor: disabled ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, boxShadow: disabled ? "none" : "0 4px 12px rgba(249,115,22,0.3)", transition: "all 0.2s" });
+  // shared card style
+  const card = "bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-4";
+  const selBtn = (active) =>
+    `p-4 rounded-xl border-2 text-left transition-all cursor-pointer ${active ? 'border-orange-400 bg-orange-50' : 'border-gray-200 hover:border-orange-200 hover:bg-orange-50/40'}`;
 
-  // STEP 1 — Topic
+  // ── STEP 1 ── Topic
   const renderStep1 = () => (
-    <div style={{ maxWidth: 600, margin: "0 auto" }}>
-      <div style={{ textAlign: "center", marginBottom: 24 }}>
-        <h2 style={{ fontSize: 22, fontWeight: 900, color: "#1f2937", margin: "0 0 4px" }}>What do you want to test?</h2>
-        <p style={{ color: "#6b7280", fontSize: 13, margin: 0 }}>Pick a course or enter your own topic</p>
+    <div className="max-w-xl mx-auto">
+      <div className="text-center mb-6">
+        <h2 className="text-2xl font-black text-gray-800 mb-1">What do you want to test?</h2>
+        <p className="text-gray-500 text-sm">Pick a course or enter your own topic</p>
       </div>
 
       {!config.customTopic && (
-        <div style={card}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
-            <Ic name="Book" size={16} /><span style={{ fontWeight: 700, fontSize: 13, color: "#374151" }}>Select Course</span>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <div className={card}>
+          <p className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
+            <span>📚</span> Select Course
+          </p>
+          <div className="space-y-2">
             {COURSES.map(c => (
               <button key={c.id} onClick={() => setConfig(p => ({ ...p, courseId: c.id, courseName: c.name, topic: c.name }))}
-                style={{ ...btn(config.courseId === c.id), display: "flex", alignItems: "center", gap: 12 }}>
-                <div style={{ width: 36, height: 36, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", background: config.courseId === c.id ? "#f97316" : "#f3f4f6", color: config.courseId === c.id ? "#fff" : "#9ca3af", flexShrink: 0 }}>
-                  <Ic name="Book" size={16} />
+                className={`w-full flex items-center gap-3 ${selBtn(config.courseId === c.id)}`}>
+                <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 text-sm
+                  ${config.courseId === c.id ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-400'}`}>📖</div>
+                <div className="flex-1 text-left">
+                  <p className="font-semibold text-sm text-gray-800">{c.name}</p>
+                  <p className="text-xs text-gray-400">{c.instructor}</p>
                 </div>
-                <div style={{ flex: 1 }}>
-                  <p style={{ margin: 0, fontWeight: 600, fontSize: 13, color: "#1f2937" }}>{c.name}</p>
-                  <p style={{ margin: 0, fontSize: 11, color: "#9ca3af" }}>{c.instructor}</p>
-                </div>
-                {config.courseId === c.id && <span style={{ color: "#f97316" }}><Ic name="Check" size={16} /></span>}
+                {config.courseId === c.id && <span className="text-orange-500 font-bold">✓</span>}
               </button>
             ))}
           </div>
         </div>
       )}
 
-      <div style={card}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-          <span style={{ fontWeight: 700, fontSize: 13, color: "#374151", display: "flex", alignItems: "center", gap: 8 }}>
-            <Ic name="Sparkles" size={16} />{config.customTopic ? "Custom Topic" : "Specific Subtopic (optional)"}
+      <div className={card}>
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-sm font-bold text-gray-700 flex items-center gap-2">
+            <span>✨</span>{config.customTopic ? 'Custom Topic' : 'Specific Subtopic (optional)'}
           </span>
-          <button onClick={() => setConfig(p => ({ ...p, customTopic: !p.customTopic, topic: "", courseId: p.customTopic ? p.courseId : null }))}
-            style={{ background: "none", border: "none", color: "#f97316", fontSize: 12, fontWeight: 700, cursor: "pointer", textDecoration: "underline" }}>
-            {config.customTopic ? "← Pick from courses" : "Enter custom topic →"}
+          <button onClick={() => setConfig(p => ({ ...p, customTopic: !p.customTopic, topic: '', courseId: null }))}
+            className="text-xs text-orange-500 font-bold underline cursor-pointer bg-transparent border-none">
+            {config.customTopic ? '← Pick from courses' : 'Enter custom topic →'}
           </button>
         </div>
-        <input type="text" value={config.topic} onChange={e => setConfig(p => ({ ...p, topic: e.target.value }))}
-          placeholder={config.customTopic ? "e.g. Machine Learning, Calculus, Indian History..." : "e.g. React Hooks, Binary Trees, SQL Joins..."}
-          style={{ width: "100%", padding: "12px 16px", border: `2px solid ${config.topic ? "#f97316" : "#e5e7eb"}`, borderRadius: 12, fontSize: 14, outline: "none", boxSizing: "border-box", transition: "border 0.2s" }} />
+        <input
+          type="text"
+          value={config.topic}
+          onChange={e => setConfig(p => ({ ...p, topic: e.target.value }))}
+          placeholder={config.customTopic ? 'e.g. Machine Learning, Calculus...' : 'e.g. React Hooks, SQL Joins...'}
+          className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-sm outline-none focus:border-orange-400 transition-colors"
+        />
       </div>
 
-      <button onClick={() => setStep(2)} disabled={!config.topic.trim()} style={orangeBtn(!config.topic.trim())}>
-        Continue <Ic name="Arrow" size={18} />
+      <button onClick={() => setStep(2)} disabled={!config.topic.trim()}
+        className="w-full py-4 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-white font-bold rounded-xl transition shadow-md flex items-center justify-center gap-2">
+        Continue →
       </button>
     </div>
   );
 
-  // STEP 2 — Settings
+  // ── STEP 2 ── Settings
   const renderStep2 = () => (
-    <div style={{ maxWidth: 600, margin: "0 auto" }}>
-      <div style={{ textAlign: "center", marginBottom: 24 }}>
-        <h2 style={{ fontSize: 22, fontWeight: 900, color: "#1f2937", margin: "0 0 4px" }}>Customise Your Test</h2>
-        <p style={{ color: "#6b7280", fontSize: 13 }}>Set difficulty, type, questions & duration</p>
+    <div className="max-w-xl mx-auto">
+      <div className="text-center mb-6">
+        <h2 className="text-2xl font-black text-gray-800 mb-1">Customise Your Test</h2>
+        <p className="text-gray-500 text-sm">Set difficulty, type, questions & duration</p>
       </div>
 
       {/* Difficulty */}
-      <div style={card}>
-        <p style={{ fontWeight: 700, fontSize: 13, color: "#374151", marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}><Ic name="Target" size={16} />Difficulty Level</p>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+      <div className={card}>
+        <p className="text-sm font-bold text-gray-700 mb-3">🎯 Difficulty Level</p>
+        <div className="grid grid-cols-2 gap-3">
           {DIFFICULTIES.map(d => (
             <button key={d.value} onClick={() => setConfig(p => ({ ...p, difficulty: d.value }))}
-              style={{ ...btn(config.difficulty === d.value), display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ width: 12, height: 12, borderRadius: "50%", background: d.dot === "bg-green-500" ? "#22c55e" : d.dot === "bg-yellow-500" ? "#eab308" : d.dot === "bg-red-500" ? "#ef4444" : "#a855f7", flexShrink: 0 }} />
-              <div>
-                <p style={{ margin: 0, fontWeight: 700, fontSize: 13, color: "#1f2937" }}>{d.label}</p>
-                <p style={{ margin: 0, fontSize: 11, color: "#9ca3af" }}>{d.desc}</p>
+              className={`flex items-center gap-3 ${selBtn(config.difficulty === d.value)}`}>
+              <span style={{ width:12, height:12, borderRadius:'50%', background: d.dotColor, flexShrink:0, display:'inline-block' }} />
+              <div className="text-left">
+                <p className="font-bold text-sm text-gray-800">{d.label}</p>
+                <p className="text-xs text-gray-400">{d.desc}</p>
               </div>
-              {config.difficulty === d.value && <span style={{ color: "#f97316", marginLeft: "auto" }}><Ic name="Check" size={15} /></span>}
+              {config.difficulty === d.value && <span className="ml-auto text-orange-500 font-bold text-sm">✓</span>}
             </button>
           ))}
         </div>
       </div>
 
       {/* Question Type */}
-      <div style={card}>
-        <p style={{ fontWeight: 700, fontSize: 13, color: "#374151", marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}><Ic name="Layers" size={16} />Question Type</p>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10 }}>
+      <div className={card}>
+        <p className="text-sm font-bold text-gray-700 mb-3">📋 Question Type</p>
+        <div className="grid grid-cols-3 gap-3">
           {QUESTION_TYPES.map(qt => (
             <button key={qt.value} onClick={() => setConfig(p => ({ ...p, questionType: qt.value }))}
-              style={{ ...btn(config.questionType === qt.value), textAlign: "center", padding: "16px 12px" }}>
-              <p style={{ margin: "0 0 4px", fontWeight: 700, fontSize: 12, color: config.questionType === qt.value ? "#f97316" : "#374151" }}>{qt.label}</p>
-              <p style={{ margin: 0, fontSize: 10, color: "#9ca3af" }}>{qt.desc}</p>
+              className={`text-center ${selBtn(config.questionType === qt.value)}`}>
+              <p className={`font-bold text-xs mb-1 ${config.questionType === qt.value ? 'text-orange-500' : 'text-gray-800'}`}>{qt.label}</p>
+              <p className="text-xs text-gray-400">{qt.desc}</p>
             </button>
           ))}
         </div>
       </div>
 
       {/* Count */}
-      <div style={card}>
-        <p style={{ fontWeight: 700, fontSize: 13, color: "#374151", marginBottom: 12 }}>Number of Questions</p>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+      <div className={card}>
+        <p className="text-sm font-bold text-gray-700 mb-3">🔢 Number of Questions</p>
+        <div className="flex gap-2 flex-wrap">
           {COUNTS.map(n => (
             <button key={n} onClick={() => setConfig(p => ({ ...p, count: n }))}
-              style={{ width: 52, height: 52, borderRadius: 12, border: `2px solid ${config.count === n ? "#f97316" : "#e5e7eb"}`, background: config.count === n ? "#f97316" : "#fff", color: config.count === n ? "#fff" : "#374151", fontWeight: 900, fontSize: 17, cursor: "pointer", transition: "all 0.15s" }}>
+              className={`w-12 h-12 rounded-xl border-2 font-black text-base transition-all
+                ${config.count === n ? 'border-orange-500 bg-orange-500 text-white shadow-md' : 'border-gray-200 text-gray-600 hover:border-orange-300'}`}>
               {n}
             </button>
           ))}
@@ -398,132 +382,144 @@ export default function TestGen() {
       </div>
 
       {/* Duration */}
-      <div style={card}>
-        <p style={{ fontWeight: 700, fontSize: 13, color: "#374151", marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}><Ic name="Clock" size={16} />Test Duration</p>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+      <div className={card}>
+        <p className="text-sm font-bold text-gray-700 mb-3">⏱️ Test Duration</p>
+        <div className="flex gap-2 flex-wrap">
           {DURATIONS.map(d => (
             <button key={d.value} onClick={() => setConfig(p => ({ ...p, duration: d.value }))}
-              style={{ padding: "10px 16px", borderRadius: 12, border: `2px solid ${config.duration === d.value ? "#f97316" : "#e5e7eb"}`, background: config.duration === d.value ? "#f97316" : "#fff", color: config.duration === d.value ? "#fff" : "#374151", cursor: "pointer", transition: "all 0.15s" }}>
-              <p style={{ margin: 0, fontWeight: 800, fontSize: 14 }}>{d.label}</p>
-              <p style={{ margin: 0, fontSize: 10, color: config.duration === d.value ? "rgba(255,255,255,0.8)" : "#9ca3af" }}>{d.sub}</p>
+              className={`flex flex-col items-center px-4 py-2.5 rounded-xl border-2 transition-all min-w-[72px]
+                ${config.duration === d.value ? 'border-orange-500 bg-orange-500 text-white shadow-md' : 'border-gray-200 text-gray-600 hover:border-orange-300'}`}>
+              <span className="font-black text-sm">{d.label}</span>
+              <span className={`text-xs mt-0.5 ${config.duration === d.value ? 'text-orange-100' : 'text-gray-400'}`}>{d.sub}</span>
             </button>
           ))}
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 12 }}>
-        <button onClick={() => setStep(1)} style={{ padding: "14px 20px", border: "2px solid #e5e7eb", borderRadius: 14, background: "#fff", color: "#374151", fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontSize: 14 }}>
-          <Ic name="ChevLeft" size={18} /> Back
+      <div className="flex gap-3">
+        <button onClick={() => setStep(1)}
+          className="px-5 py-4 border-2 border-gray-200 text-gray-600 rounded-xl font-semibold hover:bg-gray-50 transition text-sm flex items-center gap-2">
+          ← Back
         </button>
-        <button onClick={() => setStep(3)} style={{ ...orangeBtn(false), flex: 1 }}>
-          Preview Test <Ic name="Arrow" size={18} />
+        <button onClick={() => setStep(3)}
+          className="flex-1 py-4 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl transition shadow-md flex items-center justify-center gap-2">
+          Preview Test →
         </button>
       </div>
     </div>
   );
 
-  // STEP 3 — Review
+  // ── STEP 3 ── Review
   const renderStep3 = () => {
-    const diff = DIFFICULTIES.find(d => d.value === config.difficulty);
+    const diff  = DIFFICULTIES.find(d => d.value === config.difficulty);
     const qtype = QUESTION_TYPES.find(q => q.value === config.questionType);
     return (
-      <div style={{ maxWidth: 520, margin: "0 auto" }}>
-        <div style={{ textAlign: "center", marginBottom: 24 }}>
-          <h2 style={{ fontSize: 22, fontWeight: 900, color: "#1f2937", margin: "0 0 4px" }}>Ready to Generate?</h2>
-          <p style={{ color: "#6b7280", fontSize: 13 }}>Review your test configuration</p>
+      <div className="max-w-md mx-auto">
+        <div className="text-center mb-6">
+          <h2 className="text-2xl font-black text-gray-800 mb-1">Ready to Generate?</h2>
+          <p className="text-gray-500 text-sm">Review your test configuration</p>
         </div>
 
-        <div style={{ borderRadius: 20, overflow: "hidden", boxShadow: "0 2px 12px rgba(0,0,0,0.1)", marginBottom: 20 }}>
-          <div style={{ background: "linear-gradient(135deg,#1e5a8e,#164266)", padding: "24px 28px", display: "flex", alignItems: "center", gap: 16 }}>
-            <div style={{ width: 52, height: 52, background: "rgba(255,255,255,0.2)", borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff" }}>
-              <Ic name="Brain" size={26} />
-            </div>
+        <div className="rounded-2xl overflow-hidden shadow-lg mb-5">
+          <div className="px-6 py-5 flex items-center gap-4" style={{ background: 'linear-gradient(135deg,#1e5a8e,#164266)' }}>
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl" style={{ background:'rgba(255,255,255,0.2)' }}>🧠</div>
             <div>
-              <p style={{ margin: 0, color: "rgba(255,255,255,0.6)", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>AI Mock Test</p>
-              <p style={{ margin: 0, color: "#fff", fontWeight: 900, fontSize: 18 }}>{config.topic}</p>
+              <p className="text-white/60 text-xs font-bold uppercase tracking-wider">AI Mock Test</p>
+              <p className="text-white font-black text-lg">{config.topic}</p>
             </div>
           </div>
-          <div style={{ background: "#fff", padding: 24, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div className="bg-white p-5 grid grid-cols-2 gap-3">
             {[
-              { icon: "Target", label: "Difficulty", value: diff?.label, color: "#f97316" },
-              { icon: "Layers", label: "Question Type", value: qtype?.label, color: "#3b82f6" },
-              { icon: "Layers", label: "Questions", value: `${config.count} questions`, color: "#8b5cf6" },
-              { icon: "Clock", label: "Duration", value: `${config.duration} minutes`, color: "#22c55e" },
+              { emoji:'🎯', label:'Difficulty',    value: diff?.label },
+              { emoji:'📋', label:'Question Type', value: qtype?.label },
+              { emoji:'🔢', label:'Questions',     value: `${config.count} questions` },
+              { emoji:'⏱️', label:'Duration',      value: `${config.duration} minutes` },
             ].map(item => (
-              <div key={item.label} style={{ display: "flex", alignItems: "center", gap: 12, padding: 14, background: "#f9fafb", borderRadius: 12 }}>
-                <span style={{ color: item.color }}><Ic name={item.icon} size={18} /></span>
+              <div key={item.label} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                <span className="text-lg">{item.emoji}</span>
                 <div>
-                  <p style={{ margin: 0, fontSize: 11, color: "#9ca3af" }}>{item.label}</p>
-                  <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "#1f2937" }}>{item.value}</p>
+                  <p className="text-xs text-gray-400">{item.label}</p>
+                  <p className="text-sm font-bold text-gray-800">{item.value}</p>
                 </div>
               </div>
             ))}
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 12 }}>
-          <button onClick={() => setStep(2)} disabled={generating} style={{ padding: "14px 20px", border: "2px solid #e5e7eb", borderRadius: 14, background: "#fff", color: "#374151", fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontSize: 14, opacity: generating ? 0.5 : 1 }}>
-            <Ic name="ChevLeft" size={18} /> Back
+        <div className="flex gap-3">
+          <button onClick={() => setStep(2)} disabled={generating}
+            className="px-5 py-4 border-2 border-gray-200 text-gray-600 rounded-xl font-semibold hover:bg-gray-50 transition text-sm disabled:opacity-50 flex items-center gap-2">
+            ← Back
           </button>
-          <button onClick={generateTest} disabled={generating} style={{ ...orangeBtn(generating), flex: 1 }}>
+          <button onClick={generateTest} disabled={generating}
+            className="flex-1 py-4 bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300 text-white font-bold rounded-xl transition shadow-md flex items-center justify-center gap-2">
             {generating ? (
-              <><span style={{ width: 20, height: 20, border: "2px solid rgba(255,255,255,0.4)", borderTopColor: "#fff", borderRadius: "50%", display: "inline-block", animation: "spin 0.8s linear infinite" }} /> Generating your test...</>
-            ) : (
-              <><Ic name="Sparkles" size={18} /> Generate Test with AI</>
-            )}
+              <>
+                <svg className="animate-spin w-5 h-5" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                Generating your test...
+              </>
+            ) : '✨ Generate Test with AI'}
           </button>
         </div>
       </div>
     );
   };
 
-  // STEP 4 — Take Test
+  // ── STEP 4 ── Take Test
   const renderStep4 = () => {
     const q = questions[currentQ];
     if (!q) return null;
-    const answered = Object.keys(answers).length;
+    const answered  = Object.keys(answers).length;
     const isFlagged = flagged[currentQ];
-    const options = q.options || (q.type === "true_false" ? ["True", "False"] : []);
-    const labels = ["A", "B", "C", "D"];
+    const options   = q.options || (q.type === 'true_false' ? ['True', 'False'] : []);
+    const labels    = ['A', 'B', 'C', 'D'];
 
     return (
-      <div style={{ maxWidth: 720, margin: "0 auto" }}>
+      <div className="max-w-2xl mx-auto space-y-4">
         {/* Top bar */}
-        <div style={{ ...card, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px", marginBottom: 16 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: "#374151" }}>Q {currentQ + 1} <span style={{ fontWeight: 400, color: "#9ca3af" }}>/ {questions.length}</span></span>
-            <div style={{ width: 120, height: 6, background: "#f3f4f6", borderRadius: 999, overflow: "hidden" }}>
-              <div style={{ width: `${((currentQ + 1) / questions.length) * 100}%`, height: "100%", background: "#f97316", borderRadius: 999, transition: "width 0.3s" }} />
+        <div className="bg-white rounded-2xl px-5 py-3 shadow-sm border border-gray-100 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-bold text-gray-700">
+              Q {currentQ+1} <span className="text-gray-400 font-normal">/ {questions.length}</span>
+            </span>
+            <div className="w-28 h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div className="h-full bg-orange-500 rounded-full transition-all"
+                style={{ width:`${((currentQ+1)/questions.length)*100}%` }} />
             </div>
-            <span style={{ fontSize: 11, color: "#9ca3af" }}>{answered} answered</span>
+            <span className="text-xs text-gray-400">{answered} answered</span>
           </div>
-          <Timer totalSeconds={config.duration * 60} onTimeUp={finishTest} />
+          <CountdownTimer totalSeconds={config.duration * 60} onTimeUp={finishTest} />
         </div>
 
-        {/* Question */}
-        <div style={{ ...card, padding: 28 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, marginBottom: 24 }}>
-            <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-              <span style={{ width: 34, height: 34, borderRadius: 10, background: "#fff7ed", color: "#f97316", fontWeight: 900, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{currentQ + 1}</span>
-              <p style={{ margin: 0, fontSize: 15, fontWeight: 600, color: "#1f2937", lineHeight: 1.6 }}>{q.question}</p>
+        {/* Question card */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+          <div className="flex items-start justify-between gap-4 mb-5">
+            <div className="flex gap-3 items-start">
+              <span className="w-8 h-8 rounded-lg bg-orange-100 text-orange-600 font-black text-sm flex items-center justify-center flex-shrink-0 mt-0.5">
+                {currentQ+1}
+              </span>
+              <p className="text-base font-semibold text-gray-800 leading-relaxed">{q.question}</p>
             </div>
             <button onClick={() => setFlagged(p => ({ ...p, [currentQ]: !p[currentQ] }))}
-              style={{ padding: 8, borderRadius: 10, border: "none", background: isFlagged ? "#fef9c3" : "#f9fafb", color: isFlagged ? "#ca8a04" : "#9ca3af", cursor: "pointer", flexShrink: 0, transition: "all 0.2s" }}>
-              <Ic name="Flag" size={16} />
+              className={`p-2 rounded-lg border-none transition flex-shrink-0 cursor-pointer
+                ${isFlagged ? 'bg-yellow-100 text-yellow-600' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}>
+              🚩
             </button>
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div className="space-y-3">
             {options.map((opt, oi) => {
               const sel = answers[currentQ] === opt;
               return (
                 <button key={oi} onClick={() => setAnswers(p => ({ ...p, [currentQ]: opt }))}
-                  style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 16px", borderRadius: 14, border: `2px solid ${sel ? "#f97316" : "#e5e7eb"}`, background: sel ? "#fff7ed" : "#fff", cursor: "pointer", textAlign: "left", transition: "all 0.15s" }}>
-                  <span style={{ width: 32, height: 32, borderRadius: 10, background: sel ? "#f97316" : "#f3f4f6", color: sel ? "#fff" : "#6b7280", fontWeight: 900, fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                    {labels[oi] || oi + 1}
+                  className={`w-full flex items-center gap-4 p-4 rounded-xl border-2 text-left transition-all cursor-pointer
+                    ${sel ? 'border-orange-500 bg-orange-50' : 'border-gray-200 hover:border-orange-300 hover:bg-orange-50/40'}`}>
+                  <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-black flex-shrink-0
+                    ${sel ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-500'}`}>
+                    {labels[oi] || oi+1}
                   </span>
-                  <span style={{ fontSize: 14, fontWeight: 500, color: sel ? "#ea580c" : "#374151", flex: 1 }}>{opt}</span>
-                  {sel && <span style={{ color: "#f97316" }}><Ic name="Check" size={16} /></span>}
+                  <span className={`text-sm font-medium flex-1 ${sel ? 'text-orange-700' : 'text-gray-700'}`}>{opt}</span>
+                  {sel && <span className="text-orange-500 font-bold">✓</span>}
                 </button>
               );
             })}
@@ -531,40 +527,45 @@ export default function TestGen() {
         </div>
 
         {/* Navigator */}
-        <div style={{ ...card, padding: 20 }}>
-          <p style={{ fontSize: 11, color: "#9ca3af", fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, margin: "0 0 12px" }}>Question Navigator</p>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+          <p className="text-xs text-gray-400 font-bold uppercase tracking-wide mb-3">Question Navigator</p>
+          <div className="flex flex-wrap gap-2">
             {questions.map((_, i) => (
               <button key={i} onClick={() => setCurrentQ(i)}
-                style={{ width: 36, height: 36, borderRadius: 10, border: `2px solid ${i === currentQ ? "#f97316" : answers[i] !== undefined ? "#86efac" : flagged[i] ? "#fde68a" : "#e5e7eb"}`, background: i === currentQ ? "#f97316" : answers[i] !== undefined ? "#dcfce7" : flagged[i] ? "#fef9c3" : "#fff", color: i === currentQ ? "#fff" : answers[i] !== undefined ? "#15803d" : flagged[i] ? "#a16207" : "#6b7280", fontWeight: 700, fontSize: 12, cursor: "pointer", transition: "all 0.15s", boxShadow: i === currentQ ? "0 2px 8px rgba(249,115,22,0.4)" : "none" }}>
-                {i + 1}
+                className={`w-9 h-9 rounded-lg text-xs font-bold border-2 transition-all cursor-pointer
+                  ${i === currentQ          ? 'bg-orange-500 border-orange-500 text-white shadow-md'
+                  : answers[i] !== undefined ? 'bg-green-100 border-green-300 text-green-700'
+                  : flagged[i]              ? 'bg-yellow-100 border-yellow-300 text-yellow-700'
+                  :                           'border-gray-200 text-gray-500 hover:border-orange-300'}`}>
+                {i+1}
               </button>
             ))}
           </div>
-          <div style={{ display: "flex", gap: 16, marginTop: 12 }}>
-            {[["#f97316", "#fff", "Current"], ["#dcfce7", "#86efac", "Answered"], ["#fef9c3", "#fde68a", "Flagged"]].map(([bg, border, label]) => (
-              <span key={label} style={{ fontSize: 11, color: "#9ca3af", display: "flex", alignItems: "center", gap: 5 }}>
-                <span style={{ width: 12, height: 12, borderRadius: 4, background: bg, border: `1px solid ${border}`, display: "inline-block" }} /> {label}
+          <div className="flex gap-4 mt-3">
+            {[['bg-orange-500','text-white','Current'],['bg-green-100','text-green-700','Answered'],['bg-yellow-100','text-yellow-700','Flagged']].map(([bg,tc,lbl]) => (
+              <span key={lbl} className="text-xs text-gray-400 flex items-center gap-1">
+                <span className={`w-3 h-3 rounded ${bg} inline-block`} /> {lbl}
               </span>
             ))}
           </div>
         </div>
 
         {/* Nav buttons */}
-        <div style={{ display: "flex", gap: 12 }}>
-          <button onClick={() => setCurrentQ(p => Math.max(0, p - 1))} disabled={currentQ === 0}
-            style={{ padding: "14px 20px", border: "2px solid #e5e7eb", borderRadius: 14, background: "#fff", color: "#374151", fontWeight: 600, cursor: currentQ === 0 ? "not-allowed" : "pointer", opacity: currentQ === 0 ? 0.4 : 1, display: "flex", alignItems: "center", gap: 6, fontSize: 14 }}>
-            <Ic name="ChevLeft" size={18} /> Prev
+        <div className="flex gap-3">
+          <button onClick={() => setCurrentQ(p => Math.max(0, p-1))} disabled={currentQ === 0}
+            className="px-5 py-3 border-2 border-gray-200 rounded-xl font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-40 transition text-sm flex items-center gap-2">
+            ← Prev
           </button>
           {currentQ < questions.length - 1 ? (
-            <button onClick={() => setCurrentQ(p => p + 1)}
-              style={{ flex: 1, padding: 14, border: "none", borderRadius: 14, background: "#1e5a8e", color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-              Next <Ic name="ChevRight" size={18} />
+            <button onClick={() => setCurrentQ(p => p+1)}
+              className="flex-1 py-3 rounded-xl text-white font-bold transition text-sm flex items-center justify-center gap-2"
+              style={{ background:'#1e5a8e' }}>
+              Next →
             </button>
           ) : (
             <button onClick={finishTest}
-              style={{ flex: 1, padding: 14, border: "none", borderRadius: 14, background: "#22c55e", color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, boxShadow: "0 4px 12px rgba(34,197,94,0.3)" }}>
-              <Ic name="Trophy" size={18} /> Submit Test
+              className="flex-1 py-3 bg-green-500 hover:bg-green-600 text-white rounded-xl font-bold transition shadow-md text-sm flex items-center justify-center gap-2">
+              🏆 Submit Test
             </button>
           )}
         </div>
@@ -572,36 +573,43 @@ export default function TestGen() {
     );
   };
 
+  // ── RENDER ────────────────────────────────────────────────────────────────
   return (
-    <div style={{ minHeight: "100vh", background: "#f9fafb", fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } } @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.7} } * { box-sizing: border-box; }`}</style>
-
-      {/* Header */}
-      <div style={{ background: "linear-gradient(135deg,#1e5a8e,#164266)", padding: "24px 32px", marginBottom: 32 }}>
-        <div style={{ maxWidth: 760, margin: "0 auto", display: "flex", alignItems: "center", gap: 16 }}>
-          <div style={{ width: 50, height: 50, background: "rgba(255,255,255,0.2)", borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff" }}>
-            <Ic name="Brain" size={26} />
-          </div>
+    <div className="min-h-full">
+      {/* Page Header — matches dashboard style */}
+      <div className="rounded-2xl px-7 py-5 mb-7 shadow-lg flex items-center justify-between"
+        style={{ background:'linear-gradient(135deg,#1e5a8e,#164266)' }}>
+        <div className="flex items-center gap-4">
+          <div className="w-11 h-11 rounded-xl flex items-center justify-center text-2xl"
+            style={{ background:'rgba(255,255,255,0.2)' }}>🧠</div>
           <div>
-            <h1 style={{ margin: 0, color: "#fff", fontSize: 24, fontWeight: 900 }}>TestGen</h1>
-            <p style={{ margin: 0, color: "rgba(147,197,253,0.9)", fontSize: 13 }}>AI-powered mock test generator · personalised for you</p>
+            <h1 className="text-xl font-black text-white">TestGen</h1>
+            <p className="text-blue-200 text-xs">AI-powered mock test generator · personalised for you</p>
           </div>
-          {step <= 3 && (
-            <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6, color: "rgba(255,255,255,0.6)", fontSize: 13 }}>
-              <span style={{ color: "#fdba74" }}><Ic name="Sparkles" size={16} /></span> Powered by AI
-            </div>
-          )}
         </div>
+        {step <= 3 && (
+          <span className="text-white/60 text-xs flex items-center gap-1">✨ Powered by AI</span>
+        )}
       </div>
 
-      <div style={{ maxWidth: 760, margin: "0 auto", padding: "0 24px 48px" }}>
-        {step <= 4 && <StepIndicator current={step} />}
-        {step === 1 && renderStep1()}
-        {step === 2 && renderStep2()}
-        {step === 3 && renderStep3()}
-        {step === 4 && renderStep4()}
-        {step === 5 && <ResultScreen questions={questions} answers={answers} elapsed={elapsed} config={config} onRetry={handleRetry} onHome={handleRetry} />}
-      </div>
+      {/* Step indicator */}
+      {step <= 4 && <StepIndicator current={step} />}
+
+      {/* Content */}
+      {step === 1 && renderStep1()}
+      {step === 2 && renderStep2()}
+      {step === 3 && renderStep3()}
+      {step === 4 && renderStep4()}
+      {step === 5 && (
+        <ResultScreen
+          questions={questions}
+          answers={answers}
+          elapsed={elapsed}
+          config={config}
+          onRetry={handleRetry}
+          onHome={handleRetry}
+        />
+      )}
     </div>
   );
 }
