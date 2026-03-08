@@ -11,7 +11,7 @@ import CourseView from './pages/CourseView';
 import AuthCallback from './pages/AuthCallback';
 import ForgotPassword from './pages/ForgotPassword';
 import ChangePassword from './pages/ChangePassword';
-
+import TestGen from './pages/Student/testgen';
 // Loading Spinner Component
 const LoadingSpinner = () => (
   <div className="flex items-center justify-center min-h-screen bg-gray-50">
@@ -102,6 +102,7 @@ function AppRoutes() {
       <Route path="/change-password" element={<ChangePassword />} />
       <Route path="/reset-password"  element={<ChangePassword />} />
       <Route path="/auth/callback"   element={<AuthCallback />} />
+      <Route path="/student/testgen"     element={<TestGen />} />
       // ... protected routes ...
       <Route path="*" element={<Navigate to="/" replace />} />  // ← last
     </Routes>
