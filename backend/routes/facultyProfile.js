@@ -438,14 +438,26 @@ router.get('/assignments/:id/submissions', authMiddleware, async (req, res) => {
 router.post('/assignments/:id/grade', authMiddleware, async (req, res) => {
   try {
     const { sequelize } = require('../config/database');
-    const { studentId, grade, feedback } = req.body;
-    await sequelize.query(
+    // Accept both studentId and student_id from frontend
+    const { studentId, student_id, grade, feedback, submission_id } = req.body;
+    const resolvedStudentId = studentId || student_id;
+
+    if (!resolvedStudentId) {
+      return res.status(400).json({ success: false, message: 'student_id is required' });
+    }
+    if (grade === undefined || grade === null) {
+      return res.status(400).json({ success: false, message: 'grade is required' });
+    }
+
+    const [, meta] = await sequelize.query(
       `UPDATE assignment_submissions SET grade=?, feedback=?, status='graded'
        WHERE assignment_id=? AND student_id=?`,
-      { replacements: [grade, feedback, req.params.id, studentId] }
+      { replacements: [grade, feedback || null, req.params.id, resolvedStudentId] }
     );
-    res.json({ success: true });
+
+    res.json({ success: true, updated: meta?.affectedRows ?? 1 });
   } catch (e) {
+    console.error('Grade assignment error:', e);
     res.status(500).json({ success: false, message: e.message });
   }
 });
