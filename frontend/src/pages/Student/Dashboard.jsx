@@ -1919,19 +1919,26 @@ function StudentAssignments() {
     const isOverdue = new Date(dueDate) < new Date() && status === 'pending';
     if (isOverdue) return { label: 'Overdue', cls: 'bg-red-100 text-red-800' };
     switch (status) {
-      case 'graded':   return { label: 'Graded',     cls: 'bg-purple-100 text-purple-800' };
-      case 'submitted':return { label: 'Submitted',  cls: 'bg-blue-100 text-blue-800' };
-      default:         return { label: 'Pending',    cls: 'bg-yellow-100 text-yellow-800' };
+      case 'graded':    return { label: 'Graded',    cls: 'bg-purple-100 text-purple-800' };
+      case 'submitted': return { label: 'Submitted', cls: 'bg-blue-100 text-blue-800' };
+      default:          return { label: 'Pending',   cls: 'bg-yellow-100 text-yellow-800' };
     }
   };
 
   const getDaysLeft = (dueDate) => {
     const diff = Math.ceil((new Date(dueDate) - new Date()) / (1000 * 60 * 60 * 24));
-    if (diff < 0)  return { text: `${Math.abs(diff)}d overdue`, cls: 'text-red-600' };
-    if (diff === 0) return { text: 'Due today',  cls: 'text-orange-600' };
+    if (diff < 0)   return { text: `${Math.abs(diff)}d overdue`, cls: 'text-red-600' };
+    if (diff === 0) return { text: 'Due today',     cls: 'text-orange-600' };
     if (diff <= 3)  return { text: `${diff}d left`, cls: 'text-orange-500' };
-    return { text: `${diff}d left`, cls: 'text-green-600' };
+    return           { text: `${diff}d left`,        cls: 'text-green-600' };
   };
+
+  // ✅ Priority: max_marks from backend → rubric sum → total_marks
+  const getMaxMarks = (a) =>
+    a.max_marks
+    || (a.rubric?.categories?.length > 0
+        ? a.rubric.categories.reduce((s, c) => s + (parseInt(c.points) || 0), 0)
+        : a.total_marks);
 
   const filtered = assignments.filter(a => {
     if (filter === 'all') return true;
@@ -2004,8 +2011,8 @@ function StudentAssignments() {
             const badge = getStatusBadge(assignment.status, assignment.due_date);
             const daysLeft = getDaysLeft(assignment.due_date);
 
-            // ✅ FIX 1: Use max_marks if available, fallback to total_marks
-            const maxM = assignment.max_marks || assignment.total_marks;
+            // ✅ FIX 1: rubric sum takes priority over total_marks
+            const maxM = getMaxMarks(assignment);
             const scorePercent = maxM > 0 && assignment.grade != null
               ? Math.round((assignment.grade / maxM) * 100)
               : null;
@@ -2054,9 +2061,9 @@ function StudentAssignments() {
                   {assignment.status === 'graded' && (
                     <span className="flex items-center gap-1 font-semibold text-purple-700">
                       <Award size={14} />
-                      {/* ✅ FIX 2: Show correct max marks in score line */}
+                      {/* ✅ FIX 2: Score line uses rubric-aware maxM */}
                       Score: {assignment.grade != null
-                        ? `${assignment.grade}/${assignment.max_marks || assignment.total_marks}`
+                        ? `${assignment.grade}/${maxM}`
                         : 'Awaiting grade'}
                     </span>
                   )}
@@ -2117,76 +2124,79 @@ function StudentAssignments() {
       )}
 
       {/* ── DETAILS MODAL ── */}
-      {showDetailsModal && selectedAssignment && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-bold text-gray-900">Assignment Details</h3>
-              <button onClick={() => setShowDetailsModal(false)}><X size={24} /></button>
-            </div>
-            <div className="space-y-4">
-              <div>
-                <p className="text-xs text-gray-500 uppercase font-semibold mb-1">Course</p>
-                <p className="font-semibold text-gray-800">{selectedAssignment.course_name}</p>
+      {showDetailsModal && selectedAssignment && (() => {
+        // ✅ FIX 3: Details modal uses rubric-aware max marks
+        const modalMaxM = getMaxMarks(selectedAssignment);
+        return (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-bold text-gray-900">Assignment Details</h3>
+                <button onClick={() => setShowDetailsModal(false)}><X size={24} /></button>
               </div>
-              <div>
-                <p className="text-xs text-gray-500 uppercase font-semibold mb-1">Title</p>
-                <p className="font-bold text-lg text-gray-900">{selectedAssignment.title}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-500 uppercase font-semibold mb-1">Description</p>
-                <p className="text-gray-700 bg-gray-50 p-4 rounded-lg">{selectedAssignment.description}</p>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <p className="text-xs text-gray-500 mb-1">Due Date</p>
-                  <p className="font-semibold">{new Date(selectedAssignment.due_date).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
-                </div>
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <p className="text-xs text-gray-500 mb-1">Total Marks</p>
-                  <p className="font-semibold">{selectedAssignment.total_marks}</p>
-                </div>
-              </div>
-              {selectedAssignment.rubric?.categories?.length > 0 && (
+              <div className="space-y-4">
                 <div>
-                  <p className="text-xs text-gray-500 uppercase font-semibold mb-2">Grading Rubric</p>
-                  <div className="space-y-2">
-                    {selectedAssignment.rubric.categories.map((cat, i) => (
-                      <div key={i} className="flex justify-between items-center bg-blue-50 p-3 rounded-lg">
-                        <span className="text-sm font-medium text-gray-700">{cat.name}</span>
-                        <span className="text-sm font-bold text-blue-700">{cat.points} pts</span>
-                      </div>
-                    ))}
+                  <p className="text-xs text-gray-500 uppercase font-semibold mb-1">Course</p>
+                  <p className="font-semibold text-gray-800">{selectedAssignment.course_name}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 uppercase font-semibold mb-1">Title</p>
+                  <p className="font-bold text-lg text-gray-900">{selectedAssignment.title}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 uppercase font-semibold mb-1">Description</p>
+                  <p className="text-gray-700 bg-gray-50 p-4 rounded-lg">{selectedAssignment.description}</p>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <p className="text-xs text-gray-500 mb-1">Due Date</p>
+                    <p className="font-semibold">{new Date(selectedAssignment.due_date).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                  </div>
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <p className="text-xs text-gray-500 mb-1">Total Marks</p>
+                    <p className="font-semibold">{selectedAssignment.total_marks}</p>
                   </div>
                 </div>
-              )}
-              {selectedAssignment.status === 'graded' && (
-                <div className="bg-purple-50 border border-purple-200 p-4 rounded-lg">
-                  <p className="text-xs text-gray-500 uppercase font-semibold mb-2">Grade & Feedback</p>
-                  {selectedAssignment.grade != null ? (
-                    <p className="text-2xl font-bold text-purple-700 mb-2">
-                      {/* ✅ FIX 3: Details modal uses max_marks */}
-                      {selectedAssignment.grade}/{selectedAssignment.max_marks || selectedAssignment.total_marks}
-                      <span className="text-base ml-2 text-purple-500">
-                        ({Math.round((selectedAssignment.grade / (selectedAssignment.max_marks || selectedAssignment.total_marks)) * 100)}%)
-                      </span>
-                    </p>
-                  ) : (
-                    <p className="text-base font-semibold text-purple-400 mb-2">Grade not yet recorded</p>
-                  )}
-                  {selectedAssignment.feedback && (
-                    <p className="text-sm text-gray-700">{selectedAssignment.feedback}</p>
-                  )}
-                </div>
-              )}
+                {selectedAssignment.rubric?.categories?.length > 0 && (
+                  <div>
+                    <p className="text-xs text-gray-500 uppercase font-semibold mb-2">Grading Rubric</p>
+                    <div className="space-y-2">
+                      {selectedAssignment.rubric.categories.map((cat, i) => (
+                        <div key={i} className="flex justify-between items-center bg-blue-50 p-3 rounded-lg">
+                          <span className="text-sm font-medium text-gray-700">{cat.name}</span>
+                          <span className="text-sm font-bold text-blue-700">{cat.points} pts</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {selectedAssignment.status === 'graded' && (
+                  <div className="bg-purple-50 border border-purple-200 p-4 rounded-lg">
+                    <p className="text-xs text-gray-500 uppercase font-semibold mb-2">Grade & Feedback</p>
+                    {selectedAssignment.grade != null ? (
+                      <p className="text-2xl font-bold text-purple-700 mb-2">
+                        {selectedAssignment.grade}/{modalMaxM}
+                        <span className="text-base ml-2 text-purple-500">
+                          ({Math.round((selectedAssignment.grade / modalMaxM) * 100)}%)
+                        </span>
+                      </p>
+                    ) : (
+                      <p className="text-base font-semibold text-purple-400 mb-2">Grade not yet recorded</p>
+                    )}
+                    {selectedAssignment.feedback && (
+                      <p className="text-sm text-gray-700">{selectedAssignment.feedback}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+              <button onClick={() => setShowDetailsModal(false)}
+                className="mt-6 w-full bg-gray-200 hover:bg-gray-300 text-gray-700 py-3 rounded-lg font-semibold transition">
+                Close
+              </button>
             </div>
-            <button onClick={() => setShowDetailsModal(false)}
-              className="mt-6 w-full bg-gray-200 hover:bg-gray-300 text-gray-700 py-3 rounded-lg font-semibold transition">
-              Close
-            </button>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ── SUBMIT MODAL ── */}
       {showSubmitModal && selectedAssignment && (
