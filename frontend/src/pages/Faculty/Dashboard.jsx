@@ -717,6 +717,8 @@ function AssignmentManagement() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showGradingModal, setShowGradingModal] = useState(false);
   const [showAllSubmissionsModal, setShowAllSubmissionsModal] = useState(false);
+  const [showFileModal, setShowFileModal] = useState(false);
+  const [viewingFile, setViewingFile] = useState(null);
   const [selectedAssignment, setSelectedAssignment] = useState(null);
   const [assignments, setAssignments] = useState([]);
   const [courses, setCourses] = useState([]);
@@ -829,6 +831,11 @@ function AssignmentManagement() {
     setSelectedAssignment(assignment);
     fetchSubmissions(assignment.id);
     setShowAllSubmissionsModal(true);
+  };
+
+  const openFileViewer = (url, name) => {
+    setViewingFile({ url, name });
+    setShowFileModal(true);
   };
 
   const handleDeleteAssignment = async (assignmentId) => {
@@ -1140,8 +1147,14 @@ function AssignmentManagement() {
                         <h4 className="font-bold text-gray-800">{submission.studentName}</h4>
                         <p className="text-sm text-gray-600">Submitted: {submission.submittedDate}</p>
                       </div>
-                      <button className="px-3 py-1 bg-blue-100 text-blue-800 rounded-lg text-sm font-semibold">
-                        View Submission
+                      <button
+                        onClick={() => {
+                          const fileUrl = submission.file_url || submission.file_path || submission.fileUrl;
+                          if (fileUrl) openFileViewer(fileUrl, submission.studentName || 'Submission');
+                          else alert('No file was uploaded for this submission.');
+                        }}
+                        className="px-3 py-1 bg-blue-100 text-blue-800 rounded-lg text-sm font-semibold flex items-center gap-1 hover:bg-blue-200 transition">
+                        <Eye size={14} /> View File
                       </button>
                     </div>
 
@@ -1186,7 +1199,8 @@ function AssignmentManagement() {
           </div>
         </div>
       )}
-      {/* View All Submissions Modal */}
+
+      {/* ── VIEW ALL SUBMISSIONS MODAL ── */}
       {showAllSubmissionsModal && selectedAssignment && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
           <div className="bg-white rounded-xl p-8 max-w-4xl w-full mx-4 my-8 shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -1220,47 +1234,39 @@ function AssignmentManagement() {
               <div className="text-center py-12">
                 <CheckCircle className="h-16 w-16 text-gray-200 mx-auto mb-4" />
                 <p className="text-gray-400 text-lg font-semibold">No submissions yet</p>
-                <p className="text-gray-400 text-sm mt-1">Students haven't submitted this assignment.</p>
               </div>
             ) : (
               <div className="space-y-3">
                 {submissions.map((submission, idx) => {
                   const isGraded = submission.grade !== null && submission.grade !== undefined;
+                  const fileUrl = submission.file_url || submission.file_path || submission.fileUrl;
+                  const fileName = submission.file_name || submission.fileName || fileUrl?.split('/').pop() || 'submission-file';
+                  const isPdf = fileName?.toLowerCase().endsWith('.pdf');
+                  const isDoc = /\.(doc|docx)$/i.test(fileName || '');
+
                   return (
-                    <div key={submission.id || idx} className="border border-gray-200 rounded-lg p-5 hover:border-blue-300 transition">
-                      <div className="flex items-start justify-between gap-4">
-                        {/* Student info */}
-                        <div className="flex items-center gap-3 min-w-0">
+                    <div key={submission.id || idx} className="border border-gray-200 rounded-xl p-5 hover:border-blue-300 transition">
+                      <div className="flex items-start justify-between gap-4 flex-wrap">
+                        <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
                             <span className="text-blue-700 font-bold text-sm">
                               {(submission.studentName || submission.student_name || 'S').charAt(0).toUpperCase()}
                             </span>
                           </div>
-                          <div className="min-w-0">
+                          <div>
                             <p className="font-bold text-gray-800">{submission.studentName || submission.student_name || 'Student'}</p>
                             <p className="text-xs text-gray-500">{submission.studentEmail || submission.student_email || ''}</p>
                           </div>
                         </div>
-
-                        {/* Status badge */}
-                        <span className={`flex-shrink-0 px-3 py-1 rounded-full text-xs font-bold ${isGraded ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${isGraded ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
                           {isGraded ? `✅ Graded: ${submission.grade}/${selectedAssignment.totalMarks || selectedAssignment.total_marks}` : '⏳ Pending'}
                         </span>
                       </div>
 
-                      <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-gray-500">
-                        <span className="flex items-center gap-1">
-                          <Calendar size={13} />
-                          Submitted: {submission.submittedDate || submission.submitted_at
-                            ? new Date(submission.submittedDate || submission.submitted_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-                            : '—'}
-                        </span>
-                        {submission.file_url && (
-                          <a href={submission.file_url} target="_blank" rel="noopener noreferrer"
-                            className="flex items-center gap-1 text-blue-600 hover:text-blue-800 font-semibold">
-                            <Download size={13} /> Download File
-                          </a>
-                        )}
+                      <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-gray-500">
+                        <span>📅 {submission.submittedDate || submission.submitted_at
+                          ? new Date(submission.submittedDate || submission.submitted_at).toLocaleString('en-IN', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' })
+                          : '—'}</span>
                       </div>
 
                       {/* Notes */}
@@ -1271,7 +1277,28 @@ function AssignmentManagement() {
                         </div>
                       )}
 
-                      {/* Feedback if graded */}
+                      {/* File actions */}
+                      {fileUrl ? (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 flex-1 min-w-0">
+                            <span className="text-xl">{isPdf ? '📄' : isDoc ? '📝' : '📎'}</span>
+                            <span className="truncate font-medium">{fileName}</span>
+                          </div>
+                          <button
+                            onClick={() => openFileViewer(fileUrl, fileName)}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-semibold flex items-center gap-1 flex-shrink-0">
+                            <Eye size={14} /> {isPdf ? 'View PDF' : 'View File'}
+                          </button>
+                          <a href={fileUrl} download={fileName} target="_blank" rel="noopener noreferrer"
+                            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition text-sm font-semibold flex items-center gap-1 flex-shrink-0">
+                            <Download size={14} /> Download
+                          </a>
+                        </div>
+                      ) : (
+                        <p className="mt-3 text-xs text-gray-400 italic">No file uploaded — notes only submission.</p>
+                      )}
+
+                      {/* Feedback */}
                       {isGraded && submission.feedback && (
                         <div className="mt-3 bg-green-50 border-l-4 border-green-400 rounded-lg p-3">
                           <p className="text-xs font-semibold text-green-700 mb-1">Your Feedback:</p>
@@ -1279,12 +1306,10 @@ function AssignmentManagement() {
                         </div>
                       )}
 
-                      {/* Grade button if not graded */}
                       {!isGraded && (
                         <button
                           onClick={() => { setShowAllSubmissionsModal(false); openGradingModal(selectedAssignment); }}
-                          className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-semibold flex items-center gap-2"
-                        >
+                          className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-semibold flex items-center gap-2">
                           <GraduationCap size={14} /> Grade This Submission
                         </button>
                       )}
@@ -1293,7 +1318,6 @@ function AssignmentManagement() {
                 })}
               </div>
             )}
-
             <button onClick={() => setShowAllSubmissionsModal(false)}
               className="mt-6 w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-lg font-semibold transition">
               Close
@@ -1301,9 +1325,72 @@ function AssignmentManagement() {
           </div>
         </div>
       )}
+
+      {/* ── FILE VIEWER MODAL ── */}
+      {showFileModal && viewingFile && (
+        <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl flex flex-col" style={{ height: '90vh' }}>
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0">
+              <div className="flex items-center gap-3 min-w-0">
+                <span className="text-2xl">{/\.pdf$/i.test(viewingFile.name) ? '📄' : /\.(doc|docx)$/i.test(viewingFile.name) ? '📝' : '📎'}</span>
+                <p className="font-bold text-gray-800 truncate">{viewingFile.name}</p>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <a href={viewingFile.url} download={viewingFile.name} target="_blank" rel="noopener noreferrer"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition flex items-center gap-2">
+                  <Download size={14} /> Download
+                </a>
+                <button onClick={() => setShowFileModal(false)}
+                  className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition">
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            {/* Viewer body */}
+            <div className="flex-1 overflow-hidden bg-gray-100 rounded-b-xl">
+              {/\.pdf$/i.test(viewingFile.name || viewingFile.url) ? (
+                /* PDF — inline iframe */
+                <iframe
+                  src={viewingFile.url}
+                  title="PDF Preview"
+                  className="w-full h-full border-0"
+                  style={{ minHeight: '100%' }}
+                />
+              ) : /\.(doc|docx)$/i.test(viewingFile.name || viewingFile.url) ? (
+                /* Word doc — Google Docs viewer */
+                <iframe
+                  src={`https://docs.google.com/gview?url=${encodeURIComponent(viewingFile.url)}&embedded=true`}
+                  title="Document Preview"
+                  className="w-full h-full border-0"
+                  style={{ minHeight: '100%' }}
+                />
+              ) : /\.(jpg|jpeg|png|gif|webp)$/i.test(viewingFile.name || viewingFile.url) ? (
+                /* Image */
+                <div className="flex items-center justify-center h-full p-8">
+                  <img src={viewingFile.url} alt={viewingFile.name} className="max-w-full max-h-full object-contain rounded-lg shadow-lg" />
+                </div>
+              ) : (
+                /* Fallback — Google viewer for unknown types */
+                <div className="flex flex-col items-center justify-center h-full gap-6 p-8">
+                  <div className="text-6xl">📎</div>
+                  <p className="text-gray-600 font-semibold text-lg">This file type cannot be previewed directly.</p>
+                  <a href={viewingFile.url} download={viewingFile.name} target="_blank" rel="noopener noreferrer"
+                    className="px-6 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition flex items-center gap-2 text-lg">
+                    <Download size={20} /> Download to View
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
+// ==================== QUIZ/EXAM MANAGEMENT COMPONENT ====================
 function QuizExamManagement() {
   const [view, setView] = useState('list');
   const [quizzes, setQuizzes] = useState([]);
@@ -3974,7 +4061,10 @@ export default function FacultyDashboard() {
         setNotifications(response.data.notifications || []);
       }
     } catch (error) {
-      console.error('Error fetching notifications:', error);
+      if (error?.response?.status !== 404) {
+        console.error('Error fetching notifications:', error);
+      }
+      setNotifications([]);
     }
   };
 
