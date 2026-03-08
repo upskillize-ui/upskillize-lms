@@ -438,26 +438,39 @@ router.get('/assignments/:id/submissions', authMiddleware, async (req, res) => {
 router.post('/assignments/:id/grade', authMiddleware, async (req, res) => {
   try {
     const { sequelize } = require('../config/database');
-    // Accept both studentId and student_id from frontend
-    const { studentId, student_id, grade, feedback, submission_id } = req.body;
+    // Accept both camelCase and snake_case field names from frontend
+    const {
+      studentId,
+      student_id,
+      submission_id,
+      grade,
+      feedback,
+      rubric_scores
+    } = req.body;
+
     const resolvedStudentId = studentId || student_id;
+    const resolvedGrade = parseInt(grade) || 0;
 
     if (!resolvedStudentId) {
       return res.status(400).json({ success: false, message: 'student_id is required' });
     }
-    if (grade === undefined || grade === null) {
-      return res.status(400).json({ success: false, message: 'grade is required' });
+
+    // Update by submission_id if provided (most precise), else by assignment+student
+    if (submission_id) {
+      await sequelize.query(
+        `UPDATE assignment_submissions SET grade=?, feedback=?, status='graded'
+         WHERE id=?`,
+        { replacements: [resolvedGrade, feedback || '', submission_id] }
+      );
+    } else {
+      await sequelize.query(
+        `UPDATE assignment_submissions SET grade=?, feedback=?, status='graded'
+         WHERE assignment_id=? AND student_id=?`,
+        { replacements: [resolvedGrade, feedback || '', req.params.id, resolvedStudentId] }
+      );
     }
-
-    const [, meta] = await sequelize.query(
-      `UPDATE assignment_submissions SET grade=?, feedback=?, status='graded'
-       WHERE assignment_id=? AND student_id=?`,
-      { replacements: [grade, feedback || null, req.params.id, resolvedStudentId] }
-    );
-
-    res.json({ success: true, updated: meta?.affectedRows ?? 1 });
+    res.json({ success: true, grade: resolvedGrade });
   } catch (e) {
-    console.error('Grade assignment error:', e);
     res.status(500).json({ success: false, message: e.message });
   }
 });

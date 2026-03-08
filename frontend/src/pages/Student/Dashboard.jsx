@@ -1864,29 +1864,7 @@ function StudentAssignments() {
     try {
       const res = await api.get('/student/assignments');
       if (res.data.success) {
-        // 🔍 DEBUG — remove after confirming grade field name
-        const sample = res.data.assignments?.[0];
-        if (sample) console.log('📋 Assignment fields:', JSON.stringify(sample, null, 2));
-
-        // Normalize grade field — handles: grade, obtained_marks, marks_obtained,
-        // score, or nested inside Submission object
-        const normalized = (res.data.assignments || []).map(a => ({
-          ...a,
-          grade: a.grade
-            ?? a.obtained_marks
-            ?? a.marks_obtained
-            ?? a.score
-            ?? a.Submission?.grade
-            ?? a.Submission?.obtained_marks
-            ?? a.Submission?.marks_obtained
-            ?? a.Submission?.score
-            ?? null,
-          feedback: a.feedback
-            ?? a.Submission?.feedback
-            ?? a.Submission?.remarks
-            ?? null,
-        }));
-        setAssignments(normalized);
+        setAssignments(res.data.assignments || []);
       }
     } catch (e) {
       console.error('Error fetching assignments:', e);
