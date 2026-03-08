@@ -813,7 +813,7 @@ function Notifications() {
   useEffect(() => {
     const fetch = async () => {
       try {
-        const res = await api.get('/student/notifications');
+        const res = await api.get('/notifications');
         if (res.data.success) setNotifications(res.data.notifications || []);
       } catch { } finally { setLoading(false); }
     };
@@ -854,15 +854,15 @@ function Notifications() {
       ) : (
         <div className="space-y-3">
           {filtered.map((notif) => (
-            <div key={notif.id} className={`bg-white rounded-lg shadow p-4 flex items-start gap-4 ${!notif.read ? 'border-l-4 border-orange-500' : ''}`}>
+            <div key={notif.id} className={`bg-white rounded-lg shadow p-4 flex items-start gap-4 ${!notif.is_read ? 'border-l-4 border-orange-500' : ''}`}>
               <div className="mt-1">{getIcon(notif.type)}</div>
               <div className="flex-1">
                 <div className="flex justify-between items-start">
                   <h3 className="font-semibold text-gray-800">{notif.title}</h3>
-                  <span className="text-xs text-gray-500">{notif.time}</span>
+                  <span className="text-xs text-gray-500">{new Date(notif.created_at).toLocaleString()}</span>
                 </div>
                 <p className="text-sm text-gray-600 mt-1">{notif.message}</p>
-                {!notif.read && <span className="inline-block mt-2 text-xs bg-orange-500 text-white px-2 py-1 rounded">New</span>}
+                {!notif.is_read && <span className="inline-block mt-2 text-xs bg-orange-500 text-white px-2 py-1 rounded">New</span>}
               </div>
             </div>
           ))}
