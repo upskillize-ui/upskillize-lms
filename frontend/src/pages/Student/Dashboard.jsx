@@ -2353,6 +2353,13 @@ export default function StudentDashboard() {
             </div>
 
             <div className="flex items-center gap-3 flex-shrink-0">
+              {/* TestGen Button */}
+              <div className="relative group">
+                <button className="flex items-center justify-center w-10 h-10 bg-orange-500 hover:bg-orange-600 text-white rounded-lg shadow transition-all">
+                  <FilePen size={18} />
+                </button>
+                <span className="absolute left-1/2 -translate-x-1/2 top-full mt-1.5 px-2 py-1 bg-gray-800 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">TestGen</span>
+              </div>
               {/* Mail */}
               <div className="relative">
                 <button onClick={() => { setShowMailbox(!showMailbox); setShowNotifications(false); setShowHelp(false); }}
@@ -2451,7 +2458,7 @@ export default function StudentDashboard() {
                     )}
                   </div>
                   <div className="hidden md:block text-left" title={user?.full_name || 'Student'}>
-                    <div className="text-sm font-semibold text-gray-900">{(user?.full_name || 'S').charAt(0).toUpperCase()}</div>
+                    <div className="text-sm font-semibold text-gray-900">{user?.full_name?.split(' ')[0] || 'Student'}</div>
                     <div className="text-xs text-gray-500">{isPurchased ? '⭐ Premium' : 'Free Plan'}</div>
                   </div>
                   <ChevronDown size={16} className={`text-gray-400 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
