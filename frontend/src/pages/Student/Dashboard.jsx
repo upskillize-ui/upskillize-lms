@@ -2353,6 +2353,14 @@ export default function StudentDashboard() {
             </div>
 
             <div className="flex items-center gap-3">
+              {/* TestGen Button */}
+              <button
+                className="flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold rounded-lg shadow transition-all"
+              >
+                <FilePen size={16} />
+                TestGen
+              </button>
+
               {/* Mail */}
               <div className="relative">
                 <button onClick={() => { setShowMailbox(!showMailbox); setShowNotifications(false); setShowHelp(false); }}
