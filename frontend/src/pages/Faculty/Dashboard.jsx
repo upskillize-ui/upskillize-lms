@@ -1103,7 +1103,7 @@ function AssignmentManagement() {
                 </div>
                 <div className="flex items-center text-gray-600">
                   <Star className="h-4 w-4 mr-2" />
-                  <span className="text-sm">{assignment.totalMarks} marks</span>
+                  <span className="text-sm">{assignment.total_marks ?? assignment.totalMarks ?? 0} marks</span>
                 </div>
                 <div className="flex items-center text-gray-600">
                   <CheckCircle className="h-4 w-4 mr-2" />
