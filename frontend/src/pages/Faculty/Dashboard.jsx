@@ -64,7 +64,7 @@ function Overview() {
         setLastUpdated(new Date());
       }
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
+      if (error?.response?.status !== 404) console.error('Error fetching dashboard data:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -493,7 +493,7 @@ function ContentUpload() {
         setUploadedContent(response.data.content || []);
       }
     } catch (error) {
-      console.error('Error fetching content:', error);
+      if (error?.response?.status !== 404) console.error('Error fetching content:', error);
     } finally {
       setLoading(false);
     }
@@ -911,7 +911,7 @@ function AssignmentManagement() {
         setAssignments(response.data.assignments || []);
       }
     } catch (error) {
-      console.error('Error fetching assignments:', error);
+      if (error?.response?.status !== 404) console.error('Error fetching assignments:', error);
     } finally {
       setLoading(false);
     }
@@ -935,7 +935,7 @@ function AssignmentManagement() {
         setSubmissions(response.data.submissions || []);
       }
     } catch (error) {
-      console.error('Error fetching submissions:', error);
+      if (error?.response?.status !== 404) console.error('Error fetching submissions:', error);
     }
   };
 
@@ -2396,7 +2396,7 @@ function AnnouncementManagement() {
         setAnnouncements(response.data.announcements || []);
       }
     } catch (error) {
-      console.error('Error fetching announcements:', error);
+      if (error?.response?.status !== 404) console.error('Error fetching announcements:', error);
     } finally {
       setLoading(false);
     }
@@ -2581,7 +2581,7 @@ function BatchManagement() {
         setBatches(response.data.batches || []);
       }
     } catch (error) {
-      console.error('Error fetching batches:', error);
+      if (error?.response?.status !== 404) console.error('Error fetching batches:', error);
     } finally {
       setLoading(false);
     }
@@ -2594,7 +2594,7 @@ function BatchManagement() {
         setBatchStudents(response.data.students || []);
       }
     } catch (error) {
-      console.error('Error fetching batch students:', error);
+      if (error?.response?.status !== 404) console.error('Error fetching batch students:', error);
     }
   };
 
@@ -2920,7 +2920,7 @@ function LiveClassScheduling() {
         setLiveClasses(response.data.liveClasses || []);
       }
     } catch (error) {
-      console.error('Error fetching live classes:', error);
+      if (error?.response?.status !== 404) console.error('Error fetching live classes:', error);
     } finally {
       setLoading(false);
     }
@@ -3026,7 +3026,7 @@ function StudentManagement() {
         setStudents(response.data.students || []);
       }
     } catch (error) {
-      console.error('Error fetching students:', error);
+      if (error?.response?.status !== 404) console.error('Error fetching students:', error);
     } finally {
       setLoading(false);
     }
@@ -3281,7 +3281,7 @@ function DoubtClearing() {
         setDoubts(response.data.doubts || []);
       }
     } catch (error) {
-      console.error('Error fetching doubts:', error);
+      if (error?.response?.status !== 404) console.error('Error fetching doubts:', error);
     } finally {
       setLoading(false);
     }
@@ -4189,7 +4189,8 @@ export default function FacultyDashboard() {
         setMessages(response.data.messages || []);
       }
     } catch (error) {
-      console.error('Error fetching messages:', error);
+      if (error?.response?.status !== 404) console.error('Error fetching messages:', error);
+      setMessages([]);
     }
   };
 
