@@ -469,7 +469,7 @@ export default function Login() {
 
             <div className="logo-wrap">
               <img
-                src="/upskillize-logo.png"
+                src="/project.png"
                 alt="Upskillize"
                 onError={(e) => { e.target.style.display = 'none'; }}
               />
