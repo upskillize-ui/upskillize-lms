@@ -438,28 +438,13 @@ router.get('/assignments/:id/submissions', authMiddleware, async (req, res) => {
 router.post('/assignments/:id/grade', authMiddleware, async (req, res) => {
   try {
     const { sequelize } = require('../config/database');
-    // Accept both camelCase and snake_case field names from frontend
-    const {
-      studentId,
-      student_id,
-      submission_id,
-      grade,
-      feedback,
-      rubric_scores
-    } = req.body;
-
+    const { studentId, student_id, submission_id, grade, feedback } = req.body;
     const resolvedStudentId = studentId || student_id;
     const resolvedGrade = parseInt(grade) || 0;
 
-    if (!resolvedStudentId) {
-      return res.status(400).json({ success: false, message: 'student_id is required' });
-    }
-
-    // Update by submission_id if provided (most precise), else by assignment+student
     if (submission_id) {
       await sequelize.query(
-        `UPDATE assignment_submissions SET grade=?, feedback=?, status='graded'
-         WHERE id=?`,
+        `UPDATE assignment_submissions SET grade=?, feedback=?, status='graded' WHERE id=?`,
         { replacements: [resolvedGrade, feedback || '', submission_id] }
       );
     } else {

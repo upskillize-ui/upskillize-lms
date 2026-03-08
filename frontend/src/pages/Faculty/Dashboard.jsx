@@ -1025,24 +1025,30 @@ function AssignmentManagement() {
       await api.post(`/faculty/assignments/${selectedAssignment.id}/grade`, {
         submission_id: submission.id,
         student_id: submission.student_id || submission.studentId,
+        studentId: submission.student_id || submission.studentId,
         grade: totalGrade,
         feedback: feedback.trim(),
         rubric_scores: rubricScores,
       });
-      // Update submissions local state immediately
-      setSubmissions(prev =>
-        prev.map(s => s.id === submission.id
+
+      const updatedSubmissions = submissions.map(s =>
+        s.id === submission.id
           ? { ...s, grade: totalGrade, feedback: feedback.trim(), status: 'graded' }
-          : s)
+          : s
       );
-      // Update assignments local state immediately so pending count refreshes
+      setSubmissions(updatedSubmissions);
+
+      const newGradedCount = updatedSubmissions.filter(
+        s => s.grade !== null && s.grade !== undefined
+      ).length;
+
       setAssignments(prev =>
         prev.map(a => a.id === selectedAssignment.id
-          ? { ...a, graded: (a.graded || 0) + 1 }
+          ? { ...a, graded: newGradedCount }
           : a)
       );
-      // Also refetch from backend to sync
-      fetchAssignments();
+
+      setTimeout(() => fetchAssignments(), 1000);
     } catch (error) {
       console.error('Error grading submission:', error);
       alert(error.response?.data?.message || 'Failed to submit grade. Please try again.');
@@ -4205,8 +4211,9 @@ export default function FacultyDashboard() {
       if (response.data.success) {
         setMessages(response.data.messages || []);
       }
-    } catch (error) {
-      console.error('Error fetching messages:', error);
+     } catch (error) {
+      if (error?.response?.status !== 404) console.error('Error fetching messages:', error);
+      setMessages([]);
     }
   };
 
