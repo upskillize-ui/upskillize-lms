@@ -1864,7 +1864,25 @@ function StudentAssignments() {
     try {
       const res = await api.get('/student/assignments');
       if (res.data.success) {
-        setAssignments(res.data.assignments || []);
+        // Normalize grade field — backend may return it as obtained_marks,
+        // marks_obtained, score, or nested inside Submission object
+        const normalized = (res.data.assignments || []).map(a => ({
+          ...a,
+          grade: a.grade
+            ?? a.obtained_marks
+            ?? a.marks_obtained
+            ?? a.score
+            ?? a.Submission?.grade
+            ?? a.Submission?.obtained_marks
+            ?? a.Submission?.marks_obtained
+            ?? a.Submission?.score
+            ?? null,
+          feedback: a.feedback
+            ?? a.Submission?.feedback
+            ?? a.Submission?.remarks
+            ?? null,
+        }));
+        setAssignments(normalized);
       }
     } catch (e) {
       console.error('Error fetching assignments:', e);
@@ -2002,7 +2020,7 @@ function StudentAssignments() {
           {filtered.map(assignment => {
             const badge = getStatusBadge(assignment.status, assignment.due_date);
             const daysLeft = getDaysLeft(assignment.due_date);
-            const scorePercent = assignment.total_marks > 0
+            const scorePercent = assignment.total_marks > 0 && assignment.grade != null
               ? Math.round((assignment.grade / assignment.total_marks) * 100)
               : null;
 
@@ -2049,7 +2067,7 @@ function StudentAssignments() {
                   </span>
                   {assignment.status === 'graded' && (
                     <span className="flex items-center gap-1 font-semibold text-purple-700">
-                      <Award size={14} /> Score: {assignment.grade}/{assignment.total_marks}
+                      <Award size={14} /> Score: {assignment.grade != null ? `${assignment.grade}/${assignment.total_marks}` : 'Awaiting grade'}
                     </span>
                   )}
                 </div>
@@ -2155,12 +2173,16 @@ function StudentAssignments() {
               {selectedAssignment.status === 'graded' && (
                 <div className="bg-purple-50 border border-purple-200 p-4 rounded-lg">
                   <p className="text-xs text-gray-500 uppercase font-semibold mb-2">Grade & Feedback</p>
-                  <p className="text-2xl font-bold text-purple-700 mb-2">
-                    {selectedAssignment.grade}/{selectedAssignment.total_marks}
-                    <span className="text-base ml-2 text-purple-500">
-                      ({Math.round((selectedAssignment.grade / selectedAssignment.total_marks) * 100)}%)
-                    </span>
-                  </p>
+                  {selectedAssignment.grade != null ? (
+                    <p className="text-2xl font-bold text-purple-700 mb-2">
+                      {selectedAssignment.grade}/{selectedAssignment.total_marks}
+                      <span className="text-base ml-2 text-purple-500">
+                        ({Math.round((selectedAssignment.grade / selectedAssignment.total_marks) * 100)}%)
+                      </span>
+                    </p>
+                  ) : (
+                    <p className="text-base font-semibold text-purple-400 mb-2">Grade not yet recorded</p>
+                  )}
                   {selectedAssignment.feedback && (
                     <p className="text-sm text-gray-700">{selectedAssignment.feedback}</p>
                   )}
