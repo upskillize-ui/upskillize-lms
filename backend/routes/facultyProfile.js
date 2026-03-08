@@ -284,21 +284,21 @@ router.post('/announcements', authMiddleware, async (req, res) => {
 
     if (courseIds.length > 0) {
       const enrollments = await Enrollment.findAll({
-      where: { course_id: courseIds },
-      attributes: ['student_id']
-    });
+        where: { course_id: courseIds },
+        attributes: ['student_id']
+      });
 
-    console.log('👥 Enrollments found:', enrollments.length);
+      console.log('👥 Enrollments found:', enrollments.length);
 
-    const studentIds = [...new Set(enrollments.map(e => e.student_id).filter(Boolean))];
+      const studentIds = [...new Set(enrollments.map(e => e.student_id).filter(Boolean))];
 
-    const students = await Student.findAll({
-    where: { id: studentIds },
-    attributes: ['user_id']
-  });
+      const students = await Student.findAll({
+        where: { id: studentIds },
+        attributes: ['user_id']
+      });
 
-  const userIds = [...new Set(students.map(s => s.user_id).filter(Boolean))];
-  console.log('👥 userIds to notify:', userIds);
+      const userIds = [...new Set(students.map(s => s.user_id).filter(Boolean))];
+      console.log('👥 userIds to notify:', userIds);
 
       if (userIds.length > 0) {
         await Notification.bulkCreate(
