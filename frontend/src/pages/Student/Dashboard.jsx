@@ -6,6 +6,7 @@ import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
 import CoursePlayer from './CoursePlayer';
+import TestGen from './testgen';
 import BrowseCourses from '../../pages/BrowseCourses';
 import {
   BookOpen, TrendingUp, Award, PlayCircle, Clock, Bell,
@@ -1948,14 +1949,14 @@ function StudentAssignments() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-primary">My Assignments</h2>
+      <h2 className="text-2xl font-bold text-gray-900">My Assignments</h2>
 
       {/* Success message */}
       {successMsg && (
@@ -1967,13 +1968,13 @@ function StudentAssignments() {
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: 'Pending',   count: counts.pending,   color: 'yellow', icon: Clock },
-          { label: 'Submitted', count: counts.submitted, color: 'blue',   icon: CheckCircle },
-          { label: 'Graded',    count: counts.graded,    color: 'purple', icon: Star },
-          { label: 'Overdue',   count: counts.overdue,   color: 'red',    icon: AlertCircle },
-        ].map(({ label, count, color, icon: Icon }) => (
-          <div key={label} className={`bg-white p-5 rounded-xl shadow-md border-l-4 border-${color}-500`}>
-            <Icon className={`h-8 w-8 text-${color}-500 mb-2`} />
+          { label: 'Pending',   count: counts.pending,   borderCls: 'border-yellow-500', iconCls: 'text-yellow-500', icon: Clock },
+          { label: 'Submitted', count: counts.submitted, borderCls: 'border-blue-500',   iconCls: 'text-blue-500',   icon: CheckCircle },
+          { label: 'Graded',    count: counts.graded,    borderCls: 'border-purple-500', iconCls: 'text-purple-500', icon: Star },
+          { label: 'Overdue',   count: counts.overdue,   borderCls: 'border-red-500',    iconCls: 'text-red-500',    icon: AlertCircle },
+        ].map(({ label, count, borderCls, iconCls, icon: Icon }) => (
+          <div key={label} className={`bg-white p-5 rounded-xl shadow-md border-l-4 ${borderCls}`}>
+            <Icon className={`h-8 w-8 ${iconCls} mb-2`} />
             <p className="text-2xl font-bold text-gray-800">{count}</p>
             <p className="text-sm text-gray-500">{label}</p>
           </div>
@@ -1985,8 +1986,8 @@ function StudentAssignments() {
         {['all', 'pending', 'submitted', 'graded', 'overdue'].map(f => (
           <button key={f} onClick={() => setFilter(f)}
             className={`px-4 py-2 rounded-lg text-sm font-semibold capitalize transition
-              ${filter === f ? 'bg-accent text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}>
-            {f} {f !== 'all' && `(${counts[f] ?? filtered.length})`}
+              ${filter === f ? 'bg-orange-500 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}>
+            {f}{f !== 'all' && counts[f] !== undefined ? ` (${counts[f]})` : ''}
           </button>
         ))}
       </div>
@@ -2094,7 +2095,7 @@ function StudentAssignments() {
 
                   {assignment.status === 'pending' && (
                     <button onClick={() => { setSelectedAssignment(assignment); setShowSubmitModal(true); }}
-                      className="px-4 py-2 bg-accent hover:bg-blue-700 text-white rounded-lg text-sm font-semibold flex items-center gap-1 transition">
+                      className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-semibold flex items-center gap-1 transition">
                       <Upload size={15} /> Submit Assignment
                     </button>
                   )}
@@ -2116,7 +2117,7 @@ function StudentAssignments() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-bold text-primary">Assignment Details</h3>
+              <h3 className="text-xl font-bold text-gray-900">Assignment Details</h3>
               <button onClick={() => setShowDetailsModal(false)}><X size={24} /></button>
             </div>
             <div className="space-y-4">
@@ -2187,7 +2188,7 @@ function StudentAssignments() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl p-8 max-w-xl w-full shadow-2xl">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-bold text-primary">Submit Assignment</h3>
+              <h3 className="text-xl font-bold text-gray-900">Submit Assignment</h3>
               <button onClick={() => setShowSubmitModal(false)}><X size={24} /></button>
             </div>
             <p className="text-sm text-gray-600 mb-4 bg-blue-50 p-3 rounded-lg">
@@ -2197,13 +2198,13 @@ function StudentAssignments() {
               {/* File upload */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Upload File</label>
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-accent transition">
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-orange-500 transition">
                   <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
                   <p className="text-sm text-gray-500 mb-2">Upload your assignment file (PDF, DOC, ZIP)</p>
                   <input type="file" id="assign-upload" onChange={handleFileChange} className="hidden"
                     accept=".pdf,.doc,.docx,.zip,.txt,.ppt,.pptx" />
                   <label htmlFor="assign-upload"
-                    className="inline-block px-4 py-2 bg-accent text-white rounded-lg cursor-pointer hover:bg-blue-700 text-sm font-semibold transition">
+                    className="inline-block px-4 py-2 bg-orange-500 text-white rounded-lg cursor-pointer hover:bg-orange-600 text-sm font-semibold transition">
                     Choose File
                   </label>
                   {submitForm.file && (
@@ -2222,12 +2223,12 @@ function StudentAssignments() {
                 <textarea value={submitForm.notes}
                   onChange={e => setSubmitForm({ ...submitForm, notes: e.target.value })}
                   rows={4} placeholder="Add any notes for your faculty..."
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent resize-none" />
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400 resize-none" />
               </div>
             </div>
             <div className="flex gap-3 mt-6">
               <button onClick={handleSubmit} disabled={submitting}
-                className="flex-1 bg-accent hover:bg-blue-700 text-white py-3 rounded-lg font-bold transition disabled:opacity-50 flex items-center justify-center gap-2">
+                className="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-lg font-bold transition disabled:opacity-50 flex items-center justify-center gap-2">
                 {submitting ? <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" /> Submitting...</> : <><Upload size={16} /> Submit Assignment</>}
               </button>
               <button onClick={() => setShowSubmitModal(false)}
@@ -2354,7 +2355,9 @@ export default function StudentDashboard() {
 
             <div className="flex items-center gap-3 flex-shrink-0">
               {/* TestGen Button */}
-              <button className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold rounded-lg shadow transition-all">
+              <button
+                onClick={() => navigate('/student/testgen')}
+                className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold rounded-lg shadow transition-all">
                 TestGen
               </button>
               {/* Mail */}
@@ -2509,6 +2512,7 @@ export default function StudentDashboard() {
               <Route path="/payments" element={<PaymentsComponent />} />
               <Route path="/profile" element={<ProfileManagement />} />
               <Route path="/settings" element={<SystemSettings />} />
+              <Route path="/testgen" element={<TestGen />} />
             </Routes>
           </div>
         </main>

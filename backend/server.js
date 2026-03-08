@@ -99,7 +99,7 @@ app.use('/api/admin/dashboard', require('./routes/adminDashboard'));
 app.use('/api/faculty', facultyRoutes);
 app.use('/api/quizzes', require('./routes/quizzes'));
 app.use('/api/forum', require('./routes/forum'));
-
+app.use('/api/testgen', require('./routes/testgen'));
 // 404 handler
 app.use((req, res) => {
   res.status(404).json({ success: false, message: 'Route not found' });
