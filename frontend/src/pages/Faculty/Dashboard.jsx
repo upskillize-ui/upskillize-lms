@@ -716,6 +716,7 @@ function ContentUpload() {
 function AssignmentManagement() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showGradingModal, setShowGradingModal] = useState(false);
+  const [showAllSubmissionsModal, setShowAllSubmissionsModal] = useState(false);
   const [selectedAssignment, setSelectedAssignment] = useState(null);
   const [assignments, setAssignments] = useState([]);
   const [courses, setCourses] = useState([]);
@@ -822,6 +823,12 @@ function AssignmentManagement() {
     setSelectedAssignment(assignment);
     fetchSubmissions(assignment.id);
     setShowGradingModal(true);
+  };
+
+  const openAllSubmissionsModal = (assignment) => {
+    setSelectedAssignment(assignment);
+    fetchSubmissions(assignment.id);
+    setShowAllSubmissionsModal(true);
   };
 
   const handleDeleteAssignment = async (assignmentId) => {
@@ -940,7 +947,8 @@ function AssignmentManagement() {
                   <GraduationCap size={16} />
                   Grade Submissions ({assignment.submissions - assignment.graded} pending)
                 </button>
-                <button className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm font-semibold flex items-center gap-2">
+                <button className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm font-semibold flex items-center gap-2"
+                  onClick={() => openAllSubmissionsModal(assignment)}>
                   <Eye size={16} />
                   View All Submissions
                 </button>
@@ -1178,11 +1186,124 @@ function AssignmentManagement() {
           </div>
         </div>
       )}
+      {/* View All Submissions Modal */}
+      {showAllSubmissionsModal && selectedAssignment && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
+          <div className="bg-white rounded-xl p-8 max-w-4xl w-full mx-4 my-8 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h3 className="text-2xl font-bold text-gray-800">All Submissions</h3>
+                <p className="text-sm text-gray-500 mt-1">{selectedAssignment.title}</p>
+              </div>
+              <button onClick={() => setShowAllSubmissionsModal(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            {/* Summary bar */}
+            <div className="grid grid-cols-3 gap-4 mb-6">
+              <div className="bg-blue-50 rounded-lg p-4 text-center">
+                <p className="text-2xl font-bold text-blue-700">{submissions.length}</p>
+                <p className="text-xs text-blue-500 font-semibold mt-1">Total Submitted</p>
+              </div>
+              <div className="bg-green-50 rounded-lg p-4 text-center">
+                <p className="text-2xl font-bold text-green-700">{submissions.filter(s => s.grade !== null && s.grade !== undefined).length}</p>
+                <p className="text-xs text-green-500 font-semibold mt-1">Graded</p>
+              </div>
+              <div className="bg-yellow-50 rounded-lg p-4 text-center">
+                <p className="text-2xl font-bold text-yellow-700">{submissions.filter(s => s.grade === null || s.grade === undefined).length}</p>
+                <p className="text-xs text-yellow-500 font-semibold mt-1">Pending Grade</p>
+              </div>
+            </div>
+
+            {submissions.length === 0 ? (
+              <div className="text-center py-12">
+                <CheckCircle className="h-16 w-16 text-gray-200 mx-auto mb-4" />
+                <p className="text-gray-400 text-lg font-semibold">No submissions yet</p>
+                <p className="text-gray-400 text-sm mt-1">Students haven't submitted this assignment.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {submissions.map((submission, idx) => {
+                  const isGraded = submission.grade !== null && submission.grade !== undefined;
+                  return (
+                    <div key={submission.id || idx} className="border border-gray-200 rounded-lg p-5 hover:border-blue-300 transition">
+                      <div className="flex items-start justify-between gap-4">
+                        {/* Student info */}
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                            <span className="text-blue-700 font-bold text-sm">
+                              {(submission.studentName || submission.student_name || 'S').charAt(0).toUpperCase()}
+                            </span>
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-bold text-gray-800">{submission.studentName || submission.student_name || 'Student'}</p>
+                            <p className="text-xs text-gray-500">{submission.studentEmail || submission.student_email || ''}</p>
+                          </div>
+                        </div>
+
+                        {/* Status badge */}
+                        <span className={`flex-shrink-0 px-3 py-1 rounded-full text-xs font-bold ${isGraded ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                          {isGraded ? `✅ Graded: ${submission.grade}/${selectedAssignment.totalMarks || selectedAssignment.total_marks}` : '⏳ Pending'}
+                        </span>
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-gray-500">
+                        <span className="flex items-center gap-1">
+                          <Calendar size={13} />
+                          Submitted: {submission.submittedDate || submission.submitted_at
+                            ? new Date(submission.submittedDate || submission.submitted_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                            : '—'}
+                        </span>
+                        {submission.file_url && (
+                          <a href={submission.file_url} target="_blank" rel="noopener noreferrer"
+                            className="flex items-center gap-1 text-blue-600 hover:text-blue-800 font-semibold">
+                            <Download size={13} /> Download File
+                          </a>
+                        )}
+                      </div>
+
+                      {/* Notes */}
+                      {submission.notes && (
+                        <div className="mt-3 bg-gray-50 rounded-lg p-3">
+                          <p className="text-xs font-semibold text-gray-500 mb-1">Student Notes:</p>
+                          <p className="text-sm text-gray-700">{submission.notes}</p>
+                        </div>
+                      )}
+
+                      {/* Feedback if graded */}
+                      {isGraded && submission.feedback && (
+                        <div className="mt-3 bg-green-50 border-l-4 border-green-400 rounded-lg p-3">
+                          <p className="text-xs font-semibold text-green-700 mb-1">Your Feedback:</p>
+                          <p className="text-sm text-gray-700">{submission.feedback}</p>
+                        </div>
+                      )}
+
+                      {/* Grade button if not graded */}
+                      {!isGraded && (
+                        <button
+                          onClick={() => { setShowAllSubmissionsModal(false); openGradingModal(selectedAssignment); }}
+                          className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-semibold flex items-center gap-2"
+                        >
+                          <GraduationCap size={14} /> Grade This Submission
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <button onClick={() => setShowAllSubmissionsModal(false)}
+              className="mt-6 w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-lg font-semibold transition">
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
-
-// ==================== QUIZ/EXAM MANAGEMENT COMPONENT ====================
 function QuizExamManagement() {
   const [view, setView] = useState('list');
   const [quizzes, setQuizzes] = useState([]);
