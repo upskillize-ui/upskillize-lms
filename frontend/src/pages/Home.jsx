@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import Navbar from '../components/Navbar';
+// Navbar is now built into this page to support the logo
 import { 
   BookOpen, Users, Award, TrendingUp, ArrowRight, CheckCircle, Star, 
   PlayCircle, Zap, Target, Globe, X, Briefcase, GraduationCap, 
@@ -46,7 +46,46 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
-      <Navbar />
+      {/* ══════════════════════════════════════════
+          NAVBAR WITH LOGO
+      ══════════════════════════════════════════ */}
+      <nav className="bg-[#1f4e79] text-white shadow-lg sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            {/* LEFT — Logo */}
+            <Link to="/" className="flex items-center">
+              <img
+                src="/upskillize-logo.png"
+                alt="Upskillize"
+                className="h-10 w-auto object-contain"
+                onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
+              />
+              <div style={{ display: 'none' }} className="flex flex-col">
+                <span className="text-xl font-bold tracking-wider leading-none">UPSKILLIZE</span>
+                <span className="text-xs opacity-75 leading-none">Excel Beyond</span>
+              </div>
+            </Link>
+            {/* RIGHT — Nav Links */}
+            <div className="flex items-center gap-4">
+              {user ? (
+                <Link
+                  to={user.role === 'student' ? '/student' : '/faculty'}
+                  className="bg-orange-500 hover:bg-orange-600 text-white px-5 py-2 rounded-lg font-semibold transition text-sm"
+                >
+                  Dashboard
+                </Link>
+              ) : (
+                <>
+                  <Link to="/login" className="hover:text-orange-300 transition text-sm font-medium">Login</Link>
+                  <Link to="/register" className="bg-orange-500 hover:bg-orange-600 text-white px-5 py-2 rounded-lg font-semibold transition text-sm">
+                    Sign Up Free
+                  </Link>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </nav>
 
       {/* ══════════════════════════════════════════
           WATCH DEMO MODAL
@@ -120,6 +159,16 @@ export default function Home() {
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 relative z-10">
           <div className="text-center">
+            {/* Logo */}
+            <div className="flex justify-center mb-8">
+              <img
+                src="/upskillize-logo.png"
+                alt="Upskillize"
+                className="h-20 w-auto object-contain drop-shadow-lg"
+                onError={(e) => { e.target.style.display = 'none'; }}
+              />
+            </div>
+
             {/* Badge */}
             <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-700 px-4 py-2 rounded-full mb-8 border border-blue-200">
               <Zap size={16} className="text-blue-600" />
@@ -446,8 +495,16 @@ export default function Home() {
             {/* Company Info */}
             <div>
               <div className="flex items-center gap-2 mb-4">
-                <BookOpen className="h-8 w-8 text-blue-500" />
-                <span className="text-xl font-bold text-white">Upskillize</span>
+                <img
+                  src="/upskillize-logo.png"
+                  alt="Upskillize"
+                  className="h-10 w-auto object-contain brightness-0 invert"
+                  onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
+                />
+                <div style={{ display: 'none' }} className="flex items-center gap-2">
+                  <BookOpen className="h-8 w-8 text-blue-500" />
+                  <span className="text-xl font-bold text-white">Upskillize</span>
+                </div>
               </div>
               <p className="text-sm mb-4">Excel Beyond Your Potential</p>
               <p className="text-xs text-gray-500 mb-2">Business Consulting | IT Products</p>
