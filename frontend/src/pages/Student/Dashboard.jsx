@@ -1864,8 +1864,12 @@ function StudentAssignments() {
     try {
       const res = await api.get('/student/assignments');
       if (res.data.success) {
-        // Normalize grade field — backend may return it as obtained_marks,
-        // marks_obtained, score, or nested inside Submission object
+        // 🔍 DEBUG — remove after confirming grade field name
+        const sample = res.data.assignments?.[0];
+        if (sample) console.log('📋 Assignment fields:', JSON.stringify(sample, null, 2));
+
+        // Normalize grade field — handles: grade, obtained_marks, marks_obtained,
+        // score, or nested inside Submission object
         const normalized = (res.data.assignments || []).map(a => ({
           ...a,
           grade: a.grade
@@ -2067,7 +2071,10 @@ function StudentAssignments() {
                   </span>
                   {assignment.status === 'graded' && (
                     <span className="flex items-center gap-1 font-semibold text-purple-700">
-                      <Award size={14} /> Score: {assignment.grade != null ? `${assignment.grade}/${assignment.total_marks}` : 'Awaiting grade'}
+                      <Award size={14} />
+                      Score: {assignment.grade != null
+                        ? `${assignment.grade}/${assignment.total_marks}`
+                        : 'Awaiting grade'}
                     </span>
                   )}
                 </div>
