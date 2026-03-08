@@ -1,17 +1,17 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from './context/AuthContext';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import StudentDashboard from './pages/Student/Dashboard';
-import FacultyDashboard from './pages/Faculty/Dashboard';
-import AdminDashboard from './pages/Admin/Dashboard';
-import Home from './pages/Home';
-import BrowseCourses from './pages/BrowseCourses';
-import CourseView from './pages/CourseView';
-import AuthCallback from './pages/AuthCallback';
-import ForgotPassword from './pages/ForgotPassword';
-import ChangePassword from './pages/ChangePassword';
-import TestGen from './pages/Student/testgen';
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider, useAuth } from "./context/AuthContext";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+import StudentDashboard from "./pages/Student/Dashboard";
+import FacultyDashboard from "./pages/Faculty/Dashboard";
+import AdminDashboard from "./pages/Admin/Dashboard";
+import Home from "./pages/Home";
+import BrowseCourses from "./pages/BrowseCourses";
+import CourseView from "./pages/CourseView";
+import AuthCallback from "./pages/AuthCallback";
+import ForgotPassword from "./pages/ForgotPassword";
+import ChangePassword from "./pages/ChangePassword";
+
 // Loading Spinner Component
 const LoadingSpinner = () => (
   <div className="flex items-center justify-center min-h-screen bg-gray-50">
@@ -26,29 +26,18 @@ const LoadingSpinner = () => (
 const PrivateRoute = ({ children, allowedRoles }) => {
   const { user, loading } = useAuth();
 
-  if (loading) {
-    return <LoadingSpinner />;
-  }
-
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
-
+  if (loading) return <LoadingSpinner />;
+  if (!user) return <Navigate to="/login" replace />;
   if (allowedRoles && !allowedRoles.includes(user.role)) {
-    // Redirect to user's own dashboard based on their role
     return <Navigate to={`/${user.role}`} replace />;
   }
-
   return children;
 };
 
 // App Routes Component (must be inside AuthProvider)
 function AppRoutes() {
   const { user, loading } = useAuth();
-
-  if (loading) {
-    return <LoadingSpinner />;
-  }
+  if (loading) return <LoadingSpinner />;
 
   return (
     <Routes>
@@ -58,20 +47,26 @@ function AppRoutes() {
       <Route path="/course/:id" element={<CourseView />} />
 
       {/* Auth Routes */}
-      <Route 
-        path="/login" 
-        element={user ? <Navigate to={`/${user.role}`} replace /> : <Login />} 
+      <Route
+        path="/login"
+        element={user ? <Navigate to={`/${user.role}`} replace /> : <Login />}
       />
-      <Route 
-        path="/register" 
-        element={user ? <Navigate to={`/${user.role}`} replace /> : <Register />} 
+      <Route
+        path="/register"
+        element={
+          user ? <Navigate to={`/${user.role}`} replace /> : <Register />
+        }
       />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/change-password" element={<ChangePassword />} />
+      <Route path="/reset-password" element={<ChangePassword />} />
+      <Route path="/auth/callback" element={<AuthCallback />} />
 
-      {/* Protected Routes - Student */}
+      {/* Protected Routes - Student (TestGen lives INSIDE StudentDashboard via its own sub-router) */}
       <Route
         path="/student/*"
         element={
-          <PrivateRoute allowedRoles={['student']}>
+          <PrivateRoute allowedRoles={["student"]}>
             <StudentDashboard />
           </PrivateRoute>
         }
@@ -81,7 +76,7 @@ function AppRoutes() {
       <Route
         path="/faculty/*"
         element={
-          <PrivateRoute allowedRoles={['faculty']}>
+          <PrivateRoute allowedRoles={["faculty"]}>
             <FacultyDashboard />
           </PrivateRoute>
         }
@@ -91,31 +86,26 @@ function AppRoutes() {
       <Route
         path="/admin/*"
         element={
-          <PrivateRoute allowedRoles={['admin']}>
+          <PrivateRoute allowedRoles={["admin"]}>
             <AdminDashboard />
           </PrivateRoute>
         }
       />
 
-      // ✅ FIXED ORDER
-      < Route path="/forgot-password" element={<ForgotPassword />} />
-      <Route path="/change-password" element={<ChangePassword />} />
-      <Route path="/reset-password"  element={<ChangePassword />} />
-      <Route path="/auth/callback"   element={<AuthCallback />} />
-      <Route path="/student/testgen"     element={<TestGen />} />
-      // ... protected routes ...
-      <Route path="*" element={<Navigate to="/" replace />} />  // ← last
+      {/* Catch-all — must be last */}
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
 
-// Main App Component
 export default function App() {
   return (
-    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <BrowserRouter
+      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+    >
       <AuthProvider>
         <AppRoutes />
       </AuthProvider>
     </BrowserRouter>
   );
-}5
+}
