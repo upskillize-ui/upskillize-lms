@@ -873,6 +873,9 @@ function GradeSubmissionCard({ submission, assignment, onGrade }) {
 function AssignmentManagement() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showGradingModal, setShowGradingModal] = useState(false);
+  const [showAllSubmissionsModal, setShowAllSubmissionsModal] = useState(false);
+  const [showFileModal, setShowFileModal] = useState(false);
+  const [viewingFile, setViewingFile] = useState(null);
   const [selectedAssignment, setSelectedAssignment] = useState(null);
   const [assignments, setAssignments] = useState([]);
   const [courses, setCourses] = useState([]);
@@ -981,6 +984,17 @@ function AssignmentManagement() {
     setShowGradingModal(true);
   };
 
+  const openAllSubmissionsModal = (assignment) => {
+    setSelectedAssignment(assignment);
+    fetchSubmissions(assignment.id);
+    setShowAllSubmissionsModal(true);
+  };
+
+  const openFileViewer = (url, name) => {
+    setViewingFile({ url, name });
+    setShowFileModal(true);
+  };
+
   const handleDeleteAssignment = async (assignmentId) => {
     if (!window.confirm('Are you sure you want to delete this assignment?')) return;
     try {
@@ -1027,6 +1041,7 @@ function AssignmentManagement() {
   }
 
   return (
+    <>
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-primary">Assignment Management</h2>
@@ -1111,7 +1126,7 @@ function AssignmentManagement() {
                   <GraduationCap size={16} />
                   Grade Submissions ({assignment.submissions - assignment.graded} pending)
                 </button>
-                <button className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm font-semibold flex items-center gap-2">
+                <button onClick={() => openAllSubmissionsModal(assignment)} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm font-semibold flex items-center gap-2">
                   <Eye size={16} />
                   View All Submissions
                 </button>
@@ -1313,6 +1328,204 @@ function AssignmentManagement() {
         </div>
       )}
     </div>
+
+      {/* ── VIEW ALL SUBMISSIONS MODAL ── */}
+      {showAllSubmissionsModal && selectedAssignment && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={e => { if (e.target === e.currentTarget) setShowAllSubmissionsModal(false); }}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col" style={{ maxHeight: '92vh' }}>
+
+            {/* Header */}
+            <div className="flex items-center justify-between px-7 py-5 border-b flex-shrink-0">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">All Submissions</h3>
+                <p className="text-sm text-gray-500 mt-0.5">{selectedAssignment.title} · {selectedAssignment.course}</p>
+              </div>
+              <button onClick={() => setShowAllSubmissionsModal(false)} className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition">
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Summary bar */}
+            <div className="grid grid-cols-3 gap-4 px-7 py-4 bg-gray-50 border-b flex-shrink-0">
+              <div className="bg-blue-50 rounded-xl p-4 text-center">
+                <p className="text-2xl font-bold text-blue-700">{submissions.length}</p>
+                <p className="text-xs text-blue-500 font-semibold mt-1">Total Submitted</p>
+              </div>
+              <div className="bg-green-50 rounded-xl p-4 text-center">
+                <p className="text-2xl font-bold text-green-700">{submissions.filter(s => s.grade !== null && s.grade !== undefined).length}</p>
+                <p className="text-xs text-green-500 font-semibold mt-1">Graded</p>
+              </div>
+              <div className="bg-yellow-50 rounded-xl p-4 text-center">
+                <p className="text-2xl font-bold text-yellow-700">{submissions.filter(s => s.grade === null || s.grade === undefined).length}</p>
+                <p className="text-xs text-yellow-500 font-semibold mt-1">Pending</p>
+              </div>
+            </div>
+
+            {/* Submissions list */}
+            <div className="flex-1 overflow-y-auto px-7 py-5 space-y-4">
+              {submissions.length === 0 ? (
+                <div className="text-center py-16">
+                  <div className="text-5xl mb-4">📭</div>
+                  <p className="text-gray-400 font-semibold text-lg">No submissions yet</p>
+                </div>
+              ) : submissions.map((sub, idx) => {
+                const isGraded = sub.grade !== null && sub.grade !== undefined;
+                const fileUrl  = sub.file_url || sub.file_path || sub.fileUrl || sub.submission_file;
+                const rawName  = sub.file_name || sub.fileName || (fileUrl ? decodeURIComponent(fileUrl.split('/').pop().split('?')[0]) : '');
+                const isPdf    = /\.pdf$/i.test(rawName || fileUrl || '');
+                const isDoc    = /\.(doc|docx)$/i.test(rawName || fileUrl || '');
+                const isImg    = /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(rawName || fileUrl || '');
+                const fileIcon = isPdf ? '📄' : isDoc ? '📝' : isImg ? '🖼️' : '📎';
+
+                return (
+                  <div key={sub.id || idx} className={`border rounded-xl p-5 transition ${isGraded ? 'border-green-200 bg-green-50/30' : 'border-gray-200 bg-white hover:border-blue-300'}`}>
+
+                    {/* Student row */}
+                    <div className="flex items-center justify-between flex-wrap gap-3 mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-11 h-11 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-bold text-base flex-shrink-0">
+                          {(sub.studentName || sub.student_name || 'S').charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="font-bold text-gray-900">{sub.studentName || sub.student_name || '—'}</p>
+                          <p className="text-xs text-gray-500">{sub.studentEmail || sub.student_email || ''}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${isGraded ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                          {isGraded ? `✅ ${sub.grade}/${selectedAssignment.totalMarks || selectedAssignment.total_marks} pts` : '⏳ Pending Grade'}
+                        </span>
+                        <span className="text-xs text-gray-400">
+                          {sub.submitted_at || sub.submittedDate
+                            ? new Date(sub.submitted_at || sub.submittedDate).toLocaleString('en-IN', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' })
+                            : '—'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Notes */}
+                    {sub.notes && (
+                      <div className="bg-gray-50 border-l-4 border-gray-300 rounded-lg p-3 mb-3">
+                        <p className="text-xs font-semibold text-gray-500 mb-1">Student Notes</p>
+                        <p className="text-sm text-gray-700">{sub.notes}</p>
+                      </div>
+                    )}
+
+                    {/* File section */}
+                    {fileUrl ? (
+                      <div className="mt-1">
+                        {/* File info row */}
+                        <div className="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-xl p-3 mb-3">
+                          <span className="text-2xl">{fileIcon}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-gray-800 truncate">{rawName || 'Submitted File'}</p>
+                            <p className="text-xs text-gray-400">{isPdf ? 'PDF Document' : isDoc ? 'Word Document' : isImg ? 'Image File' : 'Document'}</p>
+                          </div>
+                          <div className="flex gap-2 flex-shrink-0">
+                            <button onClick={() => openFileViewer(fileUrl, rawName || 'submission')}
+                              className="px-3 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 transition flex items-center gap-1">
+                              <Eye size={13} /> {isPdf ? 'View PDF' : isDoc ? 'View Doc' : isImg ? 'View Image' : 'Preview'}
+                            </button>
+                            <a href={fileUrl} download={rawName} target="_blank" rel="noopener noreferrer"
+                              className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-xs font-bold hover:bg-gray-200 transition flex items-center gap-1">
+                              <Download size={13} /> Download
+                            </a>
+                          </div>
+                        </div>
+
+                        {/* Inline image preview */}
+                        {isImg && (
+                          <div className="rounded-xl overflow-hidden border border-gray-200 mb-3 cursor-pointer" onClick={() => openFileViewer(fileUrl, rawName || 'image')}>
+                            <img src={fileUrl} alt={rawName} className="w-full max-h-48 object-contain bg-gray-50" />
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-400 italic mb-3">No file uploaded — notes only.</p>
+                    )}
+
+                    {/* Faculty feedback (if graded) */}
+                    {isGraded && sub.feedback && (
+                      <div className="bg-green-50 border-l-4 border-green-400 rounded-lg p-3 mb-3">
+                        <p className="text-xs font-semibold text-green-700 mb-1">Your Feedback</p>
+                        <p className="text-sm text-gray-700">{sub.feedback}</p>
+                      </div>
+                    )}
+
+                    {/* Grade button if pending */}
+                    {!isGraded && (
+                      <button onClick={() => { setShowAllSubmissionsModal(false); openGradingModal(selectedAssignment); }}
+                        className="mt-1 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition flex items-center gap-2">
+                        <GraduationCap size={15} /> Grade This Submission
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="px-7 py-4 border-t flex-shrink-0">
+              <button onClick={() => setShowAllSubmissionsModal(false)}
+                className="w-full py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-semibold transition">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── FILE VIEWER MODAL ── */}
+      {showFileModal && viewingFile && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[60] p-4" onClick={e => { if (e.target === e.currentTarget) setShowFileModal(false); }}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl flex flex-col" style={{ height: '92vh' }}>
+
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0">
+              <div className="flex items-center gap-3 min-w-0">
+                <span className="text-2xl flex-shrink-0">
+                  {/\.pdf$/i.test(viewingFile.name) ? '📄' : /\.(doc|docx)$/i.test(viewingFile.name) ? '📝' : /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(viewingFile.name) ? '🖼️' : '📎'}
+                </span>
+                <p className="font-bold text-gray-800 truncate">{viewingFile.name}</p>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0 ml-4">
+                <a href={viewingFile.url} download={viewingFile.name} target="_blank" rel="noopener noreferrer"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition flex items-center gap-2">
+                  <Download size={14} /> Download
+                </a>
+                <button onClick={() => setShowFileModal(false)}
+                  className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition">
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            {/* Viewer */}
+            <div className="flex-1 overflow-hidden bg-gray-100 rounded-b-2xl">
+              {/\.pdf$/i.test(viewingFile.name || viewingFile.url) ? (
+                <iframe src={viewingFile.url} title="PDF" className="w-full h-full border-0" />
+              ) : /\.(doc|docx)$/i.test(viewingFile.name || viewingFile.url) ? (
+                <iframe
+                  src={`https://docs.google.com/gview?url=${encodeURIComponent(viewingFile.url)}&embedded=true`}
+                  title="Document" className="w-full h-full border-0" />
+              ) : /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(viewingFile.name || viewingFile.url) ? (
+                <div className="flex items-center justify-center h-full p-6">
+                  <img src={viewingFile.url} alt={viewingFile.name} className="max-w-full max-h-full object-contain rounded-xl shadow-lg" />
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full gap-6 p-8 text-center">
+                  <span className="text-7xl">📎</span>
+                  <p className="text-gray-600 font-semibold text-lg">This file type can't be previewed in browser.</p>
+                  <a href={viewingFile.url} download={viewingFile.name} target="_blank" rel="noopener noreferrer"
+                    className="px-8 py-4 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition flex items-center gap-3 text-lg">
+                    <Download size={22} /> Download to View
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
