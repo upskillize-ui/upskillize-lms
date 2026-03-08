@@ -1027,7 +1027,10 @@ function AssignmentManagement() {
         student_id: submission.student_id || submission.studentId,
         studentId: submission.student_id || submission.studentId,
         grade: totalGrade,
-        feedback: feedback.trim(),
+        max_marks: (selectedAssignment.rubric?.categories || [])
+        .reduce((s, c) => s + (parseInt(c.points) || 0), 0)
+       || selectedAssignment.total_marks || 100,
+       feedback: feedback.trim(),
         rubric_scores: rubricScores,
       });
 

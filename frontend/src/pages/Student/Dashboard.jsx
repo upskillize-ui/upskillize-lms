@@ -2003,8 +2003,11 @@ function StudentAssignments() {
           {filtered.map(assignment => {
             const badge = getStatusBadge(assignment.status, assignment.due_date);
             const daysLeft = getDaysLeft(assignment.due_date);
-            const scorePercent = assignment.total_marks > 0 && assignment.grade != null
-              ? Math.round((assignment.grade / assignment.total_marks) * 100)
+
+            // ✅ FIX 1: Use max_marks if available, fallback to total_marks
+            const maxM = assignment.max_marks || assignment.total_marks;
+            const scorePercent = maxM > 0 && assignment.grade != null
+              ? Math.round((assignment.grade / maxM) * 100)
               : null;
 
             return (
@@ -2051,8 +2054,9 @@ function StudentAssignments() {
                   {assignment.status === 'graded' && (
                     <span className="flex items-center gap-1 font-semibold text-purple-700">
                       <Award size={14} />
+                      {/* ✅ FIX 2: Show correct max marks in score line */}
                       Score: {assignment.grade != null
-                        ? `${assignment.grade}/${assignment.total_marks}`
+                        ? `${assignment.grade}/${assignment.max_marks || assignment.total_marks}`
                         : 'Awaiting grade'}
                     </span>
                   )}
@@ -2161,9 +2165,10 @@ function StudentAssignments() {
                   <p className="text-xs text-gray-500 uppercase font-semibold mb-2">Grade & Feedback</p>
                   {selectedAssignment.grade != null ? (
                     <p className="text-2xl font-bold text-purple-700 mb-2">
-                      {selectedAssignment.grade}/{selectedAssignment.total_marks}
+                      {/* ✅ FIX 3: Details modal uses max_marks */}
+                      {selectedAssignment.grade}/{selectedAssignment.max_marks || selectedAssignment.total_marks}
                       <span className="text-base ml-2 text-purple-500">
-                        ({Math.round((selectedAssignment.grade / selectedAssignment.total_marks) * 100)}%)
+                        ({Math.round((selectedAssignment.grade / (selectedAssignment.max_marks || selectedAssignment.total_marks)) * 100)}%)
                       </span>
                     </p>
                   ) : (
