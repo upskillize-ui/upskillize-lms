@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import api from '../services/api';
 
 export default function AuthCallback() {
   const navigate = useNavigate();
@@ -7,20 +8,45 @@ export default function AuthCallback() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const token = params.get('token');
-    if (token) {
-      localStorage.setItem('token', token);
-      // Decode role from token to redirect correctly
-      try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        if (payload.role === 'admin') navigate('/admin/dashboard');
-        else if (payload.role === 'faculty') navigate('/faculty/dashboard');
-        else navigate('/dashboard');
-      } catch {
-        navigate('/dashboard');
-      }
-    } else {
+
+    if (!token) {
       navigate('/login');
+      return;
     }
+
+    // 1. Save token
+    localStorage.setItem('token', token);
+    api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+
+    // 2. Fetch user from backend and save to localStorage
+    api.get('/auth/me')
+      .then((res) => {
+        if (res.data?.success && res.data?.user) {
+          const userData = res.data.user;
+          localStorage.setItem('user', JSON.stringify(userData));
+
+          // 3. Redirect based on role
+          if (userData.role === 'admin') navigate('/admin');
+          else if (userData.role === 'faculty') navigate('/faculty');
+          else navigate('/student');
+        } else {
+          navigate('/login');
+        }
+      })
+      .catch(() => {
+        // Fallback: decode role from JWT if /auth/me fails
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          const fakeUser = { role: payload.role, email: payload.email, id: payload.id };
+          localStorage.setItem('user', JSON.stringify(fakeUser));
+
+          if (payload.role === 'admin') navigate('/admin');
+          else if (payload.role === 'faculty') navigate('/faculty');
+          else navigate('/student');
+        } catch {
+          navigate('/login');
+        }
+      });
   }, []);
 
   return (
