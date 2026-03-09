@@ -2526,7 +2526,6 @@ export default function StudentDashboard() {
               <Route path="/payments" element={<PaymentsComponent />} />
               <Route path="/profile" element={<ProfileManagement />} />
               <Route path="/settings" element={<SystemSettings />} />
-              <Route path="/testgen" element={<TestGen />} />
             </Routes>
           </div>
         </main>
