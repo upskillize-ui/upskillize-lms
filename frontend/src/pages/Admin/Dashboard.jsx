@@ -690,6 +690,7 @@ function Payments() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [filter, setFilter] = useState('all');
+  const [searchTerm, setSearchTerm] = useState('');
   const [showGatewayConfig, setShowGatewayConfig] = useState(false);
 
   useEffect(() => { fetchPayments(); }, []);
@@ -703,12 +704,41 @@ function Payments() {
     finally { setLoading(false); }
   };
 
-  const filtered = filter === 'all' ? payments : payments.filter(p => p.payment_status === filter);
-  const total = filtered.reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
+  // ---- Stats calculated from all payments ----
+  const totalReceived   = payments.reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
+  const completedAmt    = payments.filter(p => p.payment_status === 'completed').reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
+  const pendingAmt      = payments.filter(p => p.payment_status === 'pending').reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
+  const partialAmt      = payments.filter(p => p.payment_status === 'partial').reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
+  const failedAmt       = payments.filter(p => p.payment_status === 'failed').reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
+  const refundedAmt     = payments.filter(p => p.payment_status === 'refunded').reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
+
+  const completedCount  = payments.filter(p => p.payment_status === 'completed').length;
+  const pendingCount    = payments.filter(p => p.payment_status === 'pending').length;
+  const partialCount    = payments.filter(p => p.payment_status === 'partial').length;
+  const failedCount     = payments.filter(p => p.payment_status === 'failed').length;
+  const refundedCount   = payments.filter(p => p.payment_status === 'refunded').length;
+
+  // ---- Filter + Search ----
+  const filtered = payments
+    .filter(p => filter === 'all' || p.payment_status === filter)
+    .filter(p =>
+      !searchTerm ||
+      p.student_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.course_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.transaction_id?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+  const filteredTotal = filtered.reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
 
   const statusBadge = (s) => {
-    const styles = { completed: 'bg-green-100 text-green-800', pending: 'bg-yellow-100 text-yellow-800', failed: 'bg-red-100 text-red-800' };
-    return <span className={`px-3 py-1 rounded-full text-xs font-semibold ${styles[s] || styles.pending}`}>{s}</span>;
+    const styles = {
+      completed: 'bg-green-100 text-green-800',
+      pending:   'bg-yellow-100 text-yellow-800',
+      failed:    'bg-red-100 text-red-800',
+      partial:   'bg-blue-100 text-blue-800',
+      refunded:  'bg-purple-100 text-purple-800',
+    };
+    return <span className={`px-3 py-1 rounded-full text-xs font-semibold capitalize ${styles[s] || 'bg-gray-100 text-gray-700'}`}>{s || 'unknown'}</span>;
   };
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent"></div></div>;
@@ -716,55 +746,174 @@ function Payments() {
 
   return (
     <div className="space-y-6">
+
+      {/* Header */}
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-primary">Payment Management</h2>
-        <button onClick={() => setShowGatewayConfig(true)} className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">
-          <Settings size={18} /> Gateway Settings
-        </button>
-      </div>
-      <div className="flex gap-2">
-        {['all', 'completed', 'pending', 'failed'].map(f => (
-          <button key={f} onClick={() => setFilter(f)}
-            className={`px-4 py-2 rounded-lg transition capitalize ${filter === f ? 'bg-accent text-white' : 'bg-gray-200'}`}>{f}</button>
-        ))}
-      </div>
-      <div className="bg-gradient-to-br from-green-500 to-green-600 p-6 rounded-xl shadow-lg text-white">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm opacity-90">Total ({filter})</p>
-            <p className="text-3xl font-bold mt-1">₹{total.toLocaleString()}</p>
-          </div>
-          <DollarSign className="h-12 w-12 opacity-80" />
+        <div className="flex gap-3">
+          <button onClick={fetchPayments} className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition">
+            <RefreshCw size={16} /> Refresh
+          </button>
+          <button onClick={() => setShowGatewayConfig(true)} className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">
+            <Settings size={18} /> Gateway Settings
+          </button>
         </div>
       </div>
+
+      {/* Summary Stats Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        {/* Total Received */}
+        <div className="lg:col-span-2 bg-gradient-to-br from-blue-600 to-blue-700 p-5 rounded-xl shadow-lg text-white flex items-center justify-between">
+          <div>
+            <p className="text-xs font-medium opacity-80 uppercase tracking-wide">Total Received</p>
+            <p className="text-2xl font-bold mt-1">₹{totalReceived.toLocaleString()}</p>
+            <p className="text-xs opacity-70 mt-1">{payments.length} transactions</p>
+          </div>
+          <DollarSign className="h-10 w-10 opacity-70" />
+        </div>
+
+        {/* Completed */}
+        <div
+          onClick={() => setFilter(filter === 'completed' ? 'all' : 'completed')}
+          className={`p-5 rounded-xl shadow-md border-2 cursor-pointer transition-all ${filter === 'completed' ? 'border-green-500 bg-green-50' : 'border-transparent bg-white hover:border-green-300'}`}>
+          <div className="flex items-center justify-between mb-2">
+            <CheckCircle className="text-green-500" size={22} />
+            <span className="text-xs font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">{completedCount}</span>
+          </div>
+          <p className="text-xs text-gray-500 font-medium">Completed</p>
+          <p className="text-xl font-bold text-green-600 mt-1">₹{completedAmt.toLocaleString()}</p>
+        </div>
+
+        {/* Pending */}
+        <div
+          onClick={() => setFilter(filter === 'pending' ? 'all' : 'pending')}
+          className={`p-5 rounded-xl shadow-md border-2 cursor-pointer transition-all ${filter === 'pending' ? 'border-yellow-500 bg-yellow-50' : 'border-transparent bg-white hover:border-yellow-300'}`}>
+          <div className="flex items-center justify-between mb-2">
+            <Calendar className="text-yellow-500" size={22} />
+            <span className="text-xs font-bold text-yellow-700 bg-yellow-100 px-2 py-0.5 rounded-full">{pendingCount}</span>
+          </div>
+          <p className="text-xs text-gray-500 font-medium">Pending</p>
+          <p className="text-xl font-bold text-yellow-600 mt-1">₹{pendingAmt.toLocaleString()}</p>
+        </div>
+
+        {/* Partial */}
+        <div
+          onClick={() => setFilter(filter === 'partial' ? 'all' : 'partial')}
+          className={`p-5 rounded-xl shadow-md border-2 cursor-pointer transition-all ${filter === 'partial' ? 'border-blue-500 bg-blue-50' : 'border-transparent bg-white hover:border-blue-300'}`}>
+          <div className="flex items-center justify-between mb-2">
+            <PieChart className="text-blue-500" size={22} />
+            <span className="text-xs font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">{partialCount}</span>
+          </div>
+          <p className="text-xs text-gray-500 font-medium">Partial</p>
+          <p className="text-xl font-bold text-blue-600 mt-1">₹{partialAmt.toLocaleString()}</p>
+        </div>
+
+        {/* Failed */}
+        <div
+          onClick={() => setFilter(filter === 'failed' ? 'all' : 'failed')}
+          className={`p-5 rounded-xl shadow-md border-2 cursor-pointer transition-all ${filter === 'failed' ? 'border-red-500 bg-red-50' : 'border-transparent bg-white hover:border-red-300'}`}>
+          <div className="flex items-center justify-between mb-2">
+            <XCircle className="text-red-500" size={22} />
+            <span className="text-xs font-bold text-red-700 bg-red-100 px-2 py-0.5 rounded-full">{failedCount}</span>
+          </div>
+          <p className="text-xs text-gray-500 font-medium">Failed</p>
+          <p className="text-xl font-bold text-red-600 mt-1">₹{failedAmt.toLocaleString()}</p>
+        </div>
+
+        {/* Refunded — spans remaining on mobile */}
+        <div
+          onClick={() => setFilter(filter === 'refunded' ? 'all' : 'refunded')}
+          className={`p-5 rounded-xl shadow-md border-2 cursor-pointer transition-all col-span-2 md:col-span-1 lg:col-span-1 ${filter === 'refunded' ? 'border-purple-500 bg-purple-50' : 'border-transparent bg-white hover:border-purple-300'}`}>
+          <div className="flex items-center justify-between mb-2">
+            <RefreshCw className="text-purple-500" size={22} />
+            <span className="text-xs font-bold text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full">{refundedCount}</span>
+          </div>
+          <p className="text-xs text-gray-500 font-medium">Refunded</p>
+          <p className="text-xl font-bold text-purple-600 mt-1">₹{refundedAmt.toLocaleString()}</p>
+        </div>
+      </div>
+
+      {/* Filter Pills + Search */}
+      <div className="flex flex-col md:flex-row gap-3 items-start md:items-center justify-between bg-white p-4 rounded-xl shadow-sm">
+        <div className="flex flex-wrap gap-2">
+          {['all', 'completed', 'pending', 'partial', 'failed', 'refunded'].map(f => (
+            <button key={f} onClick={() => setFilter(f)}
+              className={`px-4 py-1.5 rounded-full text-sm font-medium transition capitalize border ${
+                filter === f
+                  ? f === 'completed' ? 'bg-green-600 text-white border-green-600'
+                  : f === 'pending'   ? 'bg-yellow-500 text-white border-yellow-500'
+                  : f === 'partial'   ? 'bg-blue-600 text-white border-blue-600'
+                  : f === 'failed'    ? 'bg-red-600 text-white border-red-600'
+                  : f === 'refunded'  ? 'bg-purple-600 text-white border-purple-600'
+                  : 'bg-gray-800 text-white border-gray-800'
+                  : 'bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200'
+              }`}>{f}</button>
+          ))}
+        </div>
+        <div className="relative w-full md:w-72">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+          <input
+            type="text"
+            placeholder="Search student, course, txn ID..."
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-accent focus:outline-none"
+          />
+        </div>
+      </div>
+
+      {/* Filtered total banner */}
+      {filter !== 'all' && (
+        <div className="flex items-center justify-between bg-white border border-gray-200 rounded-xl px-5 py-3 shadow-sm">
+          <span className="text-sm text-gray-600">Showing <strong className="capitalize">{filter}</strong> payments ({filtered.length} records)</span>
+          <span className="text-lg font-bold text-primary">₹{filteredTotal.toLocaleString()}</span>
+        </div>
+      )}
+
+      {/* Table */}
       <div className="bg-white rounded-xl shadow-md overflow-hidden">
-        {filtered.length === 0 ? <EmptyState message="No payments found" /> : (
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b-2 border-gray-200">
-              <tr>{['Transaction ID', 'Student', 'Course', 'Amount', 'Gateway', 'Status', 'Date', 'Actions'].map(h => (
-                <th key={h} className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">{h}</th>
-              ))}</tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {filtered.map((p) => (
-                <tr key={p.id} className="hover:bg-gray-50 transition">
-                  <td className="px-6 py-4 text-sm font-mono">{p.transaction_id || '—'}</td>
-                  <td className="px-6 py-4 text-sm">{p.student_name}</td>
-                  <td className="px-6 py-4 text-sm">{p.course_name}</td>
-                  <td className="px-6 py-4 text-sm font-semibold">₹{parseFloat(p.amount || 0).toLocaleString()}</td>
-                  <td className="px-6 py-4 text-sm capitalize">{p.gateway || 'razorpay'}</td>
-                  <td className="px-6 py-4">{statusBadge(p.payment_status)}</td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{p.payment_date ? new Date(p.payment_date).toLocaleDateString() : '—'}</td>
-                  <td className="px-6 py-4">
-                    <button className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">Refund</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        {filtered.length === 0 ? <EmptyState message={`No ${filter === 'all' ? '' : filter} payments found`} /> : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b-2 border-gray-200">
+                <tr>{['Transaction ID', 'Student', 'Course', 'Amount', 'Paid', 'Due', 'Gateway', 'Status', 'Date', 'Actions'].map(h => (
+                  <th key={h} className="px-5 py-4 text-left text-xs font-semibold text-gray-600 uppercase whitespace-nowrap">{h}</th>
+                ))}</tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {filtered.map((p) => {
+                  const amount  = parseFloat(p.amount || 0);
+                  const paid    = parseFloat(p.paid_amount ?? p.amount ?? 0);
+                  const due     = Math.max(0, amount - paid);
+                  return (
+                    <tr key={p.id} className="hover:bg-gray-50 transition">
+                      <td className="px-5 py-4 text-xs font-mono text-gray-500">{p.transaction_id || '—'}</td>
+                      <td className="px-5 py-4 text-sm font-medium text-gray-800">{p.student_name || '—'}</td>
+                      <td className="px-5 py-4 text-sm text-gray-600 max-w-[160px] truncate">{p.course_name || '—'}</td>
+                      <td className="px-5 py-4 text-sm font-semibold text-gray-900">₹{amount.toLocaleString()}</td>
+                      <td className="px-5 py-4 text-sm font-semibold text-green-600">₹{paid.toLocaleString()}</td>
+                      <td className="px-5 py-4 text-sm font-semibold text-red-500">{due > 0 ? `₹${due.toLocaleString()}` : '—'}</td>
+                      <td className="px-5 py-4 text-sm capitalize text-gray-500">{p.gateway || 'razorpay'}</td>
+                      <td className="px-5 py-4">{statusBadge(p.payment_status)}</td>
+                      <td className="px-5 py-4 text-sm text-gray-400 whitespace-nowrap">{p.payment_date ? new Date(p.payment_date).toLocaleDateString() : '—'}</td>
+                      <td className="px-5 py-4">
+                        <div className="flex gap-2">
+                          <button className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition">View</button>
+                          {p.payment_status === 'completed' && (
+                            <button className="px-3 py-1 bg-purple-600 text-white rounded text-xs hover:bg-purple-700 transition">Refund</button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
+      {/* Gateway Config Modal */}
       {showGatewayConfig && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-8 max-w-2xl w-full mx-4 shadow-2xl">
