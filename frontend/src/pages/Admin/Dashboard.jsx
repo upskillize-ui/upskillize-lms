@@ -1290,11 +1290,22 @@ function DatabaseManagement() {
       <h2 className="text-2xl font-bold text-primary">Database Backup & Maintenance</h2>
       <div className="grid md:grid-cols-4 gap-4">
         {[
-          { label: 'Create Backup', sub: 'Manual backup', icon: Database, color: 'bg-blue-600 hover:bg-blue-700', onClick: handleCreateBackup, disabled: backupInProgress },
-          { label: 'Optimize DB', sub: 'Improve performance', icon: Zap, color: 'bg-green-600 hover:bg-green-700', onClick: () => alert('Optimize: connect backend'), disabled: false },
-          { label: 'Clear Cache', sub: 'Free up memory', icon: RefreshCw, color: 'bg-yellow-600 hover:bg-yellow-700', onClick: () => alert('Cache clear: connect backend'), disabled: false },
-          { label: 'Storage Info', sub: 'View usage', icon: HardDrive, color: 'bg-purple-600 hover:bg-purple-700', onClick: () => alert('Storage: connect backend'), disabled: false },
-        ].map(({ label, sub, icon: Icon, color, onClick, disabled }) => (
+          { label: 'Create Backup', sub: 'Manual backup', icon: Database, 
+            color: 'bg-blue-600 hover:bg-blue-700', 
+            onClick: handleCreateBackup, disabled: backupInProgress },
+
+          { label: 'Optimize DB', sub: 'Improve performance', icon: Zap, 
+            color: 'bg-green-600 hover:bg-green-700', 
+            onClick: () => alert('Coming soon'), disabled: false },
+
+          { label: 'Clear Cache', sub: 'Free up memory', icon: RefreshCw, 
+            color: 'bg-yellow-600 hover:bg-yellow-700', 
+            onClick: () => alert('Coming soon'), disabled: false },
+
+          { label: 'Storage Info', sub: 'View usage', icon: HardDrive, 
+            color: 'bg-purple-600 hover:bg-purple-700', 
+            onClick: () => alert('Coming soon'), disabled: false },
+          ].map(({ label, sub, icon: Icon, color, onClick, disabled }) => (
           <button key={label} onClick={onClick} disabled={disabled}
             className={`p-6 ${color} text-white rounded-xl transition disabled:opacity-50`}>
             <Icon className="h-10 w-10 mb-2" />
