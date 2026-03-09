@@ -293,11 +293,8 @@ router.post('/logout', authMiddleware, (req, res) => {
 });
 
 // ============================================================
-// ADD THIS to your existing auth.js routes file
 // POST /api/auth/change-password    ← used in Profile.jsx Security tab
 // ============================================================
-const bcrypt = require('bcryptjs');
-
 router.post('/change-password', authMiddleware, async (req, res) => {
   try {
     const { current_password, new_password } = req.body;
