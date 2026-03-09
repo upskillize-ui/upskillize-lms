@@ -292,4 +292,34 @@ router.post('/logout', authMiddleware, (req, res) => {
   res.json({ success: true, message: 'Logged out successfully' });
 });
 
+// ============================================================
+// ADD THIS to your existing auth.js routes file
+// POST /api/auth/change-password    ← used in Profile.jsx Security tab
+// ============================================================
+const bcrypt = require('bcryptjs');
+
+router.post('/change-password', authMiddleware, async (req, res) => {
+  try {
+    const { current_password, new_password } = req.body;
+
+    if (!current_password || !new_password)
+      return res.status(400).json({ success: false, message: 'Both fields are required' });
+
+    if (new_password.length < 6)
+      return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
+
+    const user = await User.findByPk(req.user.id);
+    const isMatch = await user.comparePassword(current_password);
+    if (!isMatch)
+      return res.status(400).json({ success: false, message: 'Current password is incorrect' });
+
+    const hashed = await bcrypt.hash(new_password, 10);
+    await user.update({ password_hash: hashed });
+
+    return res.json({ success: true, message: 'Password changed successfully' });
+  } catch (error) {
+    console.error('Change password error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
 module.exports = router;

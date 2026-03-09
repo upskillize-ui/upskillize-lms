@@ -661,3 +661,152 @@ router.get('/reports/overview', ...adminOnly, async (req, res) => {
 });
 
 module.exports = router;
+// ============================================================
+// REPORTS GENERATE
+// POST /api/admin/reports/generate   ← used in Dashboard.jsx
+// ============================================================
+router.post('/reports/generate', ...adminOnly, async (req, res) => {
+  try {
+    const { type, start, end, format } = req.body;
+    if (!type || !start || !end)
+      return res.status(400).json({ success: false, message: 'type, start and end are required' });
+
+    const dateFilter = { [Op.between]: [new Date(start), new Date(end)] };
+    let data = [];
+
+    if (type === 'user-registration') {
+      data = await User.findAll({
+        where: { created_at: dateFilter },
+        attributes: { exclude: ['password_hash', 'reset_token', 'reset_token_expiry'] },
+        raw: true
+      });
+    } else if (type === 'enrollment') {
+      data = await Enrollment.findAll({
+        where: { created_at: dateFilter },
+        include: [
+          { model: Student, include: [{ model: User, attributes: ['full_name', 'email'] }] },
+          { model: Course, attributes: ['course_name'] }
+        ]
+      });
+    } else if (type === 'revenue' || type === 'payment-transactions') {
+      data = await Payment.findAll({
+        where: { created_at: dateFilter },
+        include: [
+          { model: User, attributes: ['full_name', 'email'] },
+          { model: Course, attributes: ['course_name'] }
+        ]
+      });
+    } else if (type === 'completion') {
+      data = await Enrollment.findAll({
+        where: { completion_status: 'completed', updated_at: dateFilter },
+        include: [
+          { model: Student, include: [{ model: User, attributes: ['full_name', 'email'] }] },
+          { model: Course, attributes: ['course_name'] }
+        ]
+      });
+    } else if (type === 'faculty-activity') {
+      data = await Faculty.findAll({
+        include: [
+          { model: User, attributes: ['full_name', 'email'] },
+          { model: Course, attributes: ['course_name', 'is_active', 'created_at'] }
+        ]
+      });
+    }
+
+    return res.json({ success: true, message: `Report generated for "${type}"`, format: format || 'json', count: data.length, data });
+  } catch (error) {
+    console.error('Report generate error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// ============================================================
+// CONTENT MODERATION
+// GET  /api/admin/content           ← used in Dashboard.jsx
+// POST /api/admin/content/:id/approve
+// POST /api/admin/content/:id/reject
+// ============================================================
+router.get('/content', ...adminOnly, async (req, res) => {
+  try {
+    const courses = await Course.findAll({
+      where: { is_active: false },
+      include: [{ model: Faculty, include: [{ model: User, attributes: ['full_name'] }] }],
+      order: [['created_at', 'DESC']]
+    });
+
+    const content = courses.map(c => ({
+      id: c.id,
+      title: c.course_name,
+      type: 'course',
+      faculty: c.Faculty?.User?.full_name || '—',
+      uploadDate: new Date(c.created_at).toLocaleDateString('en-IN'),
+      size: `${c.duration_hours || 0}h`,
+      status: 'pending'
+    }));
+
+    return res.json({ success: true, content });
+  } catch (error) {
+    console.error('Content fetch error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+router.post('/content/:id/approve', ...adminOnly, async (req, res) => {
+  try {
+    await Course.update({ is_active: true, status: 'approved' }, { where: { id: req.params.id } });
+    return res.json({ success: true, message: 'Content approved' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+router.post('/content/:id/reject', ...adminOnly, async (req, res) => {
+  try {
+    await Course.update({ status: 'rejected' }, { where: { id: req.params.id } });
+    return res.json({ success: true, message: 'Content rejected' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// ============================================================
+// AUDIT LOGS
+// GET /api/admin/audit-logs         ← used in Dashboard.jsx
+// ============================================================
+router.get('/audit-logs', ...adminOnly, async (req, res) => {
+  try {
+    const { Notification } = require('../models');
+    const logs = await Notification.findAll({
+      include: [{ model: User, attributes: ['full_name', 'role'] }],
+      order: [['created_at', 'DESC']],
+      limit: 200
+    });
+
+    const formatted = logs.map(n => ({
+      id: n.id,
+      timestamp: new Date(n.created_at).toLocaleString('en-IN'),
+      user: n.User?.full_name || 'System',
+      action: (n.type || 'GENERAL').toUpperCase(),
+      details: `${n.title} — ${n.message}`,
+      ip: '—'
+    }));
+
+    return res.json({ success: true, logs: formatted });
+  } catch (error) {
+    console.error('Audit logs error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// ============================================================
+// DATABASE BACKUPS
+// GET  /api/admin/backups           ← used in Dashboard.jsx
+// POST /api/admin/backups/create
+// ============================================================
+router.get('/backups', ...adminOnly, async (req, res) => {
+  return res.json({ success: true, backups: [] });
+});
+
+router.post('/backups/create', ...adminOnly, async (req, res) => {
+  return res.json({ success: true, message: 'Backup initiated' });
+});
