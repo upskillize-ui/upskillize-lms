@@ -502,58 +502,34 @@ router.delete('/courses/:id', ...adminOnly, async (req, res) => {
 // ============================================================
 router.get('/payments', ...adminOnly, async (req, res) => {
   try {
-    let payments = [];
-
-    // Step 1: Try full JOIN query (Student + User + Course)
-    try {
-      payments = await Payment.findAll({
-        order: [['created_at', 'DESC']],
-        include: [
-          {
-            model: Student,
-            required: false,
-            include: [{ model: User, attributes: ['full_name'], required: false }]
-          },
-          {
-            model: Course,
-            attributes: ['course_name'],
-            required: false
-          },
-        ],
-      });
-    } catch (joinError) {
-      console.warn('JOIN query failed, falling back to raw payment fetch:', joinError.message);
-
-      // Step 2: Fallback — fetch payments alone without JOINs
-      payments = await Payment.findAll({
-        order: [['created_at', 'DESC']],
-      });
-    }
-
-    const data = payments.map(p => {
-      // Safely extract nested association data
-      let student_name = 'N/A';
-      let course_name = 'N/A';
-
-      try { student_name = p.Student?.User?.full_name || p.student_name || 'N/A'; } catch (_) {}
-      try { course_name = p.Course?.course_name || p.course_name || 'N/A'; } catch (_) {}
-
-      return {
-        id: p.id,
-        transaction_id: p.razorpay_payment_id || p.razorpay_order_id || `TXN-${p.id}`,
-        amount: parseFloat(p.amount || 0),
-        paid_amount: parseFloat(p.paid_amount || p.amount || 0),
-        payment_status: p.payment_status || 'pending',
-        payment_date: p.paid_at || p.created_at,
-        student_name,
-        course_name,
-        gateway: p.gateway || p.payment_gateway || 'razorpay',
-      };
+    // Payment model uses: user_id, course_id, order_id, payment_id, amount, status, payment_method
+    // Association: Payment.belongsTo(User) and Payment.belongsTo(Course) — NO Student association
+    const payments = await Payment.findAll({
+      order: [['created_at', 'DESC']],
+      include: [
+        { model: User, attributes: ['full_name', 'email'], required: false },
+        { model: Course, attributes: ['course_name'], required: false },
+      ],
     });
+
+    const data = payments.map(p => ({
+      id: p.id,
+      // Payment.js uses 'payment_id' and 'order_id' (not razorpay_payment_id)
+      transaction_id: p.payment_id || p.order_id || `TXN-${p.id}`,
+      amount: parseFloat(p.amount || 0),
+      paid_amount: parseFloat(p.amount || 0),
+      // Payment.js status ENUM is: 'created','completed','failed','refunded'
+      // Map 'created' → 'pending' so frontend filter works correctly
+      payment_status: p.status === 'created' ? 'pending' : (p.status || 'pending'),
+      payment_date: p.updated_at || p.created_at,
+      student_name: p.User?.full_name || p.User?.email || 'N/A',
+      course_name: p.Course?.course_name || 'N/A',
+      gateway: p.payment_method || 'razorpay',
+    }));
 
     return res.json({ success: true, payments: data, data });
   } catch (error) {
-    console.error('Payments fetch error:', error);
+    console.error('Payments fetch error:', error.message);
     res.status(500).json({ success: false, message: 'Error fetching payments: ' + error.message });
   }
 });

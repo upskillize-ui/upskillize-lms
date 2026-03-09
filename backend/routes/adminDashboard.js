@@ -189,40 +189,37 @@ router.get('/faculty', async (req, res) => {
 // Get All Payments
 router.get('/payments', async (req, res) => {
   try {
+    // Payment model: user_id (not student_id), status (not payment_status), payment_id/order_id
     const payments = await Payment.findAll({
       include: [
-        {
-          model: Student,
-          include: [{ model: User, attributes: ['full_name'] }]
-        },
-        {
-          model: Course,
-          attributes: ['course_name']
-        }
+        { model: User, attributes: ['full_name', 'email'], required: false },
+        { model: Course, attributes: ['course_name'], required: false }
       ],
       order: [['created_at', 'DESC']]
     });
 
-    // Format the response
     const formattedPayments = payments.map(payment => ({
       id: payment.id,
-      transaction_id: payment.razorpay_payment_id || payment.razorpay_order_id,
-      amount: payment.amount,
-      payment_status: payment.payment_status,
-      payment_date: payment.paid_at || payment.created_at,
-      student_name: payment.Student?.User?.full_name || 'N/A',
-      course_name: payment.Course?.course_name || 'N/A'
+      transaction_id: payment.payment_id || payment.order_id || `TXN-${payment.id}`,
+      amount: parseFloat(payment.amount || 0),
+      // Map 'created' → 'pending' for frontend display
+      payment_status: payment.status === 'created' ? 'pending' : (payment.status || 'pending'),
+      payment_date: payment.updated_at || payment.created_at,
+      student_name: payment.User?.full_name || payment.User?.email || 'N/A',
+      course_name: payment.Course?.course_name || 'N/A',
+      gateway: payment.payment_method || 'razorpay',
     }));
 
     res.json({
       success: true,
+      payments: formattedPayments,
       data: formattedPayments
     });
   } catch (error) {
-    console.error('Error fetching payments:', error);
+    console.error('Error fetching payments:', error.message);
     res.status(500).json({ 
       success: false,
-      message: 'Error fetching payments' 
+      message: 'Error fetching payments: ' + error.message
     });
   }
 });
