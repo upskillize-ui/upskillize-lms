@@ -319,9 +319,8 @@ router.put('/profile/photo', ...studentOnly, async (req, res) => {
 // ============================================================
 router.get('/settings', ...studentOnly, async (req, res) => {
   try {
-    const user = await User.findByPk(req.user.id, {
-      attributes: ['email_notifications', 'sms_notifications', 'language', 'timezone', 'theme']
-    });
+    // Fetch without specifying columns — avoids crash if columns don't exist in DB yet
+    const user = await User.findByPk(req.user.id).catch(() => null);
 
     return res.json({
       success: true,
