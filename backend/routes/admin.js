@@ -512,20 +512,26 @@ router.get('/payments', ...adminOnly, async (req, res) => {
       ],
     });
 
-    const data = payments.map(p => ({
-      id: p.id,
-      // Payment.js uses 'payment_id' and 'order_id' (not razorpay_payment_id)
-      transaction_id: p.payment_id || p.order_id || `TXN-${p.id}`,
-      amount: parseFloat(p.amount || 0),
-      paid_amount: parseFloat(p.amount || 0),
-      // Payment.js status ENUM is: 'created','completed','failed','refunded'
-      // Map 'created' → 'pending' so frontend filter works correctly
-      payment_status: p.status === 'created' ? 'pending' : (p.status || 'pending'),
-      payment_date: p.updated_at || p.created_at,
-      student_name: p.User?.full_name || p.User?.email || 'N/A',
-      course_name: p.Course?.course_name || 'N/A',
-      gateway: p.payment_method || 'razorpay',
-    }));
+    const data = payments.map(p => {
+      const totalAmount = parseFloat(p.amount || 0);
+      const paidAmount  = parseFloat(p.paid_amount ?? p.amount ?? 0);
+      const dueAmount   = Math.max(0, totalAmount - paidAmount);
+      // Map DB status to frontend: 'created' = order placed not paid yet = 'pending'
+      const displayStatus = p.status === 'created' ? 'pending' : (p.status || 'pending');
+      return {
+        id: p.id,
+        transaction_id: p.payment_id || p.order_id || `TXN-${p.id}`,
+        amount: totalAmount,
+        paid_amount: paidAmount,
+        due_amount: dueAmount,
+        payment_status: displayStatus,
+        payment_date: p.updated_at || p.created_at,
+        student_name: p.User?.full_name || p.User?.email || 'N/A',
+        course_name: p.Course?.course_name || 'N/A',
+        gateway: p.payment_method || 'razorpay',
+        notes: p.notes || null,
+      };
+    });
 
     return res.json({ success: true, payments: data, data });
   } catch (error) {
