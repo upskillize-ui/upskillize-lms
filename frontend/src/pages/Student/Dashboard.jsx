@@ -6,7 +6,6 @@ import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
 import CoursePlayer from './CoursePlayer';
-import TestGen from './testgen';
 import BrowseCourses from '../../pages/BrowseCourses';
 import {
   BookOpen, TrendingUp, Award, PlayCircle, Clock, Bell,
