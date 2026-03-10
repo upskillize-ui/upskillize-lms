@@ -366,9 +366,9 @@ function MyCourses() {
   };
 
   const filteredCourses = courses.filter(c => {
-    const matchesSearch = (c.course_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const matchesSearch = c.course_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          (c.code || '').toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesFilter = filter === 'all' || (c.status || '').toLowerCase() === filter;
+    const matchesFilter = filter === 'all' || c.status.toLowerCase() === filter;
     return matchesSearch && matchesFilter;
   });
 
@@ -569,56 +569,53 @@ function ContentUpload() {
   const [selectedCourse, setSelectedCourse] = useState('');
   const [courses, setCourses] = useState([]);
   const [uploadForm, setUploadForm] = useState({
-    title: '',
-    description: '',
-    file: null,
-    duration: '',
-    order: ''
+    title: '', description: '', file: null, duration: '', order: ''
   });
   const [uploadedContent, setUploadedContent] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [filterType, setFilterType] = useState('all');
+  const [searchContent, setSearchContent] = useState('');
 
-  useEffect(() => {
-    fetchCourses();
-    fetchUploadedContent();
-  }, []);
+  useEffect(() => { fetchCourses(); fetchUploadedContent(); }, []);
 
   const fetchCourses = async () => {
     try {
       const response = await api.get('/faculty/courses');
-      if (response.data.success) {
-        setCourses(response.data.courses || []);
-      }
-    } catch (error) {
-      console.error('Error fetching courses:', error);
-    }
+      if (response.data.success) setCourses(response.data.courses || []);
+    } catch (error) { console.error('Error fetching courses:', error); }
   };
 
   const fetchUploadedContent = async () => {
     try {
       const response = await api.get('/faculty/content');
-      if (response.data.success) {
-        setUploadedContent(response.data.content || []);
-      }
-    } catch (error) {
-      console.error('Error fetching content:', error);
-    } finally {
-      setLoading(false);
-    }
+      if (response.data.success) setUploadedContent(response.data.content || []);
+    } catch (error) { console.error('Error fetching content:', error); }
+    finally { setLoading(false); }
   };
 
-  const handleFileUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setUploadForm({...uploadForm, file});
-    }
+  const handleFileSelect = (file) => {
+    if (file) setUploadForm(f => ({...f, file}));
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file) handleFileSelect(file);
   };
 
   const handleUpload = async () => {
     if (!uploadForm.title || !uploadForm.file || !selectedCourse) {
-      alert('Please fill all required fields');
+      alert('Please fill all required fields and select a file');
       return;
     }
+    setUploading(true);
+    setUploadProgress(0);
+    setUploadSuccess(false);
 
     const formData = new FormData();
     formData.append('title', uploadForm.title);
@@ -631,190 +628,325 @@ function ContentUpload() {
 
     try {
       const response = await api.post('/faculty/content/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+        headers: { 'Content-Type': 'multipart/form-data' },
+        onUploadProgress: (progressEvent) => {
+          const pct = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          setUploadProgress(pct);
+        }
       });
       if (response.data.success) {
-        setUploadedContent([response.data.content, ...uploadedContent]);
+        setUploadedContent(prev => [response.data.content, ...prev]);
         setUploadForm({ title: '', description: '', file: null, duration: '', order: '' });
-        alert('Content uploaded successfully!');
+        setSelectedCourse('');
+        setUploadProgress(100);
+        setUploadSuccess(true);
+        setTimeout(() => { setUploadSuccess(false); setUploadProgress(0); }, 3000);
       }
     } catch (error) {
       console.error('Upload error:', error);
       alert('Upload failed. Please try again.');
+      setUploadProgress(0);
+    } finally {
+      setUploading(false);
     }
   };
 
+  const typeConfig = {
+    video:  { icon: Video,    color: 'from-red-500 to-rose-600',     bg: 'bg-red-50',    border: 'border-red-200',    text: 'text-red-600',    badge: 'bg-red-100 text-red-700',    accept: 'video/*',          label: 'MP4, MOV, AVI' },
+    pdf:    { icon: FileText, color: 'from-blue-500 to-blue-600',    bg: 'bg-blue-50',   border: 'border-blue-200',   text: 'text-blue-600',   badge: 'bg-blue-100 text-blue-700',  accept: '.pdf',             label: 'PDF files' },
+    ppt:    { icon: FilePlus, color: 'from-orange-500 to-amber-500', bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-600', badge: 'bg-orange-100 text-orange-700', accept: '.ppt,.pptx',    label: 'PPT, PPTX' },
+    scorm:  { icon: Archive,  color: 'from-green-500 to-emerald-600',bg: 'bg-green-50',  border: 'border-green-200',  text: 'text-green-600',  badge: 'bg-green-100 text-green-700',accept: '.zip',             label: 'ZIP package' },
+  };
+
+  const activeType = typeConfig[uploadType];
+  const ActiveIcon = activeType.icon;
+
+  const filteredContent = uploadedContent.filter(c => {
+    const matchType = filterType === 'all' || c.type === filterType;
+    const matchSearch = (c.title || '').toLowerCase().includes(searchContent.toLowerCase());
+    return matchType && matchSearch;
+  });
+
+  const statsMap = ['video','pdf','ppt','scorm'].map(t => ({
+    type: t,
+    count: uploadedContent.filter(c => c.type === t).length,
+    ...typeConfig[t]
+  }));
+
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-primary">Content Upload & Management</h2>
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Content Library</h2>
+          <p className="text-sm text-gray-500 mt-1">Upload and manage your course materials</p>
+        </div>
+        <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-4 py-2 shadow-sm">
+          <HardDrive size={16} className="text-gray-400" />
+          <span className="text-sm font-semibold text-gray-700">{uploadedContent.length} files uploaded</span>
+        </div>
+      </div>
 
-      {/* Upload Section */}
-      <div className="bg-white rounded-xl shadow-md p-6">
-        <h3 className="text-xl font-bold text-gray-800 mb-4">Upload New Content</h3>
-        
-        <div className="flex gap-2 mb-6">
-          {['video', 'pdf', 'ppt', 'scorm'].map(type => (
-            <button
-              key={type}
-              onClick={() => setUploadType(type)}
-              className={`px-6 py-2 rounded-lg font-semibold transition ${
-                uploadType === type
-                  ? 'bg-accent text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              {type.toUpperCase()}
-            </button>
-          ))}
+      {/* Stats row */}
+      <div className="grid grid-cols-4 gap-4">
+        {statsMap.map(({ type, count, icon: Icon, color, badge, text }) => (
+          <div key={type} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex items-center gap-3 hover:shadow-md transition">
+            <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${color} flex items-center justify-center shadow-sm`}>
+              <Icon size={18} className="text-white" />
+            </div>
+            <div>
+              <p className="text-xl font-bold text-gray-800">{count}</p>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{type}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid lg:grid-cols-5 gap-6">
+        {/* ── LEFT: Upload Form ── */}
+        <div className="lg:col-span-2 space-y-4">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            {/* Gradient header strip */}
+            <div className={`bg-gradient-to-r ${activeType.color} p-5`}>
+              <div className="flex items-center gap-3 mb-1">
+                <div className="w-9 h-9 bg-white/20 rounded-lg flex items-center justify-center">
+                  <ActiveIcon size={20} className="text-white" />
+                </div>
+                <h3 className="text-lg font-bold text-white">Upload New Content</h3>
+              </div>
+              <p className="text-white/75 text-xs">Accepts: {activeType.label}</p>
+            </div>
+
+            <div className="p-5 space-y-4">
+              {/* Type selector */}
+              <div className="grid grid-cols-4 gap-1.5 bg-gray-50 p-1.5 rounded-xl">
+                {Object.entries(typeConfig).map(([type, cfg]) => {
+                  const TIcon = cfg.icon;
+                  return (
+                    <button key={type} onClick={() => setUploadType(type)}
+                      className={`flex flex-col items-center py-2 px-1 rounded-lg text-xs font-bold transition-all ${
+                        uploadType === type
+                          ? `bg-gradient-to-br ${cfg.color} text-white shadow-sm`
+                          : 'text-gray-500 hover:bg-white hover:text-gray-700'
+                      }`}>
+                      <TIcon size={16} className="mb-0.5" />
+                      {type.toUpperCase()}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Title */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Content Title *</label>
+                <input type="text" value={uploadForm.title}
+                  onChange={e => setUploadForm(f => ({...f, title: e.target.value}))}
+                  className="w-full px-3.5 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-400 transition"
+                  placeholder="e.g. Introduction to Arrays" />
+              </div>
+
+              {/* Course */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Course *</label>
+                <select value={selectedCourse} onChange={e => setSelectedCourse(e.target.value)}
+                  className="w-full px-3.5 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-400 transition bg-white">
+                  <option value="">Choose a course</option>
+                  {courses.map(c => <option key={c.id} value={c.id}>{c.code} – {c.course_name}</option>)}
+                </select>
+              </div>
+
+              {/* Duration + Order */}
+              <div className="grid grid-cols-2 gap-3">
+                {uploadType === 'video' && (
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Duration (min)</label>
+                    <input type="number" value={uploadForm.duration}
+                      onChange={e => setUploadForm(f => ({...f, duration: e.target.value}))}
+                      className="w-full px-3.5 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-400 transition"
+                      placeholder="45" />
+                  </div>
+                )}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Display Order</label>
+                  <input type="number" value={uploadForm.order}
+                    onChange={e => setUploadForm(f => ({...f, order: e.target.value}))}
+                    className="w-full px-3.5 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-400 transition"
+                    placeholder="1" />
+                </div>
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Description</label>
+                <textarea value={uploadForm.description}
+                  onChange={e => setUploadForm(f => ({...f, description: e.target.value}))}
+                  rows="2"
+                  className="w-full px-3.5 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-400 transition resize-none"
+                  placeholder="Brief description of this content..." />
+              </div>
+
+              {/* Drag & Drop Zone */}
+              <div
+                onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={handleDrop}
+                className={`relative border-2 border-dashed rounded-xl p-5 text-center transition-all ${
+                  isDragging
+                    ? `border-blue-400 ${activeType.bg} scale-[1.01]`
+                    : uploadForm.file
+                    ? `${activeType.border} ${activeType.bg}`
+                    : 'border-gray-200 hover:border-gray-300 bg-gray-50'
+                }`}>
+                <input type="file" id="cu-file" className="hidden"
+                  accept={activeType.accept}
+                  onChange={e => handleFileSelect(e.target.files[0])} />
+
+                {uploadForm.file ? (
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${activeType.color} flex items-center justify-center`}>
+                        <ActiveIcon size={18} className="text-white" />
+                      </div>
+                      <div className="text-left">
+                        <p className={`text-sm font-bold ${activeType.text} truncate max-w-[140px]`}>{uploadForm.file.name}</p>
+                        <p className="text-xs text-gray-500">{(uploadForm.file.size / 1024 / 1024).toFixed(1)} MB</p>
+                      </div>
+                    </div>
+                    <button onClick={() => setUploadForm(f => ({...f, file: null}))}
+                      className="w-7 h-7 rounded-full bg-gray-200 hover:bg-red-100 hover:text-red-600 flex items-center justify-center transition text-gray-500">
+                      <X size={14} />
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <label htmlFor="cu-file" className="cursor-pointer block">
+                      <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${activeType.color} flex items-center justify-center mx-auto mb-2 opacity-80`}>
+                        <Upload size={22} className="text-white" />
+                      </div>
+                      <p className="text-sm font-semibold text-gray-700">Drop file here or <span className={`${activeType.text} underline underline-offset-2`}>browse</span></p>
+                      <p className="text-xs text-gray-400 mt-1">{activeType.label} supported</p>
+                    </label>
+                  </>
+                )}
+              </div>
+
+              {/* Progress bar */}
+              {(uploading || uploadProgress > 0) && (
+                <div>
+                  <div className="flex justify-between text-xs font-semibold mb-1.5">
+                    <span className="text-gray-600">{uploading ? 'Uploading...' : uploadSuccess ? '✅ Upload complete!' : ''}</span>
+                    <span className={activeType.text}>{uploadProgress}%</span>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
+                    <div
+                      className={`h-2.5 rounded-full bg-gradient-to-r ${activeType.color} transition-all duration-300`}
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Upload button */}
+              <button onClick={handleUpload} disabled={uploading}
+                className={`w-full py-3 rounded-xl font-bold text-white text-sm flex items-center justify-center gap-2 transition-all shadow-sm bg-gradient-to-r ${activeType.color} hover:opacity-90 disabled:opacity-50`}>
+                {uploading
+                  ? <><div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" /> Uploading...</>
+                  : <><Upload size={18} /> Upload {uploadType.toUpperCase()}</>
+                }
+              </button>
+            </div>
+          </div>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-6">
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Content Title *</label>
-            <input
-              type="text"
-              value={uploadForm.title}
-              onChange={(e) => setUploadForm({...uploadForm, title: e.target.value})}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent"
-              placeholder="Enter content title"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Select Course *</label>
-            <select
-              value={selectedCourse}
-              onChange={(e) => setSelectedCourse(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent"
-            >
-              <option value="">Choose a course</option>
-              {courses.map(course => (
-                <option key={course.id} value={course.id}>{course.code} - {course.course_name}</option>
-              ))}
-            </select>
-          </div>
-
-          {uploadType === 'video' && (
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Duration (minutes)</label>
-              <input
-                type="number"
-                value={uploadForm.duration}
-                onChange={(e) => setUploadForm({...uploadForm, duration: e.target.value})}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent"
-                placeholder="45"
-              />
+        {/* ── RIGHT: Content Library ── */}
+        <div className="lg:col-span-3 space-y-4">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm">
+            <div className="p-5 border-b border-gray-100">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-lg font-bold text-gray-800">Uploaded Content</h3>
+                <span className="text-xs text-gray-400 bg-gray-100 px-3 py-1 rounded-full font-semibold">{filteredContent.length} items</span>
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                {/* Search */}
+                <div className="flex-1 min-w-[160px] relative">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input type="text" value={searchContent} onChange={e => setSearchContent(e.target.value)}
+                    placeholder="Search content..."
+                    className="w-full pl-8 pr-3 py-2 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-400 transition" />
+                </div>
+                {/* Type filter */}
+                <div className="flex gap-1.5">
+                  {['all','video','pdf','ppt','scorm'].map(f => (
+                    <button key={f} onClick={() => setFilterType(f)}
+                      className={`px-3 py-2 rounded-xl text-xs font-bold transition capitalize ${
+                        filterType === f ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                      }`}>
+                      {f === 'all' ? 'All' : f.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
-          )}
 
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Display Order</label>
-            <input
-              type="number"
-              value={uploadForm.order}
-              onChange={(e) => setUploadForm({...uploadForm, order: e.target.value})}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent"
-              placeholder="1"
-            />
-          </div>
+            <div className="p-5">
+              {loading ? (
+                <div className="flex items-center justify-center h-48">
+                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500" />
+                </div>
+              ) : filteredContent.length === 0 ? (
+                <div className="text-center py-16">
+                  <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                    <HardDrive size={28} className="text-gray-300" />
+                  </div>
+                  <p className="text-gray-400 font-semibold">No content found</p>
+                  <p className="text-gray-300 text-sm mt-1">Upload your first file using the form</p>
+                </div>
+              ) : (
+                <div className="grid sm:grid-cols-2 gap-3">
+                  {filteredContent.map((content) => {
+                    const cfg = typeConfig[content.type] || typeConfig.pdf;
+                    const CIcon = cfg.icon;
+                    return (
+                      <div key={content.id}
+                        className="group border-2 border-gray-100 rounded-xl p-4 hover:border-blue-200 hover:shadow-md transition-all cursor-pointer">
+                        <div className="flex items-start gap-3 mb-3">
+                          <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${cfg.color} flex items-center justify-center flex-shrink-0 shadow-sm`}>
+                            <CIcon size={20} className="text-white" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-bold text-gray-800 text-sm truncate leading-tight">{content.title}</h4>
+                            <p className="text-xs text-gray-500 mt-0.5 truncate">{content.course || '—'}</p>
+                          </div>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase flex-shrink-0 ${cfg.badge}`}>
+                            {content.type}
+                          </span>
+                        </div>
 
-          <div className="md:col-span-2">
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Description</label>
-            <textarea
-              value={uploadForm.description}
-              onChange={(e) => setUploadForm({...uploadForm, description: e.target.value})}
-              rows="3"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent"
-              placeholder="Enter content description"
-            ></textarea>
-          </div>
-
-          <div className="md:col-span-2">
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Upload {uploadType.toUpperCase()} File *
-            </label>
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-accent transition">
-              <Upload className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-              <p className="text-sm text-gray-600 mb-2">Drag and drop your file here, or click to browse</p>
-              <input
-                type="file"
-                onChange={handleFileUpload}
-                className="hidden"
-                id="file-upload"
-                accept={
-                  uploadType === 'video' ? 'video/*' :
-                  uploadType === 'pdf' ? '.pdf' :
-                  uploadType === 'ppt' ? '.ppt,.pptx' :
-                  '.zip'
-                }
-              />
-              <label
-                htmlFor="file-upload"
-                className="inline-block px-6 py-2 bg-accent text-white rounded-lg cursor-pointer hover:bg-blue-600 transition"
-              >
-                Choose File
-              </label>
-              {uploadForm.file && (
-                <p className="text-sm text-green-600 mt-2">Selected: {uploadForm.file.name}</p>
+                        <div className="flex items-center justify-between text-xs text-gray-400">
+                          <div className="flex items-center gap-3">
+                            {content.size && <span className="flex items-center gap-1"><HardDrive size={11} />{content.size}</span>}
+                            {content.uploadDate && <span className="flex items-center gap-1"><Calendar size={11} />{content.uploadDate}</span>}
+                          </div>
+                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 flex items-center justify-center transition">
+                              <Eye size={13} />
+                            </button>
+                            <button className="w-7 h-7 rounded-lg bg-gray-50 text-gray-600 hover:bg-gray-100 flex items-center justify-center transition">
+                              <Edit2 size={13} />
+                            </button>
+                            <button className="w-7 h-7 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 flex items-center justify-center transition">
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </div>
           </div>
         </div>
-
-        <button
-          onClick={handleUpload}
-          className="mt-6 w-full bg-accent hover:bg-blue-600 text-white py-3 rounded-lg font-semibold transition flex items-center justify-center gap-2"
-        >
-          <Upload size={20} />
-          Upload Content
-        </button>
-      </div>
-
-      {/* Uploaded Content List */}
-      <div className="bg-white rounded-xl shadow-md p-6">
-        <h3 className="text-xl font-bold text-gray-800 mb-4">Uploaded Content</h3>
-        {loading ? (
-          <div className="flex items-center justify-center h-32">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent"></div>
-          </div>
-        ) : uploadedContent.length === 0 ? (
-          <p className="text-gray-400 text-sm text-center py-8">No content uploaded yet.</p>
-        ) : (
-          <div className="space-y-3">
-            {uploadedContent.map((content) => (
-              <div key={content.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
-                <div className="flex items-center gap-4">
-                  <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
-                    content.type === 'video' ? 'bg-red-100' :
-                    content.type === 'pdf' ? 'bg-blue-100' :
-                    content.type === 'ppt' ? 'bg-orange-100' :
-                    'bg-green-100'
-                  }`}>
-                    {content.type === 'video' ? <Video className="text-red-600" size={24} /> :
-                     content.type === 'pdf' ? <FileText className="text-blue-600" size={24} /> :
-                     content.type === 'ppt' ? <FilePlus className="text-orange-600" size={24} /> :
-                     <Upload className="text-green-600" size={24} />}
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-gray-800">{content.title}</h4>
-                    <p className="text-sm text-gray-600">{content.course} • {content.size} • {content.uploadDate}</p>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <button className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition">
-                    <Eye size={18} />
-                  </button>
-                  <button className="p-2 text-gray-600 hover:bg-gray-200 rounded-lg transition">
-                    <Edit2 size={18} />
-                  </button>
-                  <button className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition">
-                    <Trash2 size={18} />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );
@@ -2771,8 +2903,8 @@ function BatchManagement() {
   };
 
   const filteredBatches = batches.filter(batch => {
-    const matchesSearch = (batch.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (batch.courses || []).some(c => (c || '').toLowerCase().includes(searchTerm.toLowerCase()));
+    const matchesSearch = batch.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (batch.courses || []).some(c => c.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesStatus = filterStatus === 'all' || batch.status === filterStatus;
     return matchesSearch && matchesStatus;
   });
@@ -3304,8 +3436,8 @@ function StudentManagement() {
   };
 
   const filteredStudents = students.filter(student => {
-    const matchesSearch = (student.full_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (student.email || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = student.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         student.email.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCourse = filterCourse === 'all' || student.course === filterCourse;
     return matchesSearch && matchesCourse;
   });
