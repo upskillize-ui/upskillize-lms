@@ -36,6 +36,7 @@ const upload = multer({
   }
 });
 
+// ── PROFILE PHOTO ──────────────────────────────────────────
 router.post('/profile/upload-photo', authMiddleware, upload.single('profile_photo'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded' });
@@ -47,6 +48,7 @@ router.post('/profile/upload-photo', authMiddleware, upload.single('profile_phot
   }
 });
 
+// ── PROFILE PERSONAL ───────────────────────────────────────
 router.put('/profile/personal', authMiddleware, async (req, res) => {
   try {
     const { full_name, phone_number } = req.body;
@@ -62,6 +64,7 @@ router.put('/profile/personal', authMiddleware, async (req, res) => {
   }
 });
 
+// ── PROFILE PROFESSIONAL ───────────────────────────────────
 router.put('/profile/professional', authMiddleware, async (req, res) => {
   try {
     res.json({ success: true, message: 'Professional information updated successfully' });
@@ -70,6 +73,7 @@ router.put('/profile/professional', authMiddleware, async (req, res) => {
   }
 });
 
+// ── PROFILE CONTACT ────────────────────────────────────────
 router.put('/profile/contact', authMiddleware, async (req, res) => {
   try {
     res.json({ success: true, message: 'Contact information updated successfully' });
@@ -78,6 +82,7 @@ router.put('/profile/contact', authMiddleware, async (req, res) => {
   }
 });
 
+// ── PROFILE SOCIAL ─────────────────────────────────────────
 router.put('/profile/social', authMiddleware, async (req, res) => {
   try {
     res.json({ success: true, message: 'Social links updated successfully' });
@@ -86,6 +91,7 @@ router.put('/profile/social', authMiddleware, async (req, res) => {
   }
 });
 
+// ── DASHBOARD STATS ────────────────────────────────────────
 router.get('/dashboard/stats', authMiddleware, async (req, res) => {
   try {
     const userId = req.user.id;
@@ -179,6 +185,7 @@ router.get('/dashboard/stats', authMiddleware, async (req, res) => {
   }
 });
 
+// ── QUIZZES ────────────────────────────────────────────────
 router.get('/quizzes', authMiddleware, async (req, res) => {
   try {
     const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
@@ -209,6 +216,7 @@ router.get('/quizzes', authMiddleware, async (req, res) => {
   }
 });
 
+// ── COURSES ────────────────────────────────────────────────
 router.get('/courses', authMiddleware, async (req, res) => {
   try {
     const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
@@ -224,6 +232,123 @@ router.get('/courses', authMiddleware, async (req, res) => {
   } catch (error) {
     console.error('Get faculty courses error:', error);
     res.status(500).json({ success: false, message: 'Error fetching courses' });
+  }
+});
+
+// ── STUDENTS ───────────────────────────────────────────────
+router.get('/students', authMiddleware, async (req, res) => {
+  try {
+    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
+    if (!faculty) return res.json({ success: true, students: [] });
+
+    const courses = await Course.findAll({
+      where: { faculty_id: faculty.id },
+      attributes: ['id', 'course_name']
+    });
+    const courseIds = courses.map(c => c.id);
+    if (courseIds.length === 0) return res.json({ success: true, students: [] });
+
+    const enrollments = await Enrollment.findAll({
+      where: { course_id: { [Op.in]: courseIds } },
+      include: [
+        {
+          model: Student,
+          include: [{ model: User, attributes: ['full_name', 'email', 'phone', 'profile_photo'] }]
+        },
+        { model: Course, attributes: ['course_name'] }
+      ],
+      order: [['created_at', 'DESC']]
+    });
+
+    // Deduplicate by student_id, attach all enrolled courses
+    const studentMap = {};
+    for (const e of enrollments) {
+      const sid = e.student_id;
+      if (!studentMap[sid]) {
+        studentMap[sid] = {
+          id: sid,
+          name: e.Student?.User?.full_name || 'Unknown',
+          email: e.Student?.User?.email || '',
+          phone: e.Student?.User?.phone || '',
+          profile_photo: e.Student?.User?.profile_photo || '',
+          courses: [],
+          status: e.completion_status || 'enrolled',
+          enrolled_at: e.created_at
+        };
+      }
+      if (e.Course?.course_name) {
+        studentMap[sid].courses.push(e.Course.course_name);
+      }
+    }
+
+    res.json({ success: true, students: Object.values(studentMap) });
+  } catch (error) {
+    console.error('GET /faculty/students error:', error);
+    res.json({ success: true, students: [] });
+  }
+});
+
+// ── CONTENT GET ────────────────────────────────────────────
+router.get('/content', authMiddleware, async (req, res) => {
+  try {
+    const { sequelize } = require('../config/database');
+    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
+    if (!faculty) return res.json({ success: true, content: [] });
+
+    await sequelize.query(`
+      CREATE TABLE IF NOT EXISTS faculty_content (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        title VARCHAR(255),
+        description TEXT,
+        type VARCHAR(100) DEFAULT 'video',
+        course_id INT,
+        faculty_id INT NOT NULL,
+        file_path VARCHAR(500),
+        file_size VARCHAR(100),
+        duration VARCHAR(100),
+        status VARCHAR(50) DEFAULT 'published',
+        views INT DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    const [rows] = await sequelize.query(`
+      SELECT fc.*, COALESCE(c.course_name, 'General') as course
+      FROM faculty_content fc
+      LEFT JOIN courses c ON c.id = fc.course_id
+      WHERE fc.faculty_id = ?
+      ORDER BY fc.created_at DESC
+    `, { replacements: [faculty.id] });
+
+    res.json({ success: true, content: rows });
+  } catch (error) {
+    console.error('GET /faculty/content error:', error);
+    res.json({ success: true, content: [] });
+  }
+});
+
+// ── CONTENT UPLOAD POST ────────────────────────────────────
+router.post('/content/upload', authMiddleware, async (req, res) => {
+  try {
+    const { sequelize } = require('../config/database');
+    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
+    if (!faculty) return res.status(404).json({ success: false, message: 'Faculty not found' });
+
+    const { title, description, type, course_id, file_path, file_size, duration } = req.body;
+    if (!title) return res.status(400).json({ success: false, message: 'Title is required' });
+
+    const [result] = await sequelize.query(`
+      INSERT INTO faculty_content (title, description, type, course_id, faculty_id, file_path, file_size, duration)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `, { replacements: [title, description || '', type || 'video', course_id || null, faculty.id, file_path || '', file_size || '', duration || ''] });
+
+    res.json({
+      success: true,
+      content: { id: result, title, description, type, course_id, status: 'published', views: 0 }
+    });
+  } catch (error) {
+    console.error('POST /faculty/content/upload error:', error);
+    res.status(500).json({ success: false, message: 'Error uploading content' });
   }
 });
 
@@ -347,7 +472,7 @@ router.get('/messages', authMiddleware, async (req, res) => {
   res.json({ success: true, messages: [] });
 });
 
-// ── ASSIGNMENTS ────────────────────────────────────────────
+// ── ASSIGNMENTS GET ────────────────────────────────────────
 router.get('/assignments', authMiddleware, async (req, res) => {
   try {
     const { sequelize } = require('../config/database');
@@ -399,6 +524,7 @@ router.get('/assignments', authMiddleware, async (req, res) => {
   }
 });
 
+// ── ASSIGNMENTS POST ───────────────────────────────────────
 router.post('/assignments', authMiddleware, async (req, res) => {
   try {
     const { sequelize } = require('../config/database');
@@ -418,6 +544,7 @@ router.post('/assignments', authMiddleware, async (req, res) => {
   }
 });
 
+// ── ASSIGNMENTS SUBMISSIONS GET ────────────────────────────
 router.get('/assignments/:id/submissions', authMiddleware, async (req, res) => {
   try {
     const { sequelize } = require('../config/database');
@@ -435,6 +562,7 @@ router.get('/assignments/:id/submissions', authMiddleware, async (req, res) => {
   }
 });
 
+// ── ASSIGNMENTS GRADE POST ─────────────────────────────────
 router.post('/assignments/:id/grade', authMiddleware, async (req, res) => {
   try {
     const { sequelize } = require('../config/database');
@@ -460,6 +588,7 @@ router.post('/assignments/:id/grade', authMiddleware, async (req, res) => {
   }
 });
 
+// ── ASSIGNMENTS DELETE ─────────────────────────────────────
 router.delete('/assignments/:id', [authMiddleware, rbac(['faculty','admin'])], async (req, res) => {
   try {
     const { sequelize } = require('../config/database');
@@ -478,9 +607,7 @@ router.delete('/assignments/:id', [authMiddleware, rbac(['faculty','admin'])], a
   }
 });
 
-// ============================================================
-// GET /faculty/notifications
-// ============================================================
+// ── NOTIFICATIONS GET ──────────────────────────────────────
 router.get('/notifications', authMiddleware, async (req, res) => {
   try {
     const notifications = await Notification.findAll({
@@ -505,14 +632,7 @@ router.get('/notifications', authMiddleware, async (req, res) => {
   }
 });
 
-// ============================================================
-// GET /faculty/settings
-// PUT /faculty/settings/general
-// PUT /faculty/settings/notifications
-// PUT /faculty/settings/course
-// PUT /faculty/settings/security
-// PUT /faculty/settings/integrations
-// ============================================================
+// ── SETTINGS GET ───────────────────────────────────────────
 router.get('/settings', authMiddleware, async (req, res) => {
   try {
     const { sequelize } = require('../config/database');
@@ -585,7 +705,7 @@ router.get('/settings', authMiddleware, async (req, res) => {
   }
 });
 
-// Helper: upsert one settings section
+// ── SETTINGS UPSERT HELPER ─────────────────────────────────
 async function upsertSettings(userId, section, data) {
   const { sequelize } = require('../config/database');
   const [rows] = await sequelize.query(
@@ -604,6 +724,7 @@ async function upsertSettings(userId, section, data) {
   );
 }
 
+// ── SETTINGS PUT ───────────────────────────────────────────
 router.put('/settings/general', authMiddleware, async (req, res) => {
   try {
     await upsertSettings(req.user.id, 'general', req.body);
@@ -654,9 +775,7 @@ router.put('/settings/integrations', authMiddleware, async (req, res) => {
   }
 });
 
-// ============================================================
-// GET  /faculty/analytics
-// ============================================================
+// ── ANALYTICS ──────────────────────────────────────────────
 router.get('/analytics', authMiddleware, async (req, res) => {
   try {
     const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
@@ -700,7 +819,7 @@ router.get('/analytics', authMiddleware, async (req, res) => {
       }
     } catch (e) { console.error('Analytics exam error:', e.message); }
 
-    // Video watch stats
+    // ✅ FIX: 'title' removed from Lesson attributes — column does not exist in lessons table
     let videoCompletion = 0, watchTime = 0, videoAnalytics = [];
     try {
       const modules = await CourseModule.findAll({
@@ -712,7 +831,7 @@ router.get('/analytics', authMiddleware, async (req, res) => {
       if (moduleIds.length > 0) {
         const lessons = await Lesson.findAll({
           where: { course_module_id: { [Op.in]: moduleIds } },
-          attributes: ['id', 'title', 'duration']
+          attributes: ['id', 'duration']   // 'title' removed — does not exist in DB
         });
         const lessonIds = lessons.map(l => l.id);
 
@@ -736,7 +855,7 @@ router.get('/analytics', authMiddleware, async (req, res) => {
             const completionRate = views.length > 0
               ? Math.round((views.filter(w => w.completed).length / views.length) * 100) : 0;
             return {
-              title: lesson.title || `Lesson ${lesson.id}`,
+              title: `Lesson ${lesson.id}`,   // fallback label since title col doesn't exist
               views: views.length,
               completion: completionRate,
               avgWatchTime: `${Math.floor(avgSecs / 60)}m ${avgSecs % 60}s`,
@@ -810,10 +929,7 @@ router.get('/analytics', authMiddleware, async (req, res) => {
   }
 });
 
-// ============================================================
-// GET  /faculty/live-classes
-// POST /faculty/live-classes
-// ============================================================
+// ── LIVE CLASSES GET ───────────────────────────────────────
 router.get('/live-classes', authMiddleware, async (req, res) => {
   try {
     const { sequelize } = require('../config/database');
@@ -851,6 +967,7 @@ router.get('/live-classes', authMiddleware, async (req, res) => {
   }
 });
 
+// ── LIVE CLASSES POST ──────────────────────────────────────
 router.post('/live-classes', authMiddleware, async (req, res) => {
   try {
     const { sequelize } = require('../config/database');
@@ -889,12 +1006,7 @@ router.post('/live-classes', authMiddleware, async (req, res) => {
   }
 });
 
-// ============================================================
-// GET  /faculty/batches
-// POST /faculty/batches
-// DELETE /faculty/batches/:id
-// GET  /faculty/batches/:id/students
-// ============================================================
+// ── BATCHES GET ────────────────────────────────────────────
 router.get('/batches', authMiddleware, async (req, res) => {
   try {
     const { sequelize } = require('../config/database');
@@ -947,6 +1059,7 @@ router.get('/batches', authMiddleware, async (req, res) => {
   }
 });
 
+// ── BATCHES POST ───────────────────────────────────────────
 router.post('/batches', authMiddleware, async (req, res) => {
   try {
     const { sequelize } = require('../config/database');
@@ -984,6 +1097,7 @@ router.post('/batches', authMiddleware, async (req, res) => {
   }
 });
 
+// ── BATCHES DELETE ─────────────────────────────────────────
 router.delete('/batches/:id', authMiddleware, async (req, res) => {
   try {
     const { sequelize } = require('../config/database');
@@ -1001,6 +1115,7 @@ router.delete('/batches/:id', authMiddleware, async (req, res) => {
   }
 });
 
+// ── BATCHES STUDENTS GET ───────────────────────────────────
 router.get('/batches/:id/students', authMiddleware, async (req, res) => {
   try {
     const { sequelize } = require('../config/database');
@@ -1021,10 +1136,7 @@ router.get('/batches/:id/students', authMiddleware, async (req, res) => {
   }
 });
 
-// ============================================================
-// GET  /faculty/doubts
-// POST /faculty/doubts/:id/reply
-// ============================================================
+// ── DOUBTS GET ─────────────────────────────────────────────
 router.get('/doubts', authMiddleware, async (req, res) => {
   try {
     const { sequelize } = require('../config/database');
@@ -1073,6 +1185,7 @@ router.get('/doubts', authMiddleware, async (req, res) => {
   }
 });
 
+// ── DOUBTS REPLY POST ──────────────────────────────────────
 router.post('/doubts/:id/reply', authMiddleware, async (req, res) => {
   try {
     const { sequelize } = require('../config/database');
