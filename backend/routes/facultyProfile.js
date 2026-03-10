@@ -478,4 +478,536 @@ router.delete('/assignments/:id', [authMiddleware, rbac(['faculty','admin'])], a
   }
 });
 
+// ============================================================
+// GET /faculty/notifications
+// ============================================================
+router.get('/notifications', authMiddleware, async (req, res) => {
+  try {
+    const notifications = await Notification.findAll({
+      where: { user_id: req.user.id },
+      order: [['created_at', 'DESC']],
+      limit: 20
+    });
+    res.json({
+      success: true,
+      notifications: notifications.map(n => ({
+        id: n.id,
+        title: n.title,
+        message: n.message,
+        type: n.type || 'info',
+        time: n.created_at,
+        read: n.is_read || false
+      }))
+    });
+  } catch (error) {
+    console.error('GET /faculty/notifications error:', error);
+    res.json({ success: true, notifications: [] });
+  }
+});
+
+// ============================================================
+// GET /faculty/settings
+// PUT /faculty/settings/general
+// PUT /faculty/settings/notifications
+// PUT /faculty/settings/course
+// PUT /faculty/settings/security
+// PUT /faculty/settings/integrations
+// ============================================================
+router.get('/settings', authMiddleware, async (req, res) => {
+  try {
+    const { sequelize } = require('../config/database');
+
+    // Create table if not exists
+    await sequelize.query(`
+      CREATE TABLE IF NOT EXISTS faculty_settings (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        faculty_id INT NOT NULL UNIQUE,
+        settings JSON,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )
+    `);
+
+    const [rows] = await sequelize.query(
+      `SELECT settings FROM faculty_settings WHERE faculty_id = ?`,
+      { replacements: [req.user.id] }
+    );
+
+    const saved = rows[0]?.settings
+      ? (typeof rows[0].settings === 'string' ? JSON.parse(rows[0].settings) : rows[0].settings)
+      : {};
+
+    // Deep merge saved settings over defaults
+    const defaults = {
+      general: {
+        institution_name: '', academic_year: '2025-2026',
+        semester: 'Spring 2025', default_language: 'en',
+        timezone: 'Asia/Kolkata', date_format: 'DD/MM/YYYY', time_format: '24h'
+      },
+      notifications: {
+        email_notifications: true, student_query_alerts: true,
+        assignment_submission_alerts: true, exam_reminders: true,
+        course_updates: false, system_announcements: true,
+        daily_digest: false, weekly_report: false
+      },
+      course: {
+        auto_enroll: false, allow_late_submissions: true,
+        late_penalty_percentage: 10, max_late_days: 3,
+        default_passing_grade: 40, attendance_required: 75,
+        enable_discussion_forum: true, enable_peer_review: false
+      },
+      security: {
+        two_factor_auth: false, session_timeout: 30,
+        password_expiry_days: 90, force_password_change: false,
+        allow_multiple_sessions: true, ip_whitelist_enabled: false,
+        login_attempt_limit: 5
+      },
+      integrations: {
+        google_classroom: false, microsoft_teams: false,
+        zoom_enabled: false, zoom_api_key: '',
+        email_service: 'smtp', smtp_host: '', smtp_port: '',
+        smtp_username: '', storage_provider: 'local', max_upload_size: 100
+      }
+    };
+
+    const merged = {
+      general:      { ...defaults.general,      ...(saved.general || {}) },
+      notifications:{ ...defaults.notifications, ...(saved.notifications || {}) },
+      course:       { ...defaults.course,        ...(saved.course || {}) },
+      security:     { ...defaults.security,      ...(saved.security || {}) },
+      integrations: { ...defaults.integrations,  ...(saved.integrations || {}) }
+    };
+
+    res.json({ success: true, settings: merged });
+  } catch (error) {
+    console.error('GET /faculty/settings error:', error);
+    res.status(500).json({ success: false, message: 'Error fetching settings' });
+  }
+});
+
+// Helper: upsert one settings section
+async function upsertSettings(userId, section, data) {
+  const { sequelize } = require('../config/database');
+  const [rows] = await sequelize.query(
+    `SELECT settings FROM faculty_settings WHERE faculty_id = ?`,
+    { replacements: [userId] }
+  );
+  const current = rows[0]?.settings
+    ? (typeof rows[0].settings === 'string' ? JSON.parse(rows[0].settings) : rows[0].settings)
+    : {};
+  current[section] = { ...(current[section] || {}), ...data };
+  await sequelize.query(
+    `INSERT INTO faculty_settings (faculty_id, settings)
+     VALUES (?, ?)
+     ON DUPLICATE KEY UPDATE settings = ?, updated_at = NOW()`,
+    { replacements: [userId, JSON.stringify(current), JSON.stringify(current)] }
+  );
+}
+
+router.put('/settings/general', authMiddleware, async (req, res) => {
+  try {
+    await upsertSettings(req.user.id, 'general', req.body);
+    res.json({ success: true, message: 'General settings updated successfully' });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ success: false, message: 'Error updating general settings' });
+  }
+});
+
+router.put('/settings/notifications', authMiddleware, async (req, res) => {
+  try {
+    await upsertSettings(req.user.id, 'notifications', req.body);
+    res.json({ success: true, message: 'Notification settings updated successfully' });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ success: false, message: 'Error updating notification settings' });
+  }
+});
+
+router.put('/settings/course', authMiddleware, async (req, res) => {
+  try {
+    await upsertSettings(req.user.id, 'course', req.body);
+    res.json({ success: true, message: 'Course settings updated successfully' });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ success: false, message: 'Error updating course settings' });
+  }
+});
+
+router.put('/settings/security', authMiddleware, async (req, res) => {
+  try {
+    await upsertSettings(req.user.id, 'security', req.body);
+    res.json({ success: true, message: 'Security settings updated successfully' });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ success: false, message: 'Error updating security settings' });
+  }
+});
+
+router.put('/settings/integrations', authMiddleware, async (req, res) => {
+  try {
+    await upsertSettings(req.user.id, 'integrations', req.body);
+    res.json({ success: true, message: 'Integration settings updated successfully' });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ success: false, message: 'Error updating integration settings' });
+  }
+});
+
+// ============================================================
+// GET  /faculty/analytics
+// ============================================================
+router.get('/analytics', authMiddleware, async (req, res) => {
+  try {
+    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
+    if (!faculty) return res.json({ success: true, analytics: {} });
+
+    const courses = await Course.findAll({
+      where: { faculty_id: faculty.id },
+      attributes: ['id', 'course_name']
+    });
+    const courseIds = courses.map(c => c.id);
+
+    if (courseIds.length === 0) {
+      return res.json({
+        success: true,
+        analytics: {
+          avgPerformance: 0, videoCompletion: 0,
+          watchTime: 0, engagement: 0,
+          coursePerformance: [], videoAnalytics: []
+        }
+      });
+    }
+
+    // Average performance from Results
+    const exams = await Exam.findAll({
+      where: { course_id: courseIds },
+      attributes: ['id']
+    });
+    const examIds = exams.map(e => e.id);
+
+    let avgPerformance = 0;
+    if (examIds.length > 0) {
+      const results = await Result.findAll({
+        where: { exam_id: examIds },
+        attributes: ['score', 'total_marks']
+      });
+      if (results.length > 0) {
+        const total = results.reduce((s, r) =>
+          s + (r.total_marks > 0 ? (r.score / r.total_marks) * 100 : 0), 0);
+        avgPerformance = Math.round(total / results.length);
+      }
+    }
+
+    // Video watch stats
+    const modules = await CourseModule.findAll({
+      where: { course_id: courseIds },
+      attributes: ['id']
+    });
+    const moduleIds = modules.map(m => m.id);
+
+    let videoCompletion = 0, watchTime = 0, videoAnalytics = [];
+    if (moduleIds.length > 0) {
+      const lessons = await Lesson.findAll({
+        where: { course_module_id: moduleIds },
+        attributes: ['id', 'title', 'duration']
+      });
+      const lessonIds = lessons.map(l => l.id);
+
+      if (lessonIds.length > 0) {
+        const watchHistory = await VideoWatchHistory.findAll({
+          where: { lesson_id: lessonIds },
+          attributes: ['lesson_id', 'total_watch_time', 'completed']
+        });
+
+        const totalSeconds = watchHistory.reduce((s, w) => s + (w.total_watch_time || 0), 0);
+        watchTime = Math.round(totalSeconds / 3600);
+
+        const completed = watchHistory.filter(w => w.completed).length;
+        videoCompletion = watchHistory.length > 0
+          ? Math.round((completed / watchHistory.length) * 100) : 0;
+
+        // Per-lesson analytics
+        videoAnalytics = lessons.slice(0, 10).map(lesson => {
+          const views = watchHistory.filter(w => w.lesson_id === lesson.id);
+          const avgSecs = views.length > 0
+            ? Math.round(views.reduce((s, w) => s + (w.total_watch_time || 0), 0) / views.length) : 0;
+          const completionRate = views.length > 0
+            ? Math.round((views.filter(w => w.completed).length / views.length) * 100) : 0;
+          return {
+            title: lesson.title || `Lesson ${lesson.id}`,
+            views: views.length,
+            completion: completionRate,
+            avgWatchTime: `${Math.floor(avgSecs / 60)}m ${avgSecs % 60}s`,
+            dropOffPoint: completionRate < 50 ? 'Early' : completionRate < 80 ? 'Middle' : 'Late'
+          };
+        });
+      }
+    }
+
+    // Enrollment engagement
+    const totalEnrollments = await Enrollment.count({ where: { course_id: courseIds } });
+    const activeEnrollments = await Enrollment.count({
+      where: {
+        course_id: courseIds,
+        completion_status: { [Op.in]: ['in_progress', 'enrolled'] }
+      }
+    });
+    const engagement = totalEnrollments > 0
+      ? Math.round((activeEnrollments / totalEnrollments) * 100) : 0;
+
+    // Per-course breakdown
+    const coursePerformance = await Promise.all(courses.map(async (course) => {
+      const enrollCount = await Enrollment.count({ where: { course_id: course.id } });
+      const completed = await Enrollment.count({
+        where: { course_id: course.id, completion_status: 'completed' }
+      });
+      const courseExams = await Exam.findAll({
+        where: { course_id: course.id },
+        attributes: ['id']
+      });
+      let avgScore = 0;
+      if (courseExams.length > 0) {
+        const courseResults = await Result.findAll({
+          where: { exam_id: courseExams.map(e => e.id) },
+          attributes: ['score', 'total_marks']
+        });
+        if (courseResults.length > 0) {
+          const t = courseResults.reduce((s, r) =>
+            s + (r.total_marks > 0 ? (r.score / r.total_marks) * 100 : 0), 0);
+          avgScore = Math.round(t / courseResults.length);
+        }
+      }
+      return {
+        course: course.course_name,
+        students: enrollCount,
+        avgScore,
+        completion: enrollCount > 0 ? Math.round((completed / enrollCount) * 100) : 0
+      };
+    }));
+
+    res.json({
+      success: true,
+      analytics: {
+        avgPerformance, videoCompletion, watchTime, engagement,
+        coursePerformance, videoAnalytics
+      }
+    });
+  } catch (error) {
+    console.error('GET /faculty/analytics error:', error);
+    res.status(500).json({ success: false, message: 'Error fetching analytics' });
+  }
+});
+
+// ============================================================
+// GET  /faculty/live-classes
+// POST /faculty/live-classes
+// ============================================================
+router.get('/live-classes', authMiddleware, async (req, res) => {
+  try {
+    const { sequelize } = require('../config/database');
+    await sequelize.query(`
+      CREATE TABLE IF NOT EXISTS live_classes (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        course_id INT,
+        faculty_id INT NOT NULL,
+        date DATE,
+        time TIME,
+        duration INT DEFAULT 60,
+        platform VARCHAR(100) DEFAULT 'Zoom',
+        link VARCHAR(500),
+        status VARCHAR(50) DEFAULT 'scheduled',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
+    if (!faculty) return res.json({ success: true, liveClasses: [] });
+
+    const [rows] = await sequelize.query(`
+      SELECT lc.*, COALESCE(c.course_name, '') as course
+      FROM live_classes lc
+      LEFT JOIN courses c ON c.id = lc.course_id
+      WHERE lc.faculty_id = ?
+      ORDER BY lc.date DESC, lc.time DESC
+    `, { replacements: [faculty.id] });
+
+    res.json({ success: true, liveClasses: rows });
+  } catch (error) {
+    console.error('GET /faculty/live-classes error:', error);
+    res.status(500).json({ success: false, message: 'Error fetching live classes' });
+  }
+});
+
+router.post('/live-classes', authMiddleware, async (req, res) => {
+  try {
+    const { sequelize } = require('../config/database');
+    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
+    if (!faculty) return res.status(404).json({ success: false, message: 'Faculty not found' });
+
+    const { title, course, date, time, duration, platform, link } = req.body;
+    if (!title || !date || !time) {
+      return res.status(400).json({ success: false, message: 'Title, date and time are required' });
+    }
+
+    const [result] = await sequelize.query(`
+      INSERT INTO live_classes (title, course_id, faculty_id, date, time, duration, platform, link, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'scheduled')
+    `, { replacements: [title, course || null, faculty.id, date, time, duration || 60, platform || 'Zoom', link || ''] });
+
+    // Fetch course name for response
+    let courseName = '';
+    if (course) {
+      const courseRecord = await Course.findOne({ where: { id: course }, attributes: ['course_name'] });
+      courseName = courseRecord?.course_name || '';
+    }
+
+    res.json({
+      success: true,
+      liveClass: {
+        id: result, title, course: courseName,
+        date, time, duration: duration || 60,
+        platform: platform || 'Zoom', link: link || '',
+        status: 'scheduled'
+      }
+    });
+  } catch (error) {
+    console.error('POST /faculty/live-classes error:', error);
+    res.status(500).json({ success: false, message: 'Error scheduling live class' });
+  }
+});
+
+// ============================================================
+// GET  /faculty/batches
+// POST /faculty/batches
+// DELETE /faculty/batches/:id
+// GET  /faculty/batches/:id/students
+// ============================================================
+router.get('/batches', authMiddleware, async (req, res) => {
+  try {
+    const { sequelize } = require('../config/database');
+    await sequelize.query(`
+      CREATE TABLE IF NOT EXISTS batches (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        faculty_id INT NOT NULL,
+        courses JSON,
+        schedule VARCHAR(255),
+        start_date DATE,
+        end_date DATE,
+        status VARCHAR(50) DEFAULT 'active',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await sequelize.query(`
+      CREATE TABLE IF NOT EXISTS batch_students (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        batch_id INT NOT NULL,
+        student_id INT NOT NULL,
+        enrolled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY unique_batch_student (batch_id, student_id)
+      )
+    `);
+
+    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
+    if (!faculty) return res.json({ success: true, batches: [] });
+
+    const [rows] = await sequelize.query(`
+      SELECT b.*,
+        (SELECT COUNT(*) FROM batch_students bs WHERE bs.batch_id = b.id) as students
+      FROM batches b
+      WHERE b.faculty_id = ?
+      ORDER BY b.created_at DESC
+    `, { replacements: [faculty.id] });
+
+    res.json({
+      success: true,
+      batches: rows.map(b => ({
+        ...b,
+        courses: b.courses ? (typeof b.courses === 'string' ? JSON.parse(b.courses) : b.courses) : [],
+        startDate: b.start_date,
+        endDate: b.end_date
+      }))
+    });
+  } catch (error) {
+    console.error('GET /faculty/batches error:', error);
+    res.status(500).json({ success: false, message: 'Error fetching batches' });
+  }
+});
+
+router.post('/batches', authMiddleware, async (req, res) => {
+  try {
+    const { sequelize } = require('../config/database');
+    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
+    if (!faculty) return res.status(404).json({ success: false, message: 'Faculty not found' });
+
+    const { name, courses, schedule, startDate, endDate } = req.body;
+    if (!name || !schedule) {
+      return res.status(400).json({ success: false, message: 'Name and schedule are required' });
+    }
+
+    const coursesArr = Array.isArray(courses) ? courses : (courses ? [courses] : []);
+
+    const [result] = await sequelize.query(`
+      INSERT INTO batches (name, faculty_id, courses, schedule, start_date, end_date, status)
+      VALUES (?, ?, ?, ?, ?, ?, 'active')
+    `, {
+      replacements: [
+        name, faculty.id, JSON.stringify(coursesArr),
+        schedule, startDate || null, endDate || null
+      ]
+    });
+
+    res.json({
+      success: true,
+      batch: {
+        id: result, name, courses: coursesArr,
+        schedule, startDate, endDate,
+        status: 'active', students: 0
+      }
+    });
+  } catch (error) {
+    console.error('POST /faculty/batches error:', error);
+    res.status(500).json({ success: false, message: 'Error creating batch' });
+  }
+});
+
+router.delete('/batches/:id', authMiddleware, async (req, res) => {
+  try {
+    const { sequelize } = require('../config/database');
+    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
+    if (!faculty) return res.status(404).json({ success: false, message: 'Faculty not found' });
+
+    await sequelize.query(
+      `DELETE FROM batches WHERE id = ? AND faculty_id = ?`,
+      { replacements: [req.params.id, faculty.id] }
+    );
+    res.json({ success: true, message: 'Batch deleted successfully' });
+  } catch (error) {
+    console.error('DELETE /faculty/batches/:id error:', error);
+    res.status(500).json({ success: false, message: 'Error deleting batch' });
+  }
+});
+
+router.get('/batches/:id/students', authMiddleware, async (req, res) => {
+  try {
+    const { sequelize } = require('../config/database');
+    const [rows] = await sequelize.query(`
+      SELECT s.id, u.full_name as name, u.email,
+             u.phone, bs.enrolled_at as enrollmentDate
+      FROM batch_students bs
+      JOIN students s ON s.id = bs.student_id
+      JOIN users u ON u.id = s.user_id
+      WHERE bs.batch_id = ?
+      ORDER BY u.full_name ASC
+    `, { replacements: [req.params.id] });
+
+    res.json({ success: true, students: rows });
+  } catch (error) {
+    console.error('GET /faculty/batches/:id/students error:', error);
+    res.json({ success: true, students: [] });
+  }
+});
+
 module.exports = router;
