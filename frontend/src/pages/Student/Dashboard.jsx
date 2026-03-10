@@ -2296,7 +2296,7 @@ function CourseMaterials() {
     const load = async () => {
       try {
         const [matRes, courseRes] = await Promise.allSettled([
-          api.get(`/faculty/course-content/${courseId}`),
+          api.get(`/student/course-content/${courseId}`),
           api.get(`/courses/${courseId}`)
         ]);
         if (matRes.status === 'fulfilled' && matRes.value.data.success) {

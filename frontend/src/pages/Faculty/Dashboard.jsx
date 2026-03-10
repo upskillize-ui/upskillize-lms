@@ -1,22 +1,19 @@
 // COMPLETE TALENTLMS-STYLE FACULTY DASHBOARD
-// Matches the admin dashboard design with faculty-specific features
-
 import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
 import Profile from './Profile';
-import { 
-  Users, BookOpen, DollarSign, TrendingUp, GraduationCap, UserCheck,
-  CreditCard, BarChart3, Settings, FileText, Award, Activity, LogOut,
-  Search, Filter, Download, Plus, Edit2, Trash2, Eye, X, CheckCircle,
+import {
+  Users, BookOpen, TrendingUp, GraduationCap, UserCheck,
+  BarChart3, Settings, FileText, Award, Activity, LogOut,
+  Search, Download, Plus, Edit2, Trash2, Eye, X, CheckCircle,
   XCircle, Calendar, Clock, Mail, Phone, Upload, Star, AlertCircle,
-  ChevronRight, Bell, Shield, Database, Zap, PieChart, UserPlus,
-  Lock, Unlock, Key, RefreshCw, Archive, FileDown, History,
-  Flag, AlertTriangle, FilePlus, Video, ExternalLink, Grid3X3,
-  HelpCircle, User, Menu, ChevronDown, Home, HardDrive, ClipboardList,
-  MonitorPlay, Megaphone, Target, MessageCircle, MessageSquare, Send, PlayCircle,
-  Lightbulb, Layers, ShoppingBag, Percent, FileVideo, CalendarDays, Trophy
+  ChevronRight, Bell, Shield, Zap, UserPlus,
+  RefreshCw, Archive, FilePlus, Video,
+  HelpCircle, User, Menu, ChevronDown, HardDrive, ClipboardList,
+  MonitorPlay, Megaphone, MessageCircle, MessageSquare, Send,
+  Layers,
 } from 'lucide-react';
 
 // ==================== OVERVIEW COMPONENT ====================
@@ -30,32 +27,22 @@ function Overview() {
 
   useEffect(() => {
     fetchDashboardData();
-
-    // Re-fetch whenever the user navigates back to this tab/window
     const handleFocus = () => fetchDashboardData(true);
     window.addEventListener('focus', handleFocus);
     return () => window.removeEventListener('focus', handleFocus);
   }, []);
 
-  // Also re-fetch when the Overview tab becomes visible
-  // (e.g. user clicks Overview in sidebar after doing something elsewhere)
   useEffect(() => {
     const handleVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        fetchDashboardData(true);
-      }
+      if (document.visibilityState === 'visible') fetchDashboardData(true);
     };
     document.addEventListener('visibilitychange', handleVisibility);
     return () => document.removeEventListener('visibilitychange', handleVisibility);
   }, []);
 
   const fetchDashboardData = async (silent = false) => {
-    if (silent) {
-      setRefreshing(true);
-    } else {
-      setLoading(true);
-    }
-
+    if (silent) setRefreshing(true);
+    else setLoading(true);
     try {
       const response = await api.get('/faculty/dashboard/stats');
       if (response.data.success) {
@@ -71,187 +58,80 @@ function Overview() {
     }
   };
 
-  const handleManualRefresh = () => {
-    fetchDashboardData(true);
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent"></div>
-      </div>
-    );
-  }
-
-  if (!stats) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-gray-500">Unable to load dashboard data.</p>
-      </div>
-    );
-  }
+  if (loading) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent"></div></div>;
+  if (!stats) return <div className="flex items-center justify-center h-64"><p className="text-gray-500">Unable to load dashboard data.</p></div>;
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-3xl font-bold text-primary">Faculty Dashboard Overview</h2>
-          {lastUpdated && (
-            <p className="text-xs text-gray-400 mt-1">
-              Last updated: {lastUpdated.toLocaleTimeString()}
-            </p>
-          )}
+          {lastUpdated && <p className="text-xs text-gray-400 mt-1">Last updated: {lastUpdated.toLocaleTimeString()}</p>}
         </div>
         <div className="flex items-center gap-3">
-          {/* Manual Refresh Button */}
-          <button
-            onClick={handleManualRefresh}
-            disabled={refreshing}
-            className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition disabled:opacity-50"
-            title="Refresh stats"
-          >
+          <button onClick={() => fetchDashboardData(true)} disabled={refreshing}
+            className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition disabled:opacity-50">
             <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
             {refreshing ? 'Refreshing...' : 'Refresh'}
           </button>
-
-          <Link
-            to="/faculty/courses"
-            className="bg-accent hover:bg-blue-600 text-white px-6 py-3 rounded-lg flex items-center gap-2 transition shadow-md"
-          >
-            <BookOpen size={20} />
-            Manage Courses
+          <Link to="/faculty/courses" className="bg-accent hover:bg-blue-600 text-white px-6 py-3 rounded-lg flex items-center gap-2 transition shadow-md">
+            <BookOpen size={20} /> Manage Courses
           </Link>
         </div>
       </div>
 
-      {/* Main Stats Grid */}
       <div className="grid md:grid-cols-4 gap-6">
-        <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-6 rounded-xl shadow-lg text-white">
-          <BookOpen className="h-10 w-10 mb-3 opacity-80" />
-          <h3 className="text-sm font-medium mb-1 opacity-90">My Courses</h3>
-          <p className="text-3xl font-bold">{stats.totalCourses ?? '—'}</p>
-          <p className="text-xs mt-2 opacity-75">Active courses</p>
-        </div>
-
-        <div className="bg-gradient-to-br from-green-500 to-green-600 p-6 rounded-xl shadow-lg text-white">
-          <Users className="h-10 w-10 mb-3 opacity-80" />
-          <h3 className="text-sm font-medium mb-1 opacity-90">Total Students</h3>
-          <p className="text-3xl font-bold">{stats.totalStudents ?? '—'}</p>
-          <p className="text-xs mt-2 opacity-75">Across all courses</p>
-        </div>
-
-        <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 p-6 rounded-xl shadow-lg text-white">
-          <ClipboardList className="h-10 w-10 mb-3 opacity-80" />
-          <h3 className="text-sm font-medium mb-1 opacity-90">Pending Tasks</h3>
-          <p className="text-3xl font-bold">
-            {stats.pendingExams != null && stats.pendingAssignments != null
-              ? stats.pendingExams + stats.pendingAssignments
-              : '—'}
-          </p>
-          <p className="text-xs mt-2 opacity-75">Exams & Assignments</p>
-        </div>
-
-        <div className="bg-gradient-to-br from-purple-500 to-purple-600 p-6 rounded-xl shadow-lg text-white">
-          <Video className="h-10 w-10 mb-3 opacity-80" />
-          <h3 className="text-sm font-medium mb-1 opacity-90">Watch Time</h3>
-          <p className="text-3xl font-bold">
-            {stats.totalWatchTime != null ? `${stats.totalWatchTime}h` : '—'}
-          </p>
-          <p className="text-xs mt-2 opacity-75">Total engagement</p>
-        </div>
+        {[
+          { icon: BookOpen, label: 'My Courses', value: stats.totalCourses, sub: 'Active courses', color: 'from-blue-500 to-blue-600' },
+          { icon: Users, label: 'Total Students', value: stats.totalStudents, sub: 'Across all courses', color: 'from-green-500 to-green-600' },
+          { icon: ClipboardList, label: 'Pending Tasks', value: stats.pendingExams != null && stats.pendingAssignments != null ? stats.pendingExams + stats.pendingAssignments : null, sub: 'Exams & Assignments', color: 'from-yellow-500 to-yellow-600' },
+          { icon: Video, label: 'Watch Time', value: stats.totalWatchTime != null ? `${stats.totalWatchTime}h` : null, sub: 'Total engagement', color: 'from-purple-500 to-purple-600' },
+        ].map(({ icon: Icon, label, value, sub, color }) => (
+          <div key={label} className={`bg-gradient-to-br ${color} p-6 rounded-xl shadow-lg text-white`}>
+            <Icon className="h-10 w-10 mb-3 opacity-80" />
+            <h3 className="text-sm font-medium mb-1 opacity-90">{label}</h3>
+            <p className="text-3xl font-bold">{value ?? '—'}</p>
+            <p className="text-xs mt-2 opacity-75">{sub}</p>
+          </div>
+        ))}
       </div>
 
-      {/* Secondary Stats Grid */}
       <div className="grid md:grid-cols-4 gap-6">
-        <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-blue-500">
-          <GraduationCap className="h-10 w-10 text-blue-500 mb-3" />
-          <h3 className="text-sm font-semibold text-gray-600 mb-2">Average Grade</h3>
-          <p className="text-2xl font-bold text-primary">
-            {stats.averageGrade != null ? `${stats.averageGrade}%` : '—'}
-          </p>
-        </div>
-
-        <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-green-500">
-          <MonitorPlay className="h-10 w-10 text-green-500 mb-3" />
-          <h3 className="text-sm font-semibold text-gray-600 mb-2">Live Classes</h3>
-          <p className="text-2xl font-bold text-primary">{stats.liveClasses ?? '—'}</p>
-        </div>
-
-        <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-yellow-500">
-          <Activity className="h-10 w-10 text-yellow-500 mb-3" />
-          <h3 className="text-sm font-semibold text-gray-600 mb-2">Active Enrollments</h3>
-          <p className="text-2xl font-bold text-primary">{stats.activeEnrollments ?? '—'}</p>
-        </div>
-
-        <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-purple-500">
-          <Award className="h-10 w-10 text-purple-500 mb-3" />
-          <h3 className="text-sm font-semibold text-gray-600 mb-2">Completed</h3>
-          <p className="text-2xl font-bold text-primary">{stats.completedAssignments ?? '—'}</p>
-        </div>
+        {[
+          { icon: GraduationCap, label: 'Average Grade', value: stats.averageGrade != null ? `${stats.averageGrade}%` : '—', border: 'border-blue-500', text: 'text-blue-500' },
+          { icon: MonitorPlay, label: 'Live Classes', value: stats.liveClasses ?? '—', border: 'border-green-500', text: 'text-green-500' },
+          { icon: Activity, label: 'Active Enrollments', value: stats.activeEnrollments ?? '—', border: 'border-yellow-500', text: 'text-yellow-500' },
+          { icon: Award, label: 'Completed', value: stats.completedAssignments ?? '—', border: 'border-purple-500', text: 'text-purple-500' },
+        ].map(({ icon: Icon, label, value, border, text }) => (
+          <div key={label} className={`bg-white p-6 rounded-xl shadow-md border-l-4 ${border}`}>
+            <Icon className={`h-10 w-10 ${text} mb-3`} />
+            <h3 className="text-sm font-semibold text-gray-600 mb-2">{label}</h3>
+            <p className="text-2xl font-bold text-primary">{value}</p>
+          </div>
+        ))}
       </div>
 
-      {/* Quick Actions */}
       <div className="bg-white rounded-xl shadow-md p-6">
         <h3 className="text-xl font-bold text-gray-800 mb-4">Quick Actions</h3>
         <div className="grid md:grid-cols-5 gap-4">
-          <Link
-            to="/faculty/content-upload"
-            className="flex flex-col items-center p-4 border-2 border-gray-200 rounded-lg hover:border-accent hover:bg-blue-50 transition group"
-          >
-            <Upload className="text-accent group-hover:scale-110 transition" size={32} />
-            <div className="text-center mt-2">
-              <div className="font-semibold text-sm">Upload Content</div>
-              <div className="text-xs text-gray-600">Videos, PDFs</div>
-            </div>
-          </Link>
-
-          <Link
-            to="/faculty/assignments"
-            className="flex flex-col items-center p-4 border-2 border-gray-200 rounded-lg hover:border-accent hover:bg-blue-50 transition group"
-          >
-            <ClipboardList className="text-accent group-hover:scale-110 transition" size={32} />
-            <div className="text-center mt-2">
-              <div className="font-semibold text-sm">Assignments</div>
-              <div className="text-xs text-gray-600">Create & grade</div>
-            </div>
-          </Link>
-
-          <Link
-            to="/faculty/live-classes"
-            className="flex flex-col items-center p-4 border-2 border-gray-200 rounded-lg hover:border-accent hover:bg-blue-50 transition group"
-          >
-            <MonitorPlay className="text-accent group-hover:scale-110 transition" size={32} />
-            <div className="text-center mt-2">
-              <div className="font-semibold text-sm">Live Classes</div>
-              <div className="text-xs text-gray-600">Schedule</div>
-            </div>
-          </Link>
-
-          <Link
-            to="/faculty/analytics"
-            className="flex flex-col items-center p-4 border-2 border-gray-200 rounded-lg hover:border-accent hover:bg-blue-50 transition group"
-          >
-            <BarChart3 className="text-accent group-hover:scale-110 transition" size={32} />
-            <div className="text-center mt-2">
-              <div className="font-semibold text-sm">Analytics</div>
-              <div className="text-xs text-gray-600">View reports</div>
-            </div>
-          </Link>
-
-          <Link
-            to="/faculty/attendance"
-            className="flex flex-col items-center p-4 border-2 border-gray-200 rounded-lg hover:border-accent hover:bg-blue-50 transition group"
-          >
-            <UserCheck className="text-accent group-hover:scale-110 transition" size={32} />
-            <div className="text-center mt-2">
-              <div className="font-semibold text-sm">Attendance</div>
-              <div className="text-xs text-gray-600">Track</div>
-            </div>
-          </Link>
+          {[
+            { to: '/faculty/content-upload', icon: Upload, label: 'Upload Content', sub: 'Videos, PDFs' },
+            { to: '/faculty/assignments', icon: ClipboardList, label: 'Assignments', sub: 'Create & grade' },
+            { to: '/faculty/live-classes', icon: MonitorPlay, label: 'Live Classes', sub: 'Schedule' },
+            { to: '/faculty/analytics', icon: BarChart3, label: 'Analytics', sub: 'View reports' },
+            { to: '/faculty/attendance', icon: UserCheck, label: 'Attendance', sub: 'Track' },
+          ].map(({ to, icon: Icon, label, sub }) => (
+            <Link key={to} to={to} className="flex flex-col items-center p-4 border-2 border-gray-200 rounded-lg hover:border-accent hover:bg-blue-50 transition group">
+              <Icon className="text-accent group-hover:scale-110 transition" size={32} />
+              <div className="text-center mt-2">
+                <div className="font-semibold text-sm">{label}</div>
+                <div className="text-xs text-gray-600">{sub}</div>
+              </div>
+            </Link>
+          ))}
         </div>
       </div>
 
-      {/* Performance & Recent Activity */}
       <div className="grid md:grid-cols-2 gap-6">
         <div className="bg-white rounded-xl shadow-md p-6">
           <div className="flex items-center justify-between mb-4">
@@ -263,21 +143,15 @@ function Overview() {
               {Object.entries(stats.performance).map(([label, value]) => (
                 <div key={label}>
                   <div className="flex justify-between text-sm text-gray-600 mb-1">
-                    <span>{label}</span>
-                    <span className="font-semibold">{value}%</span>
+                    <span>{label}</span><span className="font-semibold">{value}%</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className="bg-blue-500 h-2 rounded-full transition-all"
-                      style={{ width: `${value}%` }}
-                    ></div>
+                    <div className="bg-blue-500 h-2 rounded-full transition-all" style={{ width: `${value}%` }}></div>
                   </div>
                 </div>
               ))}
             </div>
-          ) : (
-            <p className="text-gray-400 text-sm">No performance data available.</p>
-          )}
+          ) : <p className="text-gray-400 text-sm">No performance data available.</p>}
         </div>
 
         <div className="bg-white rounded-xl shadow-md p-6">
@@ -317,41 +191,24 @@ function MyCourses() {
   const [filter, setFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
 
-  useEffect(() => {
-    fetchCourses();
-  }, []);
+  useEffect(() => { fetchCourses(); }, []);
 
   const fetchCourses = async () => {
     try {
       const response = await api.get('/faculty/courses');
-      if (response.data.success) {
-        setCourses(response.data.courses || []);
-      }
-    } catch (error) {
-      console.error('Error fetching courses:', error);
-    } finally {
-      setLoading(false);
-    }
+      if (response.data.success) setCourses(response.data.courses || []);
+    } catch (error) { console.error('Error fetching courses:', error); }
+    finally { setLoading(false); }
   };
 
   const openEditModal = (course) => {
     setEditingCourse(course);
-    setEditForm({
-      course_name: course.course_name || '',
-      code: course.code || '',
-      description: course.description || '',
-      status: course.status || 'active',
-      duration_hours: course.duration_hours || '',
-      schedule: course.schedule || ''
-    });
+    setEditForm({ course_name: course.course_name || '', code: course.code || '', description: course.description || '', status: course.status || 'active', duration_hours: course.duration_hours || '', schedule: course.schedule || '' });
     setShowEditModal(true);
   };
 
   const handleEditCourse = async () => {
-    if (!editForm.course_name.trim()) {
-      alert('Course name is required');
-      return;
-    }
+    if (!editForm.course_name.trim()) { alert('Course name is required'); return; }
     try {
       const response = await api.put(`/faculty/courses/${editingCourse.id}`, editForm);
       if (response.data.success) {
@@ -366,63 +223,37 @@ function MyCourses() {
   };
 
   const filteredCourses = courses.filter(c => {
-    const matchesSearch = c.course_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (c.code || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = c.course_name.toLowerCase().includes(searchTerm.toLowerCase()) || (c.code || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesFilter = filter === 'all' || c.status.toLowerCase() === filter;
     return matchesSearch && matchesFilter;
   });
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent"></div>
-      </div>
-    );
-  }
+  if (loading) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent"></div></div>;
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-primary">My Courses</h2>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg hover:bg-blue-700 transition"
-        >
-          <Plus className="h-4 w-4" />
-          Create Course
+        <button onClick={() => setShowCreateModal(true)} className="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg hover:bg-blue-700 transition">
+          <Plus className="h-4 w-4" /> Create Course
         </button>
       </div>
 
-      {/* Search and Filters */}
       <div className="bg-white p-4 rounded-xl shadow-md">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-            <input
-              type="text"
-              placeholder="Search courses..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent"
-            />
+            <input type="text" placeholder="Search courses..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent" />
           </div>
           <div className="flex gap-2">
             {['all', 'active', 'draft'].map(f => (
-              <button
-                key={f}
-                onClick={() => setFilter(f)}
-                className={`px-4 py-2 rounded-lg capitalize transition ${
-                  filter === f ? 'bg-accent text-white' : 'bg-gray-100 hover:bg-gray-200'
-                }`}
-              >
-                {f}
-              </button>
+              <button key={f} onClick={() => setFilter(f)} className={`px-4 py-2 rounded-lg capitalize transition ${filter === f ? 'bg-accent text-white' : 'bg-gray-100 hover:bg-gray-200'}`}>{f}</button>
             ))}
           </div>
         </div>
       </div>
 
-      {/* Courses Grid */}
       {filteredCourses.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-xl shadow-md">
           <BookOpen className="h-16 w-16 text-gray-400 mx-auto mb-4" />
@@ -439,48 +270,24 @@ function MyCourses() {
                     <h3 className="text-lg font-bold text-gray-800">{course.course_name}</h3>
                     <p className="text-sm text-gray-500">{course.code}</p>
                   </div>
-                  <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-semibold">
-                    {course.status}
-                  </span>
+                  <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-semibold">{course.status}</span>
                 </div>
                 <p className="text-sm text-gray-600 mb-4 line-clamp-2">{course.description}</p>
-                
                 <div className="space-y-2 mb-4">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="flex items-center gap-1 text-gray-600">
-                      <Users size={16} />
-                      Students
-                    </span>
-                    <span className="font-semibold text-gray-800">{course.students ?? '—'}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="flex items-center gap-1 text-gray-600">
-                      <Clock size={16} />
-                      Duration
-                    </span>
-                    <span className="font-semibold text-gray-800">{course.duration_hours != null ? `${course.duration_hours}h` : '—'}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="flex items-center gap-1 text-gray-600">
-                      <Calendar size={16} />
-                      Schedule
-                    </span>
-                    <span className="font-semibold text-gray-800 text-xs">{course.schedule || '—'}</span>
-                  </div>
+                  {[
+                    { icon: Users, label: 'Students', value: course.students ?? '—' },
+                    { icon: Clock, label: 'Duration', value: course.duration_hours != null ? `${course.duration_hours}h` : '—' },
+                    { icon: Calendar, label: 'Schedule', value: course.schedule || '—' },
+                  ].map(({ icon: Icon, label, value }) => (
+                    <div key={label} className="flex items-center justify-between text-sm">
+                      <span className="flex items-center gap-1 text-gray-600"><Icon size={16} />{label}</span>
+                      <span className="font-semibold text-gray-800 text-xs">{value}</span>
+                    </div>
+                  ))}
                 </div>
-
                 <div className="flex gap-2">
-                  <Link
-                    to={`/faculty/course/${course.id}`}
-                    className="flex-1 bg-accent hover:bg-blue-600 text-white text-center py-2 rounded-lg font-semibold transition text-sm"
-                  >
-                    Manage
-                  </Link>
-                  <button
-                    onClick={() => openEditModal(course)}
-                    className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 rounded-lg font-semibold transition text-sm">
-                    Edit
-                  </button>
+                  <Link to={`/faculty/course/${course.id}`} className="flex-1 bg-accent hover:bg-blue-600 text-white text-center py-2 rounded-lg font-semibold transition text-sm">Manage</Link>
+                  <button onClick={() => openEditModal(course)} className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 rounded-lg font-semibold transition text-sm">Edit</button>
                 </div>
               </div>
             </div>
@@ -499,23 +306,18 @@ function MyCourses() {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Course Name *</label>
-                <input type="text" value={editForm.course_name}
-                  onChange={e => setEditForm({ ...editForm, course_name: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent"
-                  placeholder="e.g. Introduction to Python" />
+                <input type="text" value={editForm.course_name} onChange={e => setEditForm({ ...editForm, course_name: e.target.value })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent" placeholder="e.g. Introduction to Python" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Course Code</label>
-                  <input type="text" value={editForm.code}
-                    onChange={e => setEditForm({ ...editForm, code: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent"
-                    placeholder="e.g. CS101" />
+                  <input type="text" value={editForm.code} onChange={e => setEditForm({ ...editForm, code: e.target.value })}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent" placeholder="e.g. CS101" />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Status</label>
-                  <select value={editForm.status}
-                    onChange={e => setEditForm({ ...editForm, status: e.target.value })}
+                  <select value={editForm.status} onChange={e => setEditForm({ ...editForm, status: e.target.value })}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent">
                     <option value="active">Active</option>
                     <option value="draft">Draft</option>
@@ -526,37 +328,24 @@ function MyCourses() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Duration (hours)</label>
-                  <input type="number" value={editForm.duration_hours}
-                    onChange={e => setEditForm({ ...editForm, duration_hours: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent"
-                    placeholder="40" />
+                  <input type="number" value={editForm.duration_hours} onChange={e => setEditForm({ ...editForm, duration_hours: e.target.value })}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent" placeholder="40" />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Schedule</label>
-                  <input type="text" value={editForm.schedule}
-                    onChange={e => setEditForm({ ...editForm, schedule: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent"
-                    placeholder="e.g. Mon-Wed 10AM" />
+                  <input type="text" value={editForm.schedule} onChange={e => setEditForm({ ...editForm, schedule: e.target.value })}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent" placeholder="e.g. Mon-Wed 10AM" />
                 </div>
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Description</label>
-                <textarea value={editForm.description}
-                  onChange={e => setEditForm({ ...editForm, description: e.target.value })}
-                  rows="4"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent"
-                  placeholder="Course description..." />
+                <textarea value={editForm.description} onChange={e => setEditForm({ ...editForm, description: e.target.value })} rows="4"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent" placeholder="Course description..." />
               </div>
             </div>
             <div className="flex gap-3 mt-6">
-              <button onClick={handleEditCourse}
-                className="flex-1 bg-accent text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition">
-                Save Changes
-              </button>
-              <button onClick={() => setShowEditModal(false)}
-                className="px-6 bg-gray-200 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-300 transition">
-                Cancel
-              </button>
+              <button onClick={handleEditCourse} className="flex-1 bg-accent text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition">Save Changes</button>
+              <button onClick={() => setShowEditModal(false)} className="px-6 bg-gray-200 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-300 transition">Cancel</button>
             </div>
           </div>
         </div>
@@ -564,13 +353,13 @@ function MyCourses() {
     </div>
   );
 }
+
+// ==================== CONTENT UPLOAD COMPONENT ====================
 function ContentUpload() {
   const [uploadType, setUploadType] = useState('video');
   const [selectedCourse, setSelectedCourse] = useState('');
   const [courses, setCourses] = useState([]);
-  const [uploadForm, setUploadForm] = useState({
-    title: '', description: '', file: null, duration: '', order: ''
-  });
+  const [uploadForm, setUploadForm] = useState({ title: '', description: '', file: null, duration: '', order: '' });
   const [uploadedContent, setUploadedContent] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -579,6 +368,14 @@ function ContentUpload() {
   const [isDragging, setIsDragging] = useState(false);
   const [filterType, setFilterType] = useState('all');
   const [searchContent, setSearchContent] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
+
+  // View / Edit / Delete state
+  const [viewItem, setViewItem] = useState(null);
+  const [editItem, setEditItem] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [editSaving, setEditSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
 
   useEffect(() => { fetchCourses(); fetchUploadedContent(); }, []);
 
@@ -597,9 +394,7 @@ function ContentUpload() {
     finally { setLoading(false); }
   };
 
-  const handleFileSelect = (file) => {
-    if (file) setUploadForm(f => ({...f, file}));
-  };
+  const handleFileSelect = (file) => { if (file) setUploadForm(f => ({ ...f, file })); };
 
   const handleDrop = (e) => {
     e.preventDefault();
@@ -610,13 +405,13 @@ function ContentUpload() {
 
   const handleUpload = async () => {
     if (!uploadForm.title || !uploadForm.file || !selectedCourse) {
-      alert('Please fill all required fields and select a file');
+      setErrorMsg('Please fill all required fields and select a file');
       return;
     }
+    setErrorMsg('');
     setUploading(true);
     setUploadProgress(0);
     setUploadSuccess(false);
-
     const formData = new FormData();
     formData.append('title', uploadForm.title);
     formData.append('description', uploadForm.description);
@@ -625,7 +420,6 @@ function ContentUpload() {
     formData.append('course', selectedCourse);
     formData.append('duration', uploadForm.duration);
     formData.append('order', uploadForm.order);
-
     try {
       const response = await api.post('/faculty/content/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -644,18 +438,68 @@ function ContentUpload() {
       }
     } catch (error) {
       console.error('Upload error:', error);
-      alert('Upload failed. Please try again.');
+      setErrorMsg('Upload failed. Please try again.');
       setUploadProgress(0);
     } finally {
       setUploading(false);
     }
   };
 
+  // View handler
+  const handleViewContent = (item) => { setViewItem(item); };
+
+  // Edit handler
+  const handleEditContent = (item) => {
+    setEditItem(item);
+    setEditForm({ title: item.title || '', description: item.description || '', duration: item.duration || '', order: item.display_order || item.order || '', course_id: item.course_id || '' });
+  };
+
+  const handleEditSave = async () => {
+    if (!editForm.title) { alert('Title is required'); return; }
+    setEditSaving(true);
+    try {
+      const res = await api.put(`/faculty/content/${editItem.id}`, editForm);
+      if (res.data.success) {
+        setUploadedContent(prev => prev.map(c => c.id === editItem.id ? { ...c, ...editForm } : c));
+        setEditItem(null);
+      } else {
+        setErrorMsg('Failed to save changes');
+      }
+    } catch (e) {
+      console.error('Edit error:', e);
+      setErrorMsg('Failed to save changes');
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  // Delete handler
+  const handleDeleteContent = async (item) => {
+    if (!window.confirm(`Delete "${item.title}"? This cannot be undone.`)) return;
+    setDeletingId(item.id);
+    try {
+      await api.delete(`/faculty/content/${item.id}`);
+      setUploadedContent(prev => prev.filter(c => c.id !== item.id));
+    } catch (e) {
+      console.error('Delete error:', e);
+      setErrorMsg('Delete failed. Please try again.');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const resolveFileUrl = (filePath) => {
+    if (!filePath) return null;
+    if (filePath.startsWith('http')) return filePath;
+    const base = (import.meta?.env?.VITE_API_URL || 'https://upskillize-lms-backend.onrender.com/api').replace(/\/api$/, '');
+    return base + filePath;
+  };
+
   const typeConfig = {
-    video:  { icon: Video,    color: 'from-red-500 to-rose-600',     bg: 'bg-red-50',    border: 'border-red-200',    text: 'text-red-600',    badge: 'bg-red-100 text-red-700',    accept: 'video/*',          label: 'MP4, MOV, AVI' },
-    pdf:    { icon: FileText, color: 'from-blue-500 to-blue-600',    bg: 'bg-blue-50',   border: 'border-blue-200',   text: 'text-blue-600',   badge: 'bg-blue-100 text-blue-700',  accept: '.pdf',             label: 'PDF files' },
-    ppt:    { icon: FilePlus, color: 'from-orange-500 to-amber-500', bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-600', badge: 'bg-orange-100 text-orange-700', accept: '.ppt,.pptx',    label: 'PPT, PPTX' },
-    scorm:  { icon: Archive,  color: 'from-green-500 to-emerald-600',bg: 'bg-green-50',  border: 'border-green-200',  text: 'text-green-600',  badge: 'bg-green-100 text-green-700',accept: '.zip',             label: 'ZIP package' },
+    video: { icon: Video, color: 'from-red-500 to-pink-600', bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-600', badge: 'bg-red-100 text-red-700', accept: 'video/*', label: 'MP4, AVI, MOV' },
+    pdf: { icon: FileText, color: 'from-blue-500 to-blue-600', bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-600', badge: 'bg-blue-100 text-blue-700', accept: '.pdf', label: 'PDF files' },
+    ppt: { icon: FilePlus, color: 'from-orange-500 to-amber-500', bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-600', badge: 'bg-orange-100 text-orange-700', accept: '.ppt,.pptx', label: 'PPT, PPTX' },
+    scorm: { icon: Archive, color: 'from-green-500 to-emerald-600', bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-600', badge: 'bg-green-100 text-green-700', accept: '.zip', label: 'ZIP package' },
   };
 
   const activeType = typeConfig[uploadType];
@@ -667,10 +511,8 @@ function ContentUpload() {
     return matchType && matchSearch;
   });
 
-  const statsMap = ['video','pdf','ppt','scorm'].map(t => ({
-    type: t,
-    count: uploadedContent.filter(c => c.type === t).length,
-    ...typeConfig[t]
+  const statsMap = ['video', 'pdf', 'ppt', 'scorm'].map(t => ({
+    type: t, count: uploadedContent.filter(c => c.type === t).length, ...typeConfig[t]
   }));
 
   return (
@@ -687,9 +529,18 @@ function ContentUpload() {
         </div>
       </div>
 
+      {/* Error Banner */}
+      {errorMsg && (
+        <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700">
+          <AlertCircle size={20} className="flex-shrink-0" />
+          <span className="text-sm font-medium">{errorMsg}</span>
+          <button onClick={() => setErrorMsg('')} className="ml-auto text-red-400 hover:text-red-600"><X size={16} /></button>
+        </div>
+      )}
+
       {/* Stats row */}
       <div className="grid grid-cols-4 gap-4">
-        {statsMap.map(({ type, count, icon: Icon, color, badge, text }) => (
+        {statsMap.map(({ type, count, icon: Icon, color }) => (
           <div key={type} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex items-center gap-3 hover:shadow-md transition">
             <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${color} flex items-center justify-center shadow-sm`}>
               <Icon size={18} className="text-white" />
@@ -703,10 +554,9 @@ function ContentUpload() {
       </div>
 
       <div className="grid lg:grid-cols-5 gap-6">
-        {/* ── LEFT: Upload Form ── */}
+        {/* LEFT: Upload Form */}
         <div className="lg:col-span-2 space-y-4">
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            {/* Gradient header strip */}
             <div className={`bg-gradient-to-r ${activeType.color} p-5`}>
               <div className="flex items-center gap-3 mb-1">
                 <div className="w-9 h-9 bg-white/20 rounded-lg flex items-center justify-center">
@@ -724,11 +574,7 @@ function ContentUpload() {
                   const TIcon = cfg.icon;
                   return (
                     <button key={type} onClick={() => setUploadType(type)}
-                      className={`flex flex-col items-center py-2 px-1 rounded-lg text-xs font-bold transition-all ${
-                        uploadType === type
-                          ? `bg-gradient-to-br ${cfg.color} text-white shadow-sm`
-                          : 'text-gray-500 hover:bg-white hover:text-gray-700'
-                      }`}>
+                      className={`flex flex-col items-center py-2 px-1 rounded-lg text-xs font-bold transition-all ${uploadType === type ? `bg-gradient-to-br ${cfg.color} text-white shadow-sm` : 'text-gray-500 hover:bg-white hover:text-gray-700'}`}>
                       <TIcon size={16} className="mb-0.5" />
                       {type.toUpperCase()}
                     </button>
@@ -736,16 +582,13 @@ function ContentUpload() {
                 })}
               </div>
 
-              {/* Title */}
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Content Title *</label>
-                <input type="text" value={uploadForm.title}
-                  onChange={e => setUploadForm(f => ({...f, title: e.target.value}))}
+                <input type="text" value={uploadForm.title} onChange={e => setUploadForm(f => ({ ...f, title: e.target.value }))}
                   className="w-full px-3.5 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-400 transition"
                   placeholder="e.g. Introduction to Arrays" />
               </div>
 
-              {/* Course */}
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Course *</label>
                 <select value={selectedCourse} onChange={e => setSelectedCourse(e.target.value)}
@@ -755,34 +598,26 @@ function ContentUpload() {
                 </select>
               </div>
 
-              {/* Duration + Order */}
               <div className="grid grid-cols-2 gap-3">
                 {uploadType === 'video' && (
                   <div>
                     <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Duration (min)</label>
-                    <input type="number" value={uploadForm.duration}
-                      onChange={e => setUploadForm(f => ({...f, duration: e.target.value}))}
-                      className="w-full px-3.5 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-400 transition"
-                      placeholder="45" />
+                    <input type="number" value={uploadForm.duration} onChange={e => setUploadForm(f => ({ ...f, duration: e.target.value }))}
+                      className="w-full px-3.5 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-400 transition" placeholder="45" />
                   </div>
                 )}
                 <div>
                   <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Display Order</label>
-                  <input type="number" value={uploadForm.order}
-                    onChange={e => setUploadForm(f => ({...f, order: e.target.value}))}
-                    className="w-full px-3.5 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-400 transition"
-                    placeholder="1" />
+                  <input type="number" value={uploadForm.order} onChange={e => setUploadForm(f => ({ ...f, order: e.target.value }))}
+                    className="w-full px-3.5 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-400 transition" placeholder="1" />
                 </div>
               </div>
 
-              {/* Description */}
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Description</label>
-                <textarea value={uploadForm.description}
-                  onChange={e => setUploadForm(f => ({...f, description: e.target.value}))}
-                  rows="2"
+                <textarea value={uploadForm.description} onChange={e => setUploadForm(f => ({ ...f, description: e.target.value }))} rows="2"
                   className="w-full px-3.5 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-400 transition resize-none"
-                  placeholder="Brief description of this content..." />
+                  placeholder="Brief description..." />
               </div>
 
               {/* Drag & Drop Zone */}
@@ -790,17 +625,8 @@ function ContentUpload() {
                 onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
                 onDragLeave={() => setIsDragging(false)}
                 onDrop={handleDrop}
-                className={`relative border-2 border-dashed rounded-xl p-5 text-center transition-all ${
-                  isDragging
-                    ? `border-blue-400 ${activeType.bg} scale-[1.01]`
-                    : uploadForm.file
-                    ? `${activeType.border} ${activeType.bg}`
-                    : 'border-gray-200 hover:border-gray-300 bg-gray-50'
-                }`}>
-                <input type="file" id="cu-file" className="hidden"
-                  accept={activeType.accept}
-                  onChange={e => handleFileSelect(e.target.files[0])} />
-
+                className={`relative border-2 border-dashed rounded-xl p-5 text-center transition-all ${isDragging ? `border-blue-400 ${activeType.bg} scale-[1.01]` : uploadForm.file ? `${activeType.border} ${activeType.bg}` : 'border-gray-200 hover:border-gray-300 bg-gray-50'}`}>
+                <input type="file" id="cu-file" className="hidden" accept={activeType.accept} onChange={e => handleFileSelect(e.target.files[0])} />
                 {uploadForm.file ? (
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -812,25 +638,22 @@ function ContentUpload() {
                         <p className="text-xs text-gray-500">{(uploadForm.file.size / 1024 / 1024).toFixed(1)} MB</p>
                       </div>
                     </div>
-                    <button onClick={() => setUploadForm(f => ({...f, file: null}))}
+                    <button onClick={() => setUploadForm(f => ({ ...f, file: null }))}
                       className="w-7 h-7 rounded-full bg-gray-200 hover:bg-red-100 hover:text-red-600 flex items-center justify-center transition text-gray-500">
                       <X size={14} />
                     </button>
                   </div>
                 ) : (
-                  <>
-                    <label htmlFor="cu-file" className="cursor-pointer block">
-                      <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${activeType.color} flex items-center justify-center mx-auto mb-2 opacity-80`}>
-                        <Upload size={22} className="text-white" />
-                      </div>
-                      <p className="text-sm font-semibold text-gray-700">Drop file here or <span className={`${activeType.text} underline underline-offset-2`}>browse</span></p>
-                      <p className="text-xs text-gray-400 mt-1">{activeType.label} supported</p>
-                    </label>
-                  </>
+                  <label htmlFor="cu-file" className="cursor-pointer block">
+                    <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${activeType.color} flex items-center justify-center mx-auto mb-2 opacity-80`}>
+                      <Upload size={22} className="text-white" />
+                    </div>
+                    <p className="text-sm font-semibold text-gray-700">Drop file here or <span className={`${activeType.text} underline underline-offset-2`}>browse</span></p>
+                    <p className="text-xs text-gray-400 mt-1">{activeType.label} supported</p>
+                  </label>
                 )}
               </div>
 
-              {/* Progress bar */}
               {(uploading || uploadProgress > 0) && (
                 <div>
                   <div className="flex justify-between text-xs font-semibold mb-1.5">
@@ -838,27 +661,20 @@ function ContentUpload() {
                     <span className={activeType.text}>{uploadProgress}%</span>
                   </div>
                   <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
-                    <div
-                      className={`h-2.5 rounded-full bg-gradient-to-r ${activeType.color} transition-all duration-300`}
-                      style={{ width: `${uploadProgress}%` }}
-                    />
+                    <div className={`h-2.5 rounded-full bg-gradient-to-r ${activeType.color} transition-all duration-300`} style={{ width: `${uploadProgress}%` }} />
                   </div>
                 </div>
               )}
 
-              {/* Upload button */}
               <button onClick={handleUpload} disabled={uploading}
                 className={`w-full py-3 rounded-xl font-bold text-white text-sm flex items-center justify-center gap-2 transition-all shadow-sm bg-gradient-to-r ${activeType.color} hover:opacity-90 disabled:opacity-50`}>
-                {uploading
-                  ? <><div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" /> Uploading...</>
-                  : <><Upload size={18} /> Upload {uploadType.toUpperCase()}</>
-                }
+                {uploading ? <><div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" /> Uploading...</> : <><Upload size={18} /> Upload {uploadType.toUpperCase()}</>}
               </button>
             </div>
           </div>
         </div>
 
-        {/* ── RIGHT: Content Library ── */}
+        {/* RIGHT: Content Library */}
         <div className="lg:col-span-3 space-y-4">
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm">
             <div className="p-5 border-b border-gray-100">
@@ -867,20 +683,15 @@ function ContentUpload() {
                 <span className="text-xs text-gray-400 bg-gray-100 px-3 py-1 rounded-full font-semibold">{filteredContent.length} items</span>
               </div>
               <div className="flex gap-2 flex-wrap">
-                {/* Search */}
                 <div className="flex-1 min-w-[160px] relative">
                   <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input type="text" value={searchContent} onChange={e => setSearchContent(e.target.value)}
-                    placeholder="Search content..."
+                  <input type="text" value={searchContent} onChange={e => setSearchContent(e.target.value)} placeholder="Search content..."
                     className="w-full pl-8 pr-3 py-2 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-400 transition" />
                 </div>
-                {/* Type filter */}
                 <div className="flex gap-1.5">
-                  {['all','video','pdf','ppt','scorm'].map(f => (
+                  {['all', 'video', 'pdf', 'ppt', 'scorm'].map(f => (
                     <button key={f} onClick={() => setFilterType(f)}
-                      className={`px-3 py-2 rounded-xl text-xs font-bold transition capitalize ${
-                        filterType === f ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                      }`}>
+                      className={`px-3 py-2 rounded-xl text-xs font-bold transition capitalize ${filterType === f ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
                       {f === 'all' ? 'All' : f.toUpperCase()}
                     </button>
                   ))}
@@ -907,8 +718,7 @@ function ContentUpload() {
                     const cfg = typeConfig[content.type] || typeConfig.pdf;
                     const CIcon = cfg.icon;
                     return (
-                      <div key={content.id}
-                        className="group border-2 border-gray-100 rounded-xl p-4 hover:border-blue-200 hover:shadow-md transition-all cursor-pointer">
+                      <div key={content.id} className="group border-2 border-gray-100 rounded-xl p-4 hover:border-blue-200 hover:shadow-md transition-all">
                         <div className="flex items-start gap-3 mb-3">
                           <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${cfg.color} flex items-center justify-center flex-shrink-0 shadow-sm`}>
                             <CIcon size={20} className="text-white" />
@@ -917,25 +727,27 @@ function ContentUpload() {
                             <h4 className="font-bold text-gray-800 text-sm truncate leading-tight">{content.title}</h4>
                             <p className="text-xs text-gray-500 mt-0.5 truncate">{content.course || '—'}</p>
                           </div>
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase flex-shrink-0 ${cfg.badge}`}>
-                            {content.type}
-                          </span>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase flex-shrink-0 ${cfg.badge}`}>{content.type}</span>
                         </div>
-
                         <div className="flex items-center justify-between text-xs text-gray-400">
                           <div className="flex items-center gap-3">
                             {content.size && <span className="flex items-center gap-1"><HardDrive size={11} />{content.size}</span>}
                             {content.uploadDate && <span className="flex items-center gap-1"><Calendar size={11} />{content.uploadDate}</span>}
                           </div>
                           <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 flex items-center justify-center transition">
+                            <button onClick={() => handleViewContent(content)} title="View"
+                              className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 flex items-center justify-center transition">
                               <Eye size={13} />
                             </button>
-                            <button className="w-7 h-7 rounded-lg bg-gray-50 text-gray-600 hover:bg-gray-100 flex items-center justify-center transition">
+                            <button onClick={() => handleEditContent(content)} title="Edit"
+                              className="w-7 h-7 rounded-lg bg-gray-50 text-gray-600 hover:bg-gray-100 flex items-center justify-center transition">
                               <Edit2 size={13} />
                             </button>
-                            <button className="w-7 h-7 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 flex items-center justify-center transition">
-                              <Trash2 size={13} />
+                            <button onClick={() => handleDeleteContent(content)} disabled={deletingId === content.id} title="Delete"
+                              className="w-7 h-7 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 flex items-center justify-center transition disabled:opacity-50">
+                              {deletingId === content.id
+                                ? <div className="animate-spin rounded-full h-3 w-3 border-2 border-red-400 border-t-transparent" />
+                                : <Trash2 size={13} />}
                             </button>
                           </div>
                         </div>
@@ -948,11 +760,111 @@ function ContentUpload() {
           </div>
         </div>
       </div>
+
+      {/* VIEW MODAL */}
+      {viewItem && (() => {
+        const cfg = typeConfig[viewItem.type] || typeConfig.pdf;
+        const Icon = cfg.icon;
+        const url = resolveFileUrl(viewItem.file_path);
+        return (
+          <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={() => setViewItem(null)}>
+            <div className="bg-white rounded-2xl w-full max-w-3xl overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
+              <div className={`bg-gradient-to-r ${cfg.color} p-4 flex items-center justify-between`}>
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 bg-white/20 rounded-lg flex items-center justify-center">
+                    <Icon size={20} className="text-white" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-white text-base">{viewItem.title}</h3>
+                    <span className="text-white/70 text-xs uppercase">{viewItem.type}</span>
+                  </div>
+                </div>
+                <button onClick={() => setViewItem(null)} className="w-8 h-8 bg-white/20 hover:bg-white/30 rounded-lg flex items-center justify-center text-white transition">
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="bg-black" style={{ minHeight: '320px' }}>
+                {viewItem.type === 'video' && url ? (
+                  <video src={url} controls className="w-full max-h-[420px]" />
+                ) : viewItem.type === 'pdf' && url ? (
+                  <iframe src={url} className="w-full" style={{ height: '420px' }} title={viewItem.title} />
+                ) : viewItem.type === 'ppt' && url ? (
+                  <iframe src={`https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`} className="w-full bg-white" style={{ height: '420px' }} title={viewItem.title} />
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-64">
+                    <Icon size={48} className="text-white/30 mb-4" />
+                    {url
+                      ? <a href={url} download target="_blank" rel="noopener noreferrer" className={`flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r ${cfg.color} text-white font-bold`}><Download size={18} /> Download File</a>
+                      : <p className="text-white/50">No file available</p>}
+                  </div>
+                )}
+              </div>
+              <div className="p-4 flex items-center justify-between">
+                <div className="text-sm text-gray-500">
+                  {viewItem.description && <p>{viewItem.description}</p>}
+                  {viewItem.duration && <p className="text-xs mt-1">Duration: {viewItem.duration} min</p>}
+                </div>
+                {url && (
+                  <a href={url} download target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-semibold transition">
+                    <Download size={15} /> Download
+                  </a>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* EDIT MODAL */}
+      {editItem && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setEditItem(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="bg-gradient-to-r from-gray-700 to-gray-900 p-4 flex items-center justify-between">
+              <h3 className="font-bold text-white flex items-center gap-2"><Edit2 size={18} /> Edit Content</h3>
+              <button onClick={() => setEditItem(null)} className="w-8 h-8 bg-white/20 hover:bg-white/30 rounded-lg flex items-center justify-center text-white transition">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Title *</label>
+                <input type="text" value={editForm.title} onChange={e => setEditForm(f => ({ ...f, title: e.target.value }))}
+                  className="w-full px-3.5 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-400 transition" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Description</label>
+                <textarea value={editForm.description} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))} rows="3"
+                  className="w-full px-3.5 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-400 transition resize-none" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Duration (min)</label>
+                  <input type="number" value={editForm.duration} onChange={e => setEditForm(f => ({ ...f, duration: e.target.value }))}
+                    className="w-full px-3.5 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-400 transition" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Display Order</label>
+                  <input type="number" value={editForm.order} onChange={e => setEditForm(f => ({ ...f, order: e.target.value }))}
+                    className="w-full px-3.5 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-400 transition" />
+                </div>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => setEditItem(null)} className="flex-1 py-2.5 rounded-xl border-2 border-gray-200 text-gray-600 font-semibold text-sm hover:bg-gray-50 transition">Cancel</button>
+                <button onClick={handleEditSave} disabled={editSaving}
+                  className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition disabled:opacity-50 flex items-center justify-center gap-2">
+                  {editSaving ? <><div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" /> Saving...</> : <><CheckCircle size={16} /> Save Changes</>}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-// ==================== GRADE SUBMISSION CARD (controlled inputs) ====================
+// ==================== GRADE SUBMISSION CARD ====================
 function GradeSubmissionCard({ submission, assignment, onGrade }) {
   const [rubricScores, setRubricScores] = useState(() => {
     const init = {};
@@ -964,17 +876,12 @@ function GradeSubmissionCard({ submission, assignment, onGrade }) {
   const [done, setDone] = useState(false);
 
   const totalGrade = Object.values(rubricScores).reduce((s, v) => s + (parseInt(v) || 0), 0);
-  const maxGrade = (assignment.rubric?.categories || []).reduce((s, c) => s + (parseInt(c.points) || 0), 0)
-    || assignment.total_marks || assignment.totalMarks || 100;
+  const maxGrade = (assignment.rubric?.categories || []).reduce((s, c) => s + (parseInt(c.points) || 0), 0) || assignment.total_marks || assignment.totalMarks || 100;
 
   const handleSubmit = async () => {
     setSubmitting(true);
-    try {
-      await onGrade(submission, rubricScores, feedback);
-      setDone(true);
-    } finally {
-      setSubmitting(false);
-    }
+    try { await onGrade(submission, rubricScores, feedback); setDone(true); }
+    finally { setSubmitting(false); }
   };
 
   const fileUrl = submission.file_url || submission.file_path || submission.fileUrl;
@@ -993,7 +900,6 @@ function GradeSubmissionCard({ submission, assignment, onGrade }) {
 
   return (
     <div className="border border-gray-200 rounded-xl p-6 space-y-4">
-      {/* Header */}
       <div className="flex justify-between items-start flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center font-bold text-blue-700">
@@ -1003,7 +909,7 @@ function GradeSubmissionCard({ submission, assignment, onGrade }) {
             <p className="font-bold text-gray-800">{submission.studentName || submission.student_name}</p>
             <p className="text-xs text-gray-500">
               Submitted: {submission.submittedDate || submission.submitted_at
-                ? new Date(submission.submittedDate || submission.submitted_at).toLocaleString('en-IN', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' })
+                ? new Date(submission.submittedDate || submission.submitted_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
                 : '—'}
             </p>
           </div>
@@ -1016,7 +922,6 @@ function GradeSubmissionCard({ submission, assignment, onGrade }) {
         )}
       </div>
 
-      {/* Student notes */}
       {submission.notes && (
         <div className="bg-gray-50 rounded-lg p-3 border-l-4 border-gray-300">
           <p className="text-xs font-semibold text-gray-500 mb-1">Student Notes:</p>
@@ -1024,8 +929,7 @@ function GradeSubmissionCard({ submission, assignment, onGrade }) {
         </div>
       )}
 
-      {/* Rubric scoring */}
-      {assignment.rubric?.categories?.length > 0 && (
+      {assignment.rubric?.categories?.length > 0 ? (
         <div>
           <h5 className="font-semibold text-gray-700 mb-3">Grade by Rubric:</h5>
           <div className="space-y-3">
@@ -1033,83 +937,49 @@ function GradeSubmissionCard({ submission, assignment, onGrade }) {
               <div key={idx} className="flex items-center justify-between gap-4 bg-gray-50 rounded-lg p-3">
                 <span className="text-sm text-gray-700 flex-1">{category.name}</span>
                 <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    max={category.points}
-                    min="0"
-                    value={rubricScores[idx]}
-                    onChange={e => {
-                      const val = Math.min(parseInt(e.target.value) || 0, parseInt(category.points));
-                      setRubricScores(prev => ({ ...prev, [idx]: val }));
-                    }}
-                    className="w-20 px-3 py-2 border border-gray-300 rounded-lg text-center font-semibold focus:ring-2 focus:ring-blue-400 focus:outline-none"
-                    placeholder="0"
-                  />
+                  <input type="number" max={category.points} min="0" value={rubricScores[idx]}
+                    onChange={e => { const val = Math.min(parseInt(e.target.value) || 0, parseInt(category.points)); setRubricScores(prev => ({ ...prev, [idx]: val })); }}
+                    className="w-20 px-3 py-2 border border-gray-300 rounded-lg text-center font-semibold focus:ring-2 focus:ring-blue-400 focus:outline-none" placeholder="0" />
                   <span className="text-sm text-gray-500 font-medium">/ {category.points} pts</span>
                 </div>
               </div>
             ))}
           </div>
-
-          {/* Total score bar */}
           <div className="mt-3 flex items-center gap-3 bg-blue-50 rounded-lg p-3">
             <span className="text-sm font-semibold text-blue-700">Total Score:</span>
             <span className="text-xl font-bold text-blue-800">{totalGrade}</span>
             <span className="text-sm text-blue-500">/ {maxGrade} marks</span>
             <div className="flex-1 bg-blue-200 rounded-full h-2 ml-2">
-              <div className="bg-blue-600 h-2 rounded-full transition-all" style={{ width: `${maxGrade > 0 ? (totalGrade/maxGrade)*100 : 0}%` }} />
+              <div className="bg-blue-600 h-2 rounded-full transition-all" style={{ width: `${maxGrade > 0 ? (totalGrade / maxGrade) * 100 : 0}%` }} />
             </div>
-            <span className="text-sm font-bold text-blue-700">{maxGrade > 0 ? Math.round((totalGrade/maxGrade)*100) : 0}%</span>
+            <span className="text-sm font-bold text-blue-700">{maxGrade > 0 ? Math.round((totalGrade / maxGrade) * 100) : 0}%</span>
           </div>
         </div>
-      )}
-
-      {/* Direct marks (no rubric) */}
-      {(!assignment.rubric?.categories?.length) && (
+      ) : (
         <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">
-            Marks <span className="text-gray-400 font-normal">/ {maxGrade}</span>
-          </label>
-          <input
-            type="number"
-            min="0"
-            max={maxGrade}
-            value={rubricScores[0] || ''}
+          <label className="block text-sm font-semibold text-gray-700 mb-2">Marks <span className="text-gray-400 font-normal">/ {maxGrade}</span></label>
+          <input type="number" min="0" max={maxGrade} value={rubricScores[0] || ''}
             onChange={e => setRubricScores({ 0: Math.min(parseInt(e.target.value) || 0, maxGrade) })}
-            className="w-32 px-4 py-2 border border-gray-300 rounded-lg text-center font-bold text-lg focus:ring-2 focus:ring-blue-400 focus:outline-none"
-            placeholder="0"
-          />
+            className="w-32 px-4 py-2 border border-gray-300 rounded-lg text-center font-bold text-lg focus:ring-2 focus:ring-blue-400 focus:outline-none" placeholder="0" />
         </div>
       )}
 
-      {/* Feedback */}
       <div>
-        <label className="block text-sm font-semibold text-gray-700 mb-2">
-          Feedback <span className="text-gray-400 font-normal">(optional)</span>
-        </label>
-        <textarea
-          value={feedback}
-          onChange={e => setFeedback(e.target.value)}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:outline-none resize-none"
-          rows={3}
-          placeholder="Write feedback for the student..."
-        />
+        <label className="block text-sm font-semibold text-gray-700 mb-2">Feedback <span className="text-gray-400 font-normal">(optional)</span></label>
+        <textarea value={feedback} onChange={e => setFeedback(e.target.value)}
+          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:outline-none resize-none" rows={3}
+          placeholder="Write feedback for the student..." />
       </div>
 
-      <button
-        onClick={handleSubmit}
-        disabled={submitting}
+      <button onClick={handleSubmit} disabled={submitting}
         className="w-full py-3 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg font-bold transition flex items-center justify-center gap-2">
-        {submitting
-          ? <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" /> Submitting...</>
-          : <><CheckCircle size={18} /> Submit Grade ({totalGrade}/{maxGrade})</>
-        }
+        {submitting ? <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" /> Submitting...</> : <><CheckCircle size={18} /> Submit Grade ({totalGrade}/{maxGrade})</>}
       </button>
     </div>
   );
 }
 
-// ==================== ASSIGNMENT CREATION & GRADING COMPONENT ====================
+// ==================== ASSIGNMENT MANAGEMENT COMPONENT ====================
 function AssignmentManagement() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showGradingModal, setShowGradingModal] = useState(false);
@@ -1124,31 +994,16 @@ function AssignmentManagement() {
   const [editingId, setEditingId] = useState(null);
 
   const [assignmentForm, setAssignmentForm] = useState({
-    title: '',
-    course: '',
-    dueDate: '',
-    totalMarks: '',
-    description: '',
+    title: '', course: '', dueDate: '', totalMarks: '', description: '',
     rubricCategories: [{ name: '', points: '' }]
   });
 
-  const [gradingForm, setGradingForm] = useState({
-    studentId: null,
-    grades: {},
-    feedback: '',
-    totalGrade: 0
-  });
-
-  useEffect(() => {
-    fetchAssignments();
-    fetchCourses();
-  }, []);
+  useEffect(() => { fetchAssignments(); fetchCourses(); }, []);
 
   const fetchAssignments = async () => {
     try {
       const response = await api.get('/faculty/assignments');
       if (response.data.success) {
-        // Normalize field names from backend
         const normalized = (response.data.assignments || []).map(a => ({
           ...a,
           total_marks: a.total_marks ?? a.totalMarks ?? a.max_marks ?? a.maxMarks ?? 0,
@@ -1160,44 +1015,25 @@ function AssignmentManagement() {
       }
     } catch (error) {
       if (error?.response?.status !== 404) console.error('Error fetching assignments:', error);
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   const fetchCourses = async () => {
     try {
       const response = await api.get('/faculty/courses');
-      if (response.data.success) {
-        setCourses(response.data.courses || []);
-      }
-    } catch (error) {
-      console.error('Error fetching courses:', error);
-    }
+      if (response.data.success) setCourses(response.data.courses || []);
+    } catch (error) { console.error('Error fetching courses:', error); }
   };
 
   const fetchSubmissions = async (assignmentId) => {
     try {
       const response = await api.get(`/faculty/assignments/${assignmentId}/submissions`);
-      if (response.data.success) {
-        setSubmissions(response.data.submissions || []);
-      }
-    } catch (error) {
-      console.error('Error fetching submissions:', error);
-    }
+      if (response.data.success) setSubmissions(response.data.submissions || []);
+    } catch (error) { console.error('Error fetching submissions:', error); }
   };
 
-  const addRubricCategory = () => {
-    setAssignmentForm({
-      ...assignmentForm,
-      rubricCategories: [...assignmentForm.rubricCategories, { name: '', points: '' }]
-    });
-  };
-
-  const removeRubricCategory = (index) => {
-    const newCategories = assignmentForm.rubricCategories.filter((_, i) => i !== index);
-    setAssignmentForm({ ...assignmentForm, rubricCategories: newCategories });
-  };
+  const addRubricCategory = () => setAssignmentForm({ ...assignmentForm, rubricCategories: [...assignmentForm.rubricCategories, { name: '', points: '' }] });
+  const removeRubricCategory = (index) => setAssignmentForm({ ...assignmentForm, rubricCategories: assignmentForm.rubricCategories.filter((_, i) => i !== index) });
 
   const handleCreateAssignment = async () => {
     if (!assignmentForm.title || !assignmentForm.course) return;
@@ -1205,429 +1041,244 @@ function AssignmentManagement() {
       const response = await api.post('/faculty/assignments', {
         ...assignmentForm,
         totalMarks: parseInt(assignmentForm.totalMarks),
-        rubric: {
-          categories: assignmentForm.rubricCategories.map(cat => ({
-            name: cat.name,
-            points: parseInt(cat.points)
-          }))
-        }
+        rubric: { categories: assignmentForm.rubricCategories.map(cat => ({ name: cat.name, points: parseInt(cat.points) })) }
       });
       if (response.data.success) {
         setAssignments([...assignments, response.data.assignment]);
         setShowCreateModal(false);
-        setAssignmentForm({
-          title: '', course: '', dueDate: '', totalMarks: '', description: '',
-          rubricCategories: [{ name: '', points: '' }]
-        });
+        setEditingId(null);
+        setAssignmentForm({ title: '', course: '', dueDate: '', totalMarks: '', description: '', rubricCategories: [{ name: '', points: '' }] });
       }
-    } catch (error) {
-      console.error('Error creating assignment:', error);
-      alert('Failed to create assignment.');
-    }
+    } catch (error) { console.error('Error creating assignment:', error); alert('Failed to create assignment.'); }
   };
 
-  const openGradingModal = (assignment) => {
-    setSelectedAssignment(assignment);
-    fetchSubmissions(assignment.id);
-    setShowGradingModal(true);
-  };
-
-  const openAllSubmissionsModal = (assignment) => {
-    setSelectedAssignment(assignment);
-    fetchSubmissions(assignment.id);
-    setShowAllSubmissionsModal(true);
-  };
-
-  const openFileViewer = (url, name) => {
-    setViewingFile({ url, name });
-    setShowFileModal(true);
-  };
+  const openGradingModal = (assignment) => { setSelectedAssignment(assignment); fetchSubmissions(assignment.id); setShowGradingModal(true); };
+  const openAllSubmissionsModal = (assignment) => { setSelectedAssignment(assignment); fetchSubmissions(assignment.id); setShowAllSubmissionsModal(true); };
+  const openFileViewer = (url, name) => { setViewingFile({ url, name }); setShowFileModal(true); };
 
   const handleDeleteAssignment = async (assignmentId) => {
     if (!window.confirm('Are you sure you want to delete this assignment?')) return;
-    try {
-      await api.delete(`/faculty/assignments/${assignmentId}`);
-      setAssignments(assignments.filter(a => a.id !== assignmentId));
-    } catch (error) {
-      console.error('Error deleting assignment:', error);
-      alert('Failed to delete assignment.');
-    }
+    try { await api.delete(`/faculty/assignments/${assignmentId}`); setAssignments(assignments.filter(a => a.id !== assignmentId)); }
+    catch (error) { console.error('Error deleting assignment:', error); alert('Failed to delete assignment.'); }
   };
 
   const handleGradeSubmission = async (submission, rubricScores, feedback) => {
-    // Calculate total from rubric scores
     const totalGrade = Object.values(rubricScores).reduce((sum, v) => sum + (parseInt(v) || 0), 0);
-    if (totalGrade === 0 && !feedback.trim()) {
-      alert('Please enter at least a grade or feedback before submitting.');
-      return;
-    }
+    if (totalGrade === 0 && !feedback.trim()) { alert('Please enter at least a grade or feedback before submitting.'); return; }
     try {
       await api.post(`/faculty/assignments/${selectedAssignment.id}/grade`, {
         submission_id: submission.id,
         student_id: submission.student_id || submission.studentId,
         studentId: submission.student_id || submission.studentId,
         grade: totalGrade,
-        max_marks: (selectedAssignment.rubric?.categories || [])
-        .reduce((s, c) => s + (parseInt(c.points) || 0), 0)
-       || selectedAssignment.total_marks || 100,
-       feedback: feedback.trim(),
+        max_marks: (selectedAssignment.rubric?.categories || []).reduce((s, c) => s + (parseInt(c.points) || 0), 0) || selectedAssignment.total_marks || 100,
+        feedback: feedback.trim(),
         rubric_scores: rubricScores,
       });
-
-      const updatedSubmissions = submissions.map(s =>
-        s.id === submission.id
-          ? { ...s, grade: totalGrade, feedback: feedback.trim(), status: 'graded' }
-          : s
-      );
+      const updatedSubmissions = submissions.map(s => s.id === submission.id ? { ...s, grade: totalGrade, feedback: feedback.trim(), status: 'graded' } : s);
       setSubmissions(updatedSubmissions);
-
-      const newGradedCount = updatedSubmissions.filter(
-        s => s.grade !== null && s.grade !== undefined
-      ).length;
-
-      setAssignments(prev =>
-        prev.map(a => a.id === selectedAssignment.id
-          ? { ...a, graded: newGradedCount }
-          : a)
-      );
-
+      const newGradedCount = updatedSubmissions.filter(s => s.grade !== null && s.grade !== undefined).length;
+      setAssignments(prev => prev.map(a => a.id === selectedAssignment.id ? { ...a, graded: newGradedCount } : a));
       setTimeout(() => fetchAssignments(), 1000);
-    } catch (error) {
-      console.error('Error grading submission:', error);
-      alert(error.response?.data?.message || 'Failed to submit grade. Please try again.');
-    }
+    } catch (error) { console.error('Error grading submission:', error); alert(error.response?.data?.message || 'Failed to submit grade.'); }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent"></div>
-      </div>
-    );
-  }
+  if (loading) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent"></div></div>;
 
   return (
     <>
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-primary">Assignment Management</h2>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg hover:bg-blue-700 transition"
-        >
-          <Plus className="h-4 w-4" />
-          Create Assignment
-        </button>
-      </div>
-
-      {assignments.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-xl shadow-md">
-          <ClipboardList className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-600">No assignments found.</p>
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <h2 className="text-2xl font-bold text-primary">Assignment Management</h2>
+          <button onClick={() => { setShowCreateModal(true); setEditingId(null); setAssignmentForm({ title: '', course: '', dueDate: '', totalMarks: '', description: '', rubricCategories: [{ name: '', points: '' }] }); }}
+            className="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg hover:bg-blue-700 transition">
+            <Plus className="h-4 w-4" /> Create Assignment
+          </button>
         </div>
-      ) : (
-        <div className="space-y-4">
-          {assignments.map((assignment) => (
-            <div key={assignment.id} className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition">
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <h3 className="text-xl font-bold text-gray-800">{assignment.title}</h3>
-                  <p className="text-sm text-gray-500">{assignment.course}</p>
-                </div>
-                <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-semibold">
-                  {assignment.status}
-                </span>
-              </div>
-              
-              <div className="grid md:grid-cols-4 gap-4 mb-4">
-                <div className="flex items-center text-gray-600">
-                  <Calendar className="h-4 w-4 mr-2" />
-                  <span className="text-sm">Due: {assignment.dueDate}</span>
-                </div>
-                <div className="flex items-center text-gray-600">
-                  <Star className="h-4 w-4 mr-2" />
-                  <span className="text-sm">{assignment.total_marks ?? assignment.totalMarks ?? 0} marks</span>
-                </div>
-                <div className="flex items-center text-gray-600">
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  <span className="text-sm">{assignment.submissions}/{assignment.totalStudents} submitted</span>
-                </div>
-                <div className="flex items-center text-gray-600">
-                  <GraduationCap className="h-4 w-4 mr-2" />
-                  <span className="text-sm">{assignment.graded}/{assignment.submissions} graded</span>
-                </div>
-              </div>
 
-              <div className="mb-4">
-                <div className="flex justify-between text-xs text-gray-600 mb-1">
-                  <span>Submission Progress</span>
-                  <span>{assignment.totalStudents > 0 ? Math.round((assignment.submissions / assignment.totalStudents) * 100) : 0}%</span>
+        {assignments.length === 0 ? (
+          <div className="text-center py-16 bg-white rounded-xl shadow-md">
+            <ClipboardList className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-600">No assignments found.</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {assignments.map((assignment) => (
+              <div key={assignment.id} className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition">
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-800">{assignment.title}</h3>
+                    <p className="text-sm text-gray-500">{assignment.course}</p>
+                  </div>
+                  <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-semibold">{assignment.status}</span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div 
-                    className="bg-green-500 h-2 rounded-full" 
-                    style={{ width: assignment.totalStudents > 0 ? `${(assignment.submissions / assignment.totalStudents) * 100}%` : '0%' }}
-                  />
+                <div className="grid md:grid-cols-4 gap-4 mb-4">
+                  <div className="flex items-center text-gray-600"><Calendar className="h-4 w-4 mr-2" /><span className="text-sm">Due: {assignment.dueDate}</span></div>
+                  <div className="flex items-center text-gray-600"><Star className="h-4 w-4 mr-2" /><span className="text-sm">{assignment.total_marks ?? 0} marks</span></div>
+                  <div className="flex items-center text-gray-600"><CheckCircle className="h-4 w-4 mr-2" /><span className="text-sm">{assignment.submissions}/{assignment.totalStudents} submitted</span></div>
+                  <div className="flex items-center text-gray-600"><GraduationCap className="h-4 w-4 mr-2" /><span className="text-sm">{assignment.graded}/{assignment.submissions} graded</span></div>
                 </div>
-              </div>
-
-              {assignment.rubric && (
-                <div className="bg-gray-50 p-4 rounded-lg mb-4">
-                  <h4 className="text-sm font-semibold text-gray-700 mb-2">Grading Rubric:</h4>
-                  <div className="flex flex-wrap gap-2">
-                    {assignment.rubric.categories.map((cat, idx) => (
-                      <span key={idx} className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">
-                        {cat.name}: {cat.points} pts
-                      </span>
-                    ))}
+                <div className="mb-4">
+                  <div className="flex justify-between text-xs text-gray-600 mb-1">
+                    <span>Submission Progress</span>
+                    <span>{assignment.totalStudents > 0 ? Math.round((assignment.submissions / assignment.totalStudents) * 100) : 0}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="bg-green-500 h-2 rounded-full" style={{ width: assignment.totalStudents > 0 ? `${(assignment.submissions / assignment.totalStudents) * 100}%` : '0%' }} />
                   </div>
                 </div>
-              )}
-
-              <div className="flex gap-2">
-                <button
-                  onClick={() => openGradingModal(assignment)}
-                  className="px-4 py-2 bg-accent text-white rounded-lg hover:bg-blue-700 transition text-sm font-semibold flex items-center gap-2"
-                >
-                  <GraduationCap size={16} />
-                  Grade Submissions ({assignment.submissions - assignment.graded} pending)
-                </button>
-                <button onClick={() => openAllSubmissionsModal(assignment)} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm font-semibold flex items-center gap-2">
-                  <Eye size={16} />
-                  View All Submissions
-                </button>
-                <button 
-                  onClick={() => {
-                  setAssignmentForm({
-                  title: assignment.title,
-                  course: assignment.course_id || assignment.course,
-                  dueDate: assignment.due_date || assignment.dueDate,
-                  totalMarks: assignment.total_marks || assignment.totalMarks,
-                  description: assignment.description || '',
-                  rubricCategories: assignment.rubric?.categories || [{ name: '', points: '' }]
-                });
-                setEditingId(assignment.id);
-                setShowCreateModal(true);
-              }}
-              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition text-sm font-semibold"
-              >
-                <Edit2 className="h-4 w-4 inline mr-1" />
-                  Edit
-            </button>
-             <button
-                  onClick={() => handleDeleteAssignment(assignment.id)}
-                  className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition text-sm font-semibold flex items-center gap-1"
-                >
-                  <Trash2 size={16} />
-                  Delete
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Create Assignment Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
-          <div className="bg-white rounded-xl p-8 max-w-3xl w-full mx-4 my-8 shadow-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-2xl font-bold text-primary">Create New Assignment</h3>
-              <button onClick={() => setShowCreateModal(false)} className="text-gray-400 hover:text-gray-600">
-                <X className="h-6 w-6" />
-              </button>
-            </div>
-
-            <div className="space-y-6">
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Assignment Title *</label>
-                  <input
-                    type="text"
-                    value={assignmentForm.title}
-                    onChange={(e) => setAssignmentForm({...assignmentForm, title: e.target.value})}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent"
-                    placeholder="e.g., Project: Build a Web Application"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Course *</label>
-                  <select
-                    value={assignmentForm.course}
-                    onChange={(e) => setAssignmentForm({...assignmentForm, course: e.target.value})}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent"
-                  >
-                    <option value="">Select Course</option>
-                    {courses.map(course => (
-                      <option key={course.id} value={course.id}>{course.code} - {course.course_name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Due Date *</label>
-                  <input
-                    type="date"
-                    value={assignmentForm.dueDate}
-                    onChange={(e) => setAssignmentForm({...assignmentForm, dueDate: e.target.value})}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent"
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Description *</label>
-                  <textarea
-                    value={assignmentForm.description}
-                    onChange={(e) => setAssignmentForm({...assignmentForm, description: e.target.value})}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent"
-                    rows="4"
-                    placeholder="Assignment description and requirements..."
-                  />
-                </div>
-              </div>
-
-              <div className="border-t pt-6">
-                <div className="flex justify-between items-center mb-4">
-                  <h4 className="text-lg font-bold text-gray-800">Grading Rubric</h4>
-                  <button
-                    onClick={addRubricCategory}
-                    className="px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm flex items-center gap-1"
-                  >
-                    <Plus size={16} />
-                    Add Category
+                {assignment.rubric && (
+                  <div className="bg-gray-50 p-4 rounded-lg mb-4">
+                    <h4 className="text-sm font-semibold text-gray-700 mb-2">Grading Rubric:</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {assignment.rubric.categories.map((cat, idx) => (
+                        <span key={idx} className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">{cat.name}: {cat.points} pts</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div className="flex gap-2 flex-wrap">
+                  <button onClick={() => openGradingModal(assignment)} className="px-4 py-2 bg-accent text-white rounded-lg hover:bg-blue-700 transition text-sm font-semibold flex items-center gap-2">
+                    <GraduationCap size={16} /> Grade Submissions ({assignment.submissions - assignment.graded} pending)
+                  </button>
+                  <button onClick={() => openAllSubmissionsModal(assignment)} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm font-semibold flex items-center gap-2">
+                    <Eye size={16} /> View All Submissions
+                  </button>
+                  <button onClick={() => {
+                    setAssignmentForm({ title: assignment.title, course: assignment.course_id || assignment.course, dueDate: assignment.due_date || assignment.dueDate, totalMarks: assignment.total_marks || assignment.totalMarks, description: assignment.description || '', rubricCategories: assignment.rubric?.categories || [{ name: '', points: '' }] });
+                    setEditingId(assignment.id);
+                    setShowCreateModal(true);
+                  }} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition text-sm font-semibold">
+                    <Edit2 className="h-4 w-4 inline mr-1" /> Edit
+                  </button>
+                  <button onClick={() => handleDeleteAssignment(assignment.id)} className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition text-sm font-semibold flex items-center gap-1">
+                    <Trash2 size={16} /> Delete
                   </button>
                 </div>
+              </div>
+            ))}
+          </div>
+        )}
 
-                <div className="space-y-3">
-                  {assignmentForm.rubricCategories.map((category, index) => (
-                    <div key={index} className="flex gap-3 items-center">
-                      <input
-                        type="text"
-                        value={category.name}
-                        onChange={(e) => {
-                          const newCategories = [...assignmentForm.rubricCategories];
-                          newCategories[index].name = e.target.value;
-                          setAssignmentForm({...assignmentForm, rubricCategories: newCategories});
-                        }}
-                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent"
-                        placeholder="Category name (e.g., Code Quality)"
-                      />
-                      <input
-                        type="number"
-                        value={category.points}
-                        onChange={(e) => {
-                          const newCategories = [...assignmentForm.rubricCategories];
-                          newCategories[index].points = e.target.value;
-                          setAssignmentForm({...assignmentForm, rubricCategories: newCategories});
-                        }}
-                        className="w-24 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent"
-                        placeholder="Points"
-                      />
-                      {assignmentForm.rubricCategories.length > 1 && (
-                        <button
-                          onClick={() => removeRubricCategory(index)}
-                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      )}
-                    </div>
+        {/* Create/Edit Assignment Modal */}
+        {showCreateModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
+            <div className="bg-white rounded-xl p-8 max-w-3xl w-full mx-4 my-8 shadow-2xl max-h-[90vh] overflow-y-auto">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-2xl font-bold text-primary">{editingId ? 'Edit Assignment' : 'Create New Assignment'}</h3>
+                <button onClick={() => { setShowCreateModal(false); setEditingId(null); }} className="text-gray-400 hover:text-gray-600"><X className="h-6 w-6" /></button>
+              </div>
+              <div className="space-y-6">
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Assignment Title *</label>
+                    <input type="text" value={assignmentForm.title} onChange={(e) => setAssignmentForm({ ...assignmentForm, title: e.target.value })}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent" placeholder="e.g., Project: Build a Web Application" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Course *</label>
+                    <select value={assignmentForm.course} onChange={(e) => setAssignmentForm({ ...assignmentForm, course: e.target.value })}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent">
+                      <option value="">Select Course</option>
+                      {courses.map(course => <option key={course.id} value={course.id}>{course.code} - {course.course_name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Due Date *</label>
+                    <input type="date" value={assignmentForm.dueDate} onChange={(e) => setAssignmentForm({ ...assignmentForm, dueDate: e.target.value })}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent" />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Description *</label>
+                    <textarea value={assignmentForm.description} onChange={(e) => setAssignmentForm({ ...assignmentForm, description: e.target.value })}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent" rows="4" placeholder="Assignment description and requirements..." />
+                  </div>
+                </div>
+                <div className="border-t pt-6">
+                  <div className="flex justify-between items-center mb-4">
+                    <h4 className="text-lg font-bold text-gray-800">Grading Rubric</h4>
+                    <button onClick={addRubricCategory} className="px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm flex items-center gap-1">
+                      <Plus size={16} /> Add Category
+                    </button>
+                  </div>
+                  <div className="space-y-3">
+                    {assignmentForm.rubricCategories.map((category, index) => (
+                      <div key={index} className="flex gap-3 items-center">
+                        <input type="text" value={category.name}
+                          onChange={(e) => { const newCategories = [...assignmentForm.rubricCategories]; newCategories[index].name = e.target.value; setAssignmentForm({ ...assignmentForm, rubricCategories: newCategories }); }}
+                          className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent" placeholder="Category name (e.g., Code Quality)" />
+                        <input type="number" value={category.points}
+                          onChange={(e) => { const newCategories = [...assignmentForm.rubricCategories]; newCategories[index].points = e.target.value; setAssignmentForm({ ...assignmentForm, rubricCategories: newCategories }); }}
+                          className="w-24 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent" placeholder="Points" />
+                        {assignmentForm.rubricCategories.length > 1 && (
+                          <button onClick={() => removeRubricCategory(index)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"><Trash2 size={18} /></button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                    <p className="text-sm text-blue-800"><strong>Total Points:</strong> {assignmentForm.rubricCategories.reduce((sum, cat) => sum + (parseInt(cat.points) || 0), 0)}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-3 mt-6">
+                <button onClick={handleCreateAssignment} className="flex-1 px-4 py-3 bg-accent text-white rounded-lg hover:bg-blue-700 transition font-semibold">
+                  {editingId ? 'Update Assignment' : 'Create Assignment'}
+                </button>
+                <button onClick={() => { setShowCreateModal(false); setEditingId(null); }} className="flex-1 px-4 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition font-semibold">Cancel</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Grading Modal */}
+        {showGradingModal && selectedAssignment && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
+            <div className="bg-white rounded-xl p-8 max-w-4xl w-full mx-4 my-8 shadow-2xl max-h-[90vh] overflow-y-auto">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-2xl font-bold text-primary">Grade Submissions — {selectedAssignment.title}</h3>
+                <button onClick={() => setShowGradingModal(false)} className="text-gray-400 hover:text-gray-600"><X className="h-6 w-6" /></button>
+              </div>
+              {submissions.filter(s => s.grade === null || s.grade === undefined).length === 0 ? (
+                <div className="text-center py-12">
+                  <CheckCircle className="h-16 w-16 text-green-300 mx-auto mb-3" />
+                  <p className="text-gray-500 font-semibold">All submissions have been graded!</p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {submissions.filter(s => s.grade === null || s.grade === undefined).map((submission) => (
+                    <GradeSubmissionCard key={submission.id} submission={submission} assignment={selectedAssignment} onGrade={handleGradeSubmission} />
                   ))}
                 </div>
-
-                <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                  <p className="text-sm text-blue-800">
-                    <strong>Total Points:</strong> {assignmentForm.rubricCategories.reduce((sum, cat) => sum + (parseInt(cat.points) || 0), 0)}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={handleCreateAssignment}
-                className="flex-1 px-4 py-3 bg-accent text-white rounded-lg hover:bg-blue-700 transition font-semibold"
-              >
-                Create Assignment
-              </button>
-              <button
-                onClick={() => setShowCreateModal(false)}
-                className="flex-1 px-4 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition font-semibold"
-              >
-                Cancel
-              </button>
+              )}
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* Grading Modal */}
-      {showGradingModal && selectedAssignment && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
-          <div className="bg-white rounded-xl p-8 max-w-4xl w-full mx-4 my-8 shadow-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-2xl font-bold text-primary">Grade Submissions — {selectedAssignment.title}</h3>
-              <button onClick={() => setShowGradingModal(false)} className="text-gray-400 hover:text-gray-600">
-                <X className="h-6 w-6" />
-              </button>
-            </div>
-
-            {submissions.filter(s => s.grade === null || s.grade === undefined).length === 0 ? (
-              <div className="text-center py-12">
-                <CheckCircle className="h-16 w-16 text-green-300 mx-auto mb-3" />
-                <p className="text-gray-500 font-semibold">All submissions have been graded!</p>
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {submissions.filter(s => s.grade === null || s.grade === undefined).map((submission) => (
-                  <GradeSubmissionCard
-                    key={submission.id}
-                    submission={submission}
-                    assignment={selectedAssignment}
-                    onGrade={handleGradeSubmission}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-
-      {/* ── VIEW ALL SUBMISSIONS MODAL ── */}
+      {/* All Submissions Modal */}
       {showAllSubmissionsModal && selectedAssignment && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={e => { if (e.target === e.currentTarget) setShowAllSubmissionsModal(false); }}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col" style={{ maxHeight: '92vh' }}>
-
-            {/* Header */}
             <div className="flex items-center justify-between px-7 py-5 border-b flex-shrink-0">
               <div>
                 <h3 className="text-xl font-bold text-gray-900">All Submissions</h3>
                 <p className="text-sm text-gray-500 mt-0.5">{selectedAssignment.title} · {selectedAssignment.course}</p>
               </div>
-              <button onClick={() => setShowAllSubmissionsModal(false)} className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition">
-                <X size={18} />
-              </button>
+              <button onClick={() => setShowAllSubmissionsModal(false)} className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition"><X size={18} /></button>
             </div>
-
-            {/* Summary bar */}
             <div className="grid grid-cols-3 gap-4 px-7 py-4 bg-gray-50 border-b flex-shrink-0">
-              <div className="bg-blue-50 rounded-xl p-4 text-center">
-                <p className="text-2xl font-bold text-blue-700">{submissions.length}</p>
-                <p className="text-xs text-blue-500 font-semibold mt-1">Total Submitted</p>
-              </div>
-              <div className="bg-green-50 rounded-xl p-4 text-center">
-                <p className="text-2xl font-bold text-green-700">{submissions.filter(s => s.grade !== null && s.grade !== undefined).length}</p>
-                <p className="text-xs text-green-500 font-semibold mt-1">Graded</p>
-              </div>
-              <div className="bg-yellow-50 rounded-xl p-4 text-center">
-                <p className="text-2xl font-bold text-yellow-700">{submissions.filter(s => s.grade === null || s.grade === undefined).length}</p>
-                <p className="text-xs text-yellow-500 font-semibold mt-1">Pending</p>
-              </div>
+              {[
+                { count: submissions.length, label: 'Total Submitted', color: 'blue' },
+                { count: submissions.filter(s => s.grade !== null && s.grade !== undefined).length, label: 'Graded', color: 'green' },
+                { count: submissions.filter(s => s.grade === null || s.grade === undefined).length, label: 'Pending', color: 'yellow' },
+              ].map(({ count, label, color }) => (
+                <div key={label} className={`bg-${color}-50 rounded-xl p-4 text-center`}>
+                  <p className={`text-2xl font-bold text-${color}-700`}>{count}</p>
+                  <p className={`text-xs text-${color}-500 font-semibold mt-1`}>{label}</p>
+                </div>
+              ))}
             </div>
-
-            {/* Submissions list */}
             <div className="flex-1 overflow-y-auto px-7 py-5 space-y-4">
               {submissions.length === 0 ? (
                 <div className="text-center py-16">
@@ -1636,17 +1287,15 @@ function AssignmentManagement() {
                 </div>
               ) : submissions.map((sub, idx) => {
                 const isGraded = sub.grade !== null && sub.grade !== undefined;
-                const fileUrl  = sub.file_url || sub.file_path || sub.fileUrl || sub.submission_file;
-                const rawName  = sub.file_name || sub.fileName || (fileUrl ? decodeURIComponent(fileUrl.split('/').pop().split('?')[0]) : '');
-                const isPdf    = /\.pdf$/i.test(rawName || fileUrl || '');
-                const isDoc    = /\.(doc|docx)$/i.test(rawName || fileUrl || '');
-                const isImg    = /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(rawName || fileUrl || '');
+                const fileUrl = sub.file_url || sub.file_path || sub.fileUrl || sub.submission_file;
+                const rawName = sub.file_name || sub.fileName || (fileUrl ? decodeURIComponent(fileUrl.split('/').pop().split('?')[0]) : '');
+                const isPdf = /\.pdf$/i.test(rawName || fileUrl || '');
+                const isDoc = /\.(doc|docx)$/i.test(rawName || fileUrl || '');
+                const isImg = /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(rawName || fileUrl || '');
                 const fileIcon = isPdf ? '📄' : isDoc ? '📝' : isImg ? '🖼️' : '📎';
 
                 return (
                   <div key={sub.id || idx} className={`border rounded-xl p-5 transition ${isGraded ? 'border-green-200 bg-green-50/30' : 'border-gray-200 bg-white hover:border-blue-300'}`}>
-
-                    {/* Student row */}
                     <div className="flex items-center justify-between flex-wrap gap-3 mb-3">
                       <div className="flex items-center gap-3">
                         <div className="w-11 h-11 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-bold text-base flex-shrink-0">
@@ -1662,25 +1311,18 @@ function AssignmentManagement() {
                           {isGraded ? `✅ ${sub.grade}/${selectedAssignment.totalMarks || selectedAssignment.total_marks} pts` : '⏳ Pending Grade'}
                         </span>
                         <span className="text-xs text-gray-400">
-                          {sub.submitted_at || sub.submittedDate
-                            ? new Date(sub.submitted_at || sub.submittedDate).toLocaleString('en-IN', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' })
-                            : '—'}
+                          {sub.submitted_at || sub.submittedDate ? new Date(sub.submitted_at || sub.submittedDate).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
                         </span>
                       </div>
                     </div>
-
-                    {/* Notes */}
                     {sub.notes && (
                       <div className="bg-gray-50 border-l-4 border-gray-300 rounded-lg p-3 mb-3">
                         <p className="text-xs font-semibold text-gray-500 mb-1">Student Notes</p>
                         <p className="text-sm text-gray-700">{sub.notes}</p>
                       </div>
                     )}
-
-                    {/* File section */}
                     {fileUrl ? (
                       <div className="mt-1">
-                        {/* File info row */}
                         <div className="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-xl p-3 mb-3">
                           <span className="text-2xl">{fileIcon}</span>
                           <div className="flex-1 min-w-0">
@@ -1698,8 +1340,6 @@ function AssignmentManagement() {
                             </a>
                           </div>
                         </div>
-
-                        {/* Inline image preview */}
                         {isImg && (
                           <div className="rounded-xl overflow-hidden border border-gray-200 mb-3 cursor-pointer" onClick={() => openFileViewer(fileUrl, rawName || 'image')}>
                             <img src={fileUrl} alt={rawName} className="w-full max-h-48 object-contain bg-gray-50" />
@@ -1709,16 +1349,12 @@ function AssignmentManagement() {
                     ) : (
                       <p className="text-xs text-gray-400 italic mb-3">No file uploaded — notes only.</p>
                     )}
-
-                    {/* Faculty feedback (if graded) */}
                     {isGraded && sub.feedback && (
                       <div className="bg-green-50 border-l-4 border-green-400 rounded-lg p-3 mb-3">
                         <p className="text-xs font-semibold text-green-700 mb-1">Your Feedback</p>
                         <p className="text-sm text-gray-700">{sub.feedback}</p>
                       </div>
                     )}
-
-                    {/* Grade button if pending */}
                     {!isGraded && (
                       <button onClick={() => { setShowAllSubmissionsModal(false); openGradingModal(selectedAssignment); }}
                         className="mt-1 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition flex items-center gap-2">
@@ -1729,23 +1365,17 @@ function AssignmentManagement() {
                 );
               })}
             </div>
-
             <div className="px-7 py-4 border-t flex-shrink-0">
-              <button onClick={() => setShowAllSubmissionsModal(false)}
-                className="w-full py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-semibold transition">
-                Close
-              </button>
+              <button onClick={() => setShowAllSubmissionsModal(false)} className="w-full py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-semibold transition">Close</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ── FILE VIEWER MODAL ── */}
+      {/* File Viewer Modal */}
       {showFileModal && viewingFile && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[60] p-4" onClick={e => { if (e.target === e.currentTarget) setShowFileModal(false); }}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl flex flex-col" style={{ height: '92vh' }}>
-
-            {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0">
               <div className="flex items-center gap-3 min-w-0">
                 <span className="text-2xl flex-shrink-0">
@@ -1758,21 +1388,14 @@ function AssignmentManagement() {
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition flex items-center gap-2">
                   <Download size={14} /> Download
                 </a>
-                <button onClick={() => setShowFileModal(false)}
-                  className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition">
-                  <X size={18} />
-                </button>
+                <button onClick={() => setShowFileModal(false)} className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition"><X size={18} /></button>
               </div>
             </div>
-
-            {/* Viewer */}
             <div className="flex-1 overflow-hidden bg-gray-100 rounded-b-2xl">
               {/\.pdf$/i.test(viewingFile.name || viewingFile.url) ? (
                 <iframe src={viewingFile.url} title="PDF" className="w-full h-full border-0" />
               ) : /\.(doc|docx)$/i.test(viewingFile.name || viewingFile.url) ? (
-                <iframe
-                  src={`https://docs.google.com/gview?url=${encodeURIComponent(viewingFile.url)}&embedded=true`}
-                  title="Document" className="w-full h-full border-0" />
+                <iframe src={`https://docs.google.com/gview?url=${encodeURIComponent(viewingFile.url)}&embedded=true`} title="Document" className="w-full h-full border-0" />
               ) : /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(viewingFile.name || viewingFile.url) ? (
                 <div className="flex items-center justify-center h-full p-6">
                   <img src={viewingFile.url} alt={viewingFile.name} className="max-w-full max-h-full object-contain rounded-xl shadow-lg" />
@@ -1806,76 +1429,49 @@ function QuizExamManagement() {
   const [results, setResults] = useState([]);
   const [loadingResults, setLoadingResults] = useState(false);
 
-  const [quizForm, setQuizForm] = useState({
-    course_id: '', title: '', description: '',
-    time_limit_minutes: 30, pass_percentage: 60
-  });
+  const [quizForm, setQuizForm] = useState({ course_id: '', title: '', description: '', time_limit_minutes: 30, pass_percentage: 60 });
+  const [questions, setQuestions] = useState([{ question_text: '', option_a: '', option_b: '', option_c: '', option_d: '', correct_option: 'a', marks: 1 }]);
 
-  const [questions, setQuestions] = useState([
-    { question_text: '', option_a: '', option_b: '', option_c: '',
-      option_d: '', correct_option: 'a', marks: 1 }
-  ]);
-
-  useEffect(() => {
-    fetchQuizzes();
-    fetchCourses();
-  }, []);
+  useEffect(() => { fetchQuizzes(); fetchCourses(); }, []);
 
   const fetchQuizzes = async () => {
-    try {
-      const res = await api.get('/faculty/quizzes');
-      if (res.data.success) setQuizzes(res.data.quizzes || []);
-    } catch (e) { console.error(e); }
+    try { const res = await api.get('/faculty/quizzes'); if (res.data.success) setQuizzes(res.data.quizzes || []); }
+    catch (e) { console.error(e); }
     finally { setLoading(false); }
   };
 
   const fetchCourses = async () => {
-    try {
-      const res = await api.get('/faculty/courses');
-      if (res.data.success) setCourses(res.data.courses || []);
-    } catch (e) { console.error(e); }
+    try { const res = await api.get('/faculty/courses'); if (res.data.success) setCourses(res.data.courses || []); }
+    catch (e) { console.error(e); }
   };
 
   const fetchResults = async (quizId) => {
     setLoadingResults(true);
-    try {
-      const res = await api.get(`/quizzes/${quizId}/results`);
-      if (res.data.success) setResults(res.data.attempts || []);
-    } catch (e) { console.error(e); }
+    try { const res = await api.get(`/quizzes/${quizId}/results`); if (res.data.success) setResults(res.data.attempts || []); }
+    catch (e) { console.error(e); }
     finally { setLoadingResults(false); }
   };
 
   const handleCreateQuiz = async () => {
-    if (!quizForm.course_id || !quizForm.title) {
-      alert('Course and title are required');
-      return;
-    }
+    if (!quizForm.course_id || !quizForm.title) { alert('Course and title are required'); return; }
     setSaving(true);
     try {
       const res = await api.post('/quizzes', quizForm);
-      if (res.data.success) {
-        setSelectedQuiz(res.data.quiz);
-        setView('questions');
-      }
+      if (res.data.success) { setSelectedQuiz(res.data.quiz); setView('questions'); }
     } catch (e) { alert(e.response?.data?.message || 'Error creating quiz'); }
     finally { setSaving(false); }
   };
 
   const handleSaveQuestions = async () => {
     const invalid = questions.some(q => !q.question_text || !q.option_a || !q.option_b);
-    if (invalid) {
-      alert('Each question needs text, Option A and Option B');
-      return;
-    }
+    if (invalid) { alert('Each question needs text, Option A and Option B'); return; }
     setSaving(true);
     try {
       await api.post(`/quizzes/${selectedQuiz.id}/questions`, { questions });
       await fetchQuizzes();
       setView('list');
-      setQuizForm({ course_id: '', title: '', description: '',
-        time_limit_minutes: 30, pass_percentage: 60 });
-      setQuestions([{ question_text: '', option_a: '', option_b: '',
-        option_c: '', option_d: '', correct_option: 'a', marks: 1 }]);
+      setQuizForm({ course_id: '', title: '', description: '', time_limit_minutes: 30, pass_percentage: 60 });
+      setQuestions([{ question_text: '', option_a: '', option_b: '', option_c: '', option_d: '', correct_option: 'a', marks: 1 }]);
       alert('✅ Quiz published! Students can now see it.');
     } catch (e) { alert(e.response?.data?.message || 'Error saving questions'); }
     finally { setSaving(false); }
@@ -1883,43 +1479,21 @@ function QuizExamManagement() {
 
   const handleDeleteQuiz = async (quizId) => {
     if (!window.confirm('Delete this quiz?')) return;
-    try {
-      await api.delete(`/quizzes/${quizId}`);
-      setQuizzes(quizzes.filter(q => q.id !== quizId));
-    } catch (e) { alert('Error deleting quiz'); }
+    try { await api.delete(`/quizzes/${quizId}`); setQuizzes(quizzes.filter(q => q.id !== quizId)); }
+    catch (e) { alert('Error deleting quiz'); }
   };
 
-  const addQuestion = () => {
-    setQuestions([...questions, {
-      question_text: '', option_a: '', option_b: '',
-      option_c: '', option_d: '', correct_option: 'a', marks: 1
-    }]);
-  };
+  const addQuestion = () => setQuestions([...questions, { question_text: '', option_a: '', option_b: '', option_c: '', option_d: '', correct_option: 'a', marks: 1 }]);
+  const removeQuestion = (idx) => { if (questions.length === 1) return; setQuestions(questions.filter((_, i) => i !== idx)); };
+  const updateQuestion = (idx, field, value) => { const updated = [...questions]; updated[idx][field] = value; setQuestions(updated); };
 
-  const removeQuestion = (idx) => {
-    if (questions.length === 1) return;
-    setQuestions(questions.filter((_, i) => i !== idx));
-  };
-
-  const updateQuestion = (idx, field, value) => {
-    const updated = [...questions];
-    updated[idx][field] = value;
-    setQuestions(updated);
-  };
-
-  // ── RESULTS VIEW ──────────────────────────────────────────────
   if (view === 'results' && selectedQuiz) {
     const passCount = results.filter(r => r.passed).length;
-    const avgScore = results.length
-      ? Math.round(results.reduce((s, r) =>
-          s + (r.score / r.total_marks * 100), 0) / results.length)
-      : 0;
-
+    const avgScore = results.length ? Math.round(results.reduce((s, r) => s + (r.score / r.total_marks * 100), 0) / results.length) : 0;
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <button onClick={() => setView('list')}
-            className="text-gray-500 hover:text-gray-800 flex items-center gap-1">
+          <button onClick={() => setView('list')} className="text-gray-500 hover:text-gray-800 flex items-center gap-1">
             <ChevronRight size={20} className="rotate-180" /> Back
           </button>
           <div>
@@ -1927,105 +1501,59 @@ function QuizExamManagement() {
             <p className="text-sm text-gray-500">{selectedQuiz.title}</p>
           </div>
         </div>
-
         <div className="grid md:grid-cols-3 gap-4">
-          <div className="bg-white p-5 rounded-xl shadow-md flex items-center gap-4">
-            <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-              <Users size={22} className="text-blue-600" />
+          {[
+            { icon: Users, color: 'blue', value: results.length, label: 'Total Attempts' },
+            { icon: CheckCircle, color: 'green', value: passCount, label: `Passed (${results.length > 0 ? Math.round(passCount / results.length * 100) : 0}%)` },
+            { icon: TrendingUp, color: 'orange', value: `${avgScore}%`, label: 'Average Score' },
+          ].map(({ icon: Icon, color, value, label }) => (
+            <div key={label} className="bg-white p-5 rounded-xl shadow-md flex items-center gap-4">
+              <div className={`w-12 h-12 bg-${color}-100 rounded-xl flex items-center justify-center`}>
+                <Icon size={22} className={`text-${color}-600`} />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-gray-800">{value}</p>
+                <p className="text-sm text-gray-500">{label}</p>
+              </div>
             </div>
-            <div>
-              <p className="text-2xl font-bold text-gray-800">{results.length}</p>
-              <p className="text-sm text-gray-500">Total Attempts</p>
-            </div>
-          </div>
-          <div className="bg-white p-5 rounded-xl shadow-md flex items-center gap-4">
-            <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
-              <CheckCircle size={22} className="text-green-600" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-gray-800">{passCount}</p>
-              <p className="text-sm text-gray-500">
-                Passed ({results.length > 0
-                  ? Math.round(passCount / results.length * 100) : 0}%)
-              </p>
-            </div>
-          </div>
-          <div className="bg-white p-5 rounded-xl shadow-md flex items-center gap-4">
-            <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center">
-              <TrendingUp size={22} className="text-orange-500" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-gray-800">{avgScore}%</p>
-              <p className="text-sm text-gray-500">Average Score</p>
-            </div>
-          </div>
+          ))}
         </div>
-
         <div className="bg-white rounded-xl shadow-md overflow-hidden">
           {loadingResults ? (
-            <div className="flex items-center justify-center py-16">
-              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-accent" />
-            </div>
+            <div className="flex items-center justify-center py-16"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-accent" /></div>
           ) : results.length === 0 ? (
-            <div className="text-center py-16 text-gray-400">
-              <Users size={48} className="mx-auto mb-3 opacity-30" />
-              <p>No attempts yet</p>
-            </div>
+            <div className="text-center py-16 text-gray-400"><Users size={48} className="mx-auto mb-3 opacity-30" /><p>No attempts yet</p></div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 text-gray-600 font-semibold">
                   <tr>
-                    <th className="px-6 py-3 text-left">#</th>
-                    <th className="px-6 py-3 text-left">Student</th>
-                    <th className="px-6 py-3 text-left">Score</th>
-                    <th className="px-6 py-3 text-left">Percentage</th>
-                    <th className="px-6 py-3 text-left">Time</th>
-                    <th className="px-6 py-3 text-left">Status</th>
+                    {['#', 'Student', 'Score', 'Percentage', 'Time', 'Status'].map(h => <th key={h} className="px-6 py-3 text-left">{h}</th>)}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {results.map((attempt, idx) => {
-                    const pct = Math.round(
-                      (attempt.score / attempt.total_marks) * 100);
-                    const mins = Math.floor(
-                      (attempt.time_taken_seconds || 0) / 60);
+                    const pct = Math.round((attempt.score / attempt.total_marks) * 100);
+                    const mins = Math.floor((attempt.time_taken_seconds || 0) / 60);
                     const secs = (attempt.time_taken_seconds || 0) % 60;
                     return (
                       <tr key={attempt.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 text-gray-400">{idx + 1}</td>
-                        <td className="px-6 py-4">
-                          <p className="font-semibold text-gray-800">
-                            {attempt.Student?.User?.full_name || 'Unknown'}
-                          </p>
-                          <p className="text-gray-400 text-xs">
-                            {attempt.Student?.User?.email}
-                          </p>
-                        </td>
-                        <td className="px-6 py-4 font-semibold">
-                          {attempt.score}/{attempt.total_marks}
-                        </td>
+                        <td className="px-6 py-4"><p className="font-semibold text-gray-800">{attempt.Student?.User?.full_name || 'Unknown'}</p><p className="text-gray-400 text-xs">{attempt.Student?.User?.email}</p></td>
+                        <td className="px-6 py-4 font-semibold">{attempt.score}/{attempt.total_marks}</td>
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-2">
                             <div className="w-16 h-2 bg-gray-100 rounded-full overflow-hidden">
-                              <div className={`h-2 rounded-full ${pct >= 60 ? 'bg-green-500' : 'bg-red-400'}`}
-                                style={{ width: `${pct}%` }} />
+                              <div className={`h-2 rounded-full ${pct >= 60 ? 'bg-green-500' : 'bg-red-400'}`} style={{ width: `${pct}%` }} />
                             </div>
                             <span className="font-semibold">{pct}%</span>
                           </div>
                         </td>
-                        <td className="px-6 py-4 text-gray-600">
-                          {mins}m {secs}s
-                        </td>
+                        <td className="px-6 py-4 text-gray-600">{mins}m {secs}s</td>
                         <td className="px-6 py-4">
                           {attempt.passed
-                            ? <span className="text-green-600 font-semibold text-xs flex items-center gap-1">
-                                <CheckCircle size={14} /> Passed
-                              </span>
-                            : <span className="text-red-500 font-semibold text-xs flex items-center gap-1">
-                                <XCircle size={14} /> Failed
-                              </span>
-                          }
+                            ? <span className="text-green-600 font-semibold text-xs flex items-center gap-1"><CheckCircle size={14} /> Passed</span>
+                            : <span className="text-red-500 font-semibold text-xs flex items-center gap-1"><XCircle size={14} /> Failed</span>}
                         </td>
                       </tr>
                     );
@@ -2039,174 +1567,103 @@ function QuizExamManagement() {
     );
   }
 
-  // ── ADD QUESTIONS VIEW ────────────────────────────────────────
   if (view === 'questions') {
     return (
       <div className="space-y-5">
         <div className="flex items-center gap-4">
-          <button onClick={() => setView('list')}
-            className="text-gray-500 hover:text-gray-800 flex items-center gap-1">
-            <ChevronRight size={20} className="rotate-180" /> Back
-          </button>
-          <div>
-            <h2 className="text-2xl font-bold text-primary">Add Questions</h2>
-            <p className="text-sm text-gray-500">Quiz: {selectedQuiz?.title}</p>
-          </div>
-          <span className="ml-auto text-sm text-gray-500">
-            {questions.length} question(s)
-          </span>
+          <button onClick={() => setView('list')} className="text-gray-500 hover:text-gray-800 flex items-center gap-1"><ChevronRight size={20} className="rotate-180" /> Back</button>
+          <div><h2 className="text-2xl font-bold text-primary">Add Questions</h2><p className="text-sm text-gray-500">Quiz: {selectedQuiz?.title}</p></div>
+          <span className="ml-auto text-sm text-gray-500">{questions.length} question(s)</span>
         </div>
-
         {questions.map((q, idx) => (
           <div key={idx} className="bg-white rounded-xl p-6 shadow-md">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-bold text-gray-700">Question {idx + 1}</h3>
-              <button onClick={() => removeQuestion(idx)}
-                disabled={questions.length === 1}
-                className="text-red-400 hover:text-red-600 disabled:opacity-30">
-                <Trash2 size={18} />
-              </button>
+              <button onClick={() => removeQuestion(idx)} disabled={questions.length === 1} className="text-red-400 hover:text-red-600 disabled:opacity-30"><Trash2 size={18} /></button>
             </div>
-
-            <textarea value={q.question_text}
-              onChange={e => updateQuestion(idx, 'question_text', e.target.value)}
-              placeholder="Enter your question here..." rows={2}
+            <textarea value={q.question_text} onChange={e => updateQuestion(idx, 'question_text', e.target.value)} placeholder="Enter your question here..." rows={2}
               className="w-full border border-gray-300 rounded-lg px-4 py-2.5 mb-4 focus:ring-2 focus:ring-accent" />
-
             <div className="grid md:grid-cols-2 gap-3 mb-4">
               {['a', 'b', 'c', 'd'].map(opt => (
-                <div key={opt} className={`flex items-center gap-2 border-2 rounded-lg px-3 py-2
-                  ${q.correct_option === opt
-                    ? 'border-green-400 bg-green-50'
-                    : 'border-gray-200'}`}>
+                <div key={opt} className={`flex items-center gap-2 border-2 rounded-lg px-3 py-2 ${q.correct_option === opt ? 'border-green-400 bg-green-50' : 'border-gray-200'}`}>
                   <span onClick={() => updateQuestion(idx, 'correct_option', opt)}
-                    className={`w-7 h-7 rounded-full text-xs font-bold flex items-center
-                      justify-center flex-shrink-0 cursor-pointer
-                      ${q.correct_option === opt
-                        ? 'bg-green-500 text-white'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                    className={`w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center flex-shrink-0 cursor-pointer ${q.correct_option === opt ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
                     {opt.toUpperCase()}
                   </span>
-                  <input value={q[`option_${opt}`]}
-                    onChange={e => updateQuestion(idx, `option_${opt}`, e.target.value)}
+                  <input value={q[`option_${opt}`]} onChange={e => updateQuestion(idx, `option_${opt}`, e.target.value)}
                     placeholder={`Option ${opt.toUpperCase()}${opt === 'a' || opt === 'b' ? ' *' : ''}`}
                     className="flex-1 bg-transparent outline-none text-sm" />
                 </div>
               ))}
             </div>
-
             <div className="flex items-center gap-6">
               <div className="flex items-center gap-2">
-                <label className="text-sm font-semibold text-gray-600">
-                  Correct Answer:
-                </label>
-                <select value={q.correct_option}
-                  onChange={e => updateQuestion(idx, 'correct_option', e.target.value)}
+                <label className="text-sm font-semibold text-gray-600">Correct Answer:</label>
+                <select value={q.correct_option} onChange={e => updateQuestion(idx, 'correct_option', e.target.value)}
                   className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-accent">
-                  <option value="a">Option A</option>
-                  <option value="b">Option B</option>
-                  <option value="c">Option C</option>
-                  <option value="d">Option D</option>
+                  <option value="a">Option A</option><option value="b">Option B</option><option value="c">Option C</option><option value="d">Option D</option>
                 </select>
               </div>
               <div className="flex items-center gap-2">
                 <label className="text-sm font-semibold text-gray-600">Marks:</label>
-                <input type="number" value={q.marks} min={1} max={10}
-                  onChange={e => updateQuestion(idx, 'marks', parseInt(e.target.value))}
+                <input type="number" value={q.marks} min={1} max={10} onChange={e => updateQuestion(idx, 'marks', parseInt(e.target.value))}
                   className="w-16 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-accent" />
               </div>
             </div>
           </div>
         ))}
-
-        <button onClick={addQuestion}
-          className="w-full border-2 border-dashed border-blue-300 text-accent py-3
-            rounded-xl font-semibold hover:bg-blue-50 transition flex items-center justify-center gap-2">
+        <button onClick={addQuestion} className="w-full border-2 border-dashed border-blue-300 text-accent py-3 rounded-xl font-semibold hover:bg-blue-50 transition flex items-center justify-center gap-2">
           <Plus size={18} /> Add Another Question
         </button>
-
         <button onClick={handleSaveQuestions} disabled={saving}
-          className="w-full bg-accent hover:bg-blue-700 text-white py-3 rounded-xl
-            font-bold text-lg transition disabled:opacity-50 flex items-center justify-center gap-2">
+          className="w-full bg-accent hover:bg-blue-700 text-white py-3 rounded-xl font-bold text-lg transition disabled:opacity-50 flex items-center justify-center gap-2">
           {saving ? 'Publishing...' : '🚀 Publish Quiz to Students'}
         </button>
       </div>
     );
   }
 
-  // ── CREATE QUIZ VIEW ──────────────────────────────────────────
   if (view === 'create') {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <button onClick={() => setView('list')}
-            className="text-gray-500 hover:text-gray-800 flex items-center gap-1">
-            <ChevronRight size={20} className="rotate-180" /> Back
-          </button>
+          <button onClick={() => setView('list')} className="text-gray-500 hover:text-gray-800 flex items-center gap-1"><ChevronRight size={20} className="rotate-180" /> Back</button>
           <h2 className="text-2xl font-bold text-primary">Create New Quiz</h2>
         </div>
-
         <div className="bg-white rounded-xl p-8 shadow-md max-w-2xl">
           <div className="space-y-5">
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Select Course *
-              </label>
-              <select value={quizForm.course_id}
-                onChange={e => setQuizForm({ ...quizForm, course_id: e.target.value })}
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Select Course *</label>
+              <select value={quizForm.course_id} onChange={e => setQuizForm({ ...quizForm, course_id: e.target.value })}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent">
                 <option value="">-- Select a course --</option>
-                {courses.map(c => (
-                  <option key={c.id} value={c.id}>{c.course_name}</option>
-                ))}
+                {courses.map(c => <option key={c.id} value={c.id}>{c.course_name}</option>)}
               </select>
             </div>
-
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Quiz Title *
-              </label>
-              <input value={quizForm.title}
-                onChange={e => setQuizForm({ ...quizForm, title: e.target.value })}
-                placeholder="e.g. Module 1 Assessment"
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Quiz Title *</label>
+              <input value={quizForm.title} onChange={e => setQuizForm({ ...quizForm, title: e.target.value })} placeholder="e.g. Module 1 Assessment"
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent" />
             </div>
-
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Description
-              </label>
-              <textarea value={quizForm.description}
-                onChange={e => setQuizForm({ ...quizForm, description: e.target.value })}
-                rows={3} placeholder="Brief description..."
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Description</label>
+              <textarea value={quizForm.description} onChange={e => setQuizForm({ ...quizForm, description: e.target.value })} rows={3} placeholder="Brief description..."
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent" />
             </div>
-
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Time Limit (minutes)
-                </label>
-                <input type="number" value={quizForm.time_limit_minutes}
-                  min={1} max={180}
-                  onChange={e => setQuizForm({ ...quizForm, time_limit_minutes: e.target.value })}
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Time Limit (minutes)</label>
+                <input type="number" value={quizForm.time_limit_minutes} min={1} max={180} onChange={e => setQuizForm({ ...quizForm, time_limit_minutes: e.target.value })}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent" />
               </div>
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Pass Percentage (%)
-                </label>
-                <input type="number" value={quizForm.pass_percentage}
-                  min={1} max={100}
-                  onChange={e => setQuizForm({ ...quizForm, pass_percentage: e.target.value })}
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Pass Percentage (%)</label>
+                <input type="number" value={quizForm.pass_percentage} min={1} max={100} onChange={e => setQuizForm({ ...quizForm, pass_percentage: e.target.value })}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent" />
               </div>
             </div>
           </div>
-
-          <button onClick={handleCreateQuiz} disabled={saving}
-            className="mt-8 w-full bg-accent hover:bg-blue-700 text-white py-3
-              rounded-xl font-bold text-lg transition disabled:opacity-50">
+          <button onClick={handleCreateQuiz} disabled={saving} className="mt-8 w-full bg-accent hover:bg-blue-700 text-white py-3 rounded-xl font-bold text-lg transition disabled:opacity-50">
             {saving ? 'Creating...' : 'Next: Add Questions →'}
           </button>
         </div>
@@ -2214,31 +1671,21 @@ function QuizExamManagement() {
     );
   }
 
-  // ── QUIZ LIST VIEW ────────────────────────────────────────────
-  if (loading) return (
-    <div className="flex items-center justify-center h-64">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent" />
-    </div>
-  );
+  if (loading) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent" /></div>;
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-primary">Quiz & Exam Management</h2>
-        <button onClick={() => setView('create')}
-          className="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg hover:bg-blue-700 transition">
+        <button onClick={() => setView('create')} className="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg hover:bg-blue-700 transition">
           <Plus size={16} /> Create Quiz
         </button>
       </div>
-
       {quizzes.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-xl shadow-md">
           <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
           <p className="text-gray-600 mb-4">No quizzes yet.</p>
-          <button onClick={() => setView('create')}
-            className="bg-accent text-white px-6 py-2.5 rounded-lg font-semibold hover:bg-blue-700 transition">
-            Create Your First Quiz
-          </button>
+          <button onClick={() => setView('create')} className="bg-accent text-white px-6 py-2.5 rounded-lg font-semibold hover:bg-blue-700 transition">Create Your First Quiz</button>
         </div>
       ) : (
         <div className="space-y-4">
@@ -2247,30 +1694,20 @@ function QuizExamManagement() {
               <div className="flex justify-between items-start mb-3">
                 <div>
                   <h3 className="text-lg font-bold text-gray-800">{quiz.title}</h3>
-                  <p className="text-sm text-gray-500">
-                    {quiz.Course?.course_name} • {quiz.time_limit_minutes} min •
-                    Pass: {quiz.pass_percentage}% • {quiz.question_count} questions
-                  </p>
+                  <p className="text-sm text-gray-500">{quiz.Course?.course_name} • {quiz.time_limit_minutes} min • Pass: {quiz.pass_percentage}% • {quiz.question_count} questions</p>
                 </div>
-                <span className={`px-3 py-1 rounded-full text-xs font-semibold
-                  ${quiz.is_active
-                    ? 'bg-green-100 text-green-800'
-                    : 'bg-gray-100 text-gray-600'}`}>
+                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${quiz.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
                   {quiz.is_active ? '🟢 Active' : 'Inactive'}
                 </span>
               </div>
-
               <div className="flex gap-2 flex-wrap">
-                <button onClick={() => { setSelectedQuiz(quiz); setView('questions'); }}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm font-semibold flex items-center gap-1">
+                <button onClick={() => { setSelectedQuiz(quiz); setView('questions'); }} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm font-semibold flex items-center gap-1">
                   <Plus size={15} /> Add Questions
                 </button>
-                <button onClick={() => { setSelectedQuiz(quiz); fetchResults(quiz.id); setView('results'); }}
-                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition text-sm font-semibold flex items-center gap-1">
+                <button onClick={() => { setSelectedQuiz(quiz); fetchResults(quiz.id); setView('results'); }} className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition text-sm font-semibold flex items-center gap-1">
                   <BarChart3 size={15} /> View Results
                 </button>
-                <button onClick={() => handleDeleteQuiz(quiz.id)}
-                  className="px-4 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition text-sm font-semibold flex items-center gap-1">
+                <button onClick={() => handleDeleteQuiz(quiz.id)} className="px-4 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition text-sm font-semibold flex items-center gap-1">
                   <Trash2 size={15} /> Delete
                 </button>
               </div>
@@ -2290,117 +1727,71 @@ function AttendanceTracking() {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    fetchCourses();
-  }, []);
-
-  useEffect(() => {
-    if (selectedCourse) fetchAttendance();
-  }, [selectedCourse, selectedDate]);
+  useEffect(() => { fetchCourses(); }, []);
+  useEffect(() => { if (selectedCourse) fetchAttendance(); }, [selectedCourse, selectedDate]);
 
   const fetchCourses = async () => {
-    try {
-      const response = await api.get('/faculty/courses');
-      if (response.data.success) {
-        setCourses(response.data.courses || []);
-      }
-    } catch (error) {
-      console.error('Error fetching courses:', error);
-    }
+    try { const r = await api.get('/faculty/courses'); if (r.data.success) setCourses(r.data.courses || []); }
+    catch (e) { console.error(e); }
   };
 
   const fetchAttendance = async () => {
     setLoading(true);
-    try {
-      const response = await api.get(`/faculty/attendance?course=${selectedCourse}&date=${selectedDate}`);
-      if (response.data.success) {
-        setStudents(response.data.students || []);
-      }
-    } catch (error) {
-      console.error('Error fetching attendance:', error);
-    } finally {
-      setLoading(false);
-    }
+    try { const r = await api.get(`/faculty/attendance?course=${selectedCourse}&date=${selectedDate}`); if (r.data.success) setStudents(r.data.students || []); }
+    catch (e) { console.error(e); }
+    finally { setLoading(false); }
   };
 
   const markAttendance = async (studentId, status) => {
-    setStudents(students.map(s => s.id === studentId ? {...s, status} : s));
-    try {
-      await api.post('/faculty/attendance/mark', { studentId, status, course: selectedCourse, date: selectedDate });
-    } catch (error) {
-      console.error('Error marking attendance:', error);
-    }
+    setStudents(students.map(s => s.id === studentId ? { ...s, status } : s));
+    try { await api.post('/faculty/attendance/mark', { studentId, status, course: selectedCourse, date: selectedDate }); }
+    catch (e) { console.error(e); }
   };
 
   const markAllPresent = async () => {
-    const updated = students.map(s => ({...s, status: 'present'}));
-    setStudents(updated);
-    try {
-      await api.post('/faculty/attendance/mark-all', { status: 'present', course: selectedCourse, date: selectedDate });
-    } catch (error) {
-      console.error('Error marking all present:', error);
-    }
+    setStudents(students.map(s => ({ ...s, status: 'present' })));
+    try { await api.post('/faculty/attendance/mark-all', { status: 'present', course: selectedCourse, date: selectedDate }); }
+    catch (e) { console.error(e); }
   };
 
   const exportAttendance = () => {
-    const csvContent = [
-      ['Roll No', 'Name', 'Status', 'Overall Attendance'],
-      ...students.map(s => [s.rollNo, s.name, s.status, s.attendance])
-    ].map(row => row.join(',')).join('\n');
-
+    const csvContent = [['Roll No', 'Name', 'Status', 'Overall Attendance'], ...students.map(s => [s.rollNo, s.name, s.status, s.attendance])].map(row => row.join(',')).join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url;
-    a.download = `attendance-${selectedDate}.csv`;
-    a.click();
+    a.href = url; a.download = `attendance-${selectedDate}.csv`; a.click();
   };
+
+  const AvatarSVG = () => (
+    <svg viewBox="0 0 100 100" className="w-full h-full" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="50" cy="50" r="48" stroke="#111" strokeWidth="3.5" fill="white" />
+      <circle cx="50" cy="37" r="17" fill="#111" />
+      <ellipse cx="50" cy="80" rx="27" ry="17" fill="#111" />
+    </svg>
+  );
 
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold text-primary">Attendance Tracking</h2>
-
       <div className="bg-white p-6 rounded-xl shadow-md">
         <div className="grid md:grid-cols-4 gap-4">
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">Select Course</label>
-            <select
-              value={selectedCourse}
-              onChange={(e) => setSelectedCourse(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent"
-            >
+            <select value={selectedCourse} onChange={(e) => setSelectedCourse(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent">
               <option value="">Choose course</option>
-              {courses.map(course => (
-                <option key={course.id} value={course.id}>{course.code} - {course.course_name}</option>
-              ))}
+              {courses.map(course => <option key={course.id} value={course.id}>{course.code} - {course.course_name}</option>)}
             </select>
           </div>
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">Date</label>
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent"
-            />
+            <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent" />
           </div>
           <div className="flex items-end">
-            <button
-              onClick={markAllPresent}
-              disabled={!selectedCourse}
-              className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold disabled:opacity-50"
-            >
-              Mark All Present
-            </button>
+            <button onClick={markAllPresent} disabled={!selectedCourse} className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold disabled:opacity-50">Mark All Present</button>
           </div>
           <div className="flex items-end">
-            <button
-              onClick={exportAttendance}
-              disabled={students.length === 0}
-              className="w-full px-4 py-2 bg-accent text-white rounded-lg hover:bg-blue-700 transition font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
-            >
-              <Download size={18} />
-              Export
+            <button onClick={exportAttendance} disabled={students.length === 0} className="w-full px-4 py-2 bg-accent text-white rounded-lg hover:bg-blue-700 transition font-semibold flex items-center justify-center gap-2 disabled:opacity-50">
+              <Download size={18} /> Export
             </button>
           </div>
         </div>
@@ -2412,23 +1803,15 @@ function AttendanceTracking() {
           <p className="text-gray-600">Select a course to view attendance.</p>
         </div>
       ) : loading ? (
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent"></div>
-        </div>
+        <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent"></div></div>
       ) : students.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-xl shadow-md">
-          <p className="text-gray-600">No students found for this course.</p>
-        </div>
+        <div className="text-center py-16 bg-white rounded-xl shadow-md"><p className="text-gray-600">No students found for this course.</p></div>
       ) : (
         <div className="bg-white rounded-xl shadow-md overflow-hidden">
           <table className="w-full">
             <thead className="bg-gray-50 border-b-2 border-gray-200">
               <tr>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Roll No</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Student Name</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Overall</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Status</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Actions</th>
+                {['Roll No', 'Student Name', 'Overall', 'Status', 'Actions'].map(h => <th key={h} className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">{h}</th>)}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -2437,36 +1820,21 @@ function AttendanceTracking() {
                   <td className="px-6 py-4 text-sm font-medium text-gray-900">{student.rollNo}</td>
                   <td className="px-6 py-4">
                     <div className="flex items-center">
-                      <div className="h-10 w-10 rounded-full border-2 border-gray-300 bg-white flex items-center justify-center overflow-hidden">
-                        <svg viewBox="0 0 100 100" className="w-full h-full" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <circle cx="50" cy="50" r="48" stroke="#111" strokeWidth="3.5" fill="white"/>
-                          <circle cx="50" cy="37" r="17" fill="#111"/>
-                          <ellipse cx="50" cy="80" rx="27" ry="17" fill="#111"/>
-                        </svg>
-                      </div>
+                      <div className="h-10 w-10 rounded-full border-2 border-gray-300 bg-white flex items-center justify-center overflow-hidden"><AvatarSVG /></div>
                       <span className="ml-3 font-medium text-gray-900">{student.name}</span>
                     </div>
                   </td>
+                  <td className="px-6 py-4"><span className="text-sm font-semibold text-gray-700">{student.attendance}</span></td>
                   <td className="px-6 py-4">
-                    <span className="text-sm font-semibold text-gray-700">{student.attendance}</span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                      student.status === 'present' ? 'bg-green-100 text-green-800' :
-                      student.status === 'absent' ? 'bg-red-100 text-red-800' :
-                      'bg-yellow-100 text-yellow-800'
-                    }`}>
+                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${student.status === 'present' ? 'bg-green-100 text-green-800' : student.status === 'absent' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}`}>
                       {student.status?.charAt(0).toUpperCase() + student.status?.slice(1)}
                     </span>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex gap-2">
-                      <button onClick={() => markAttendance(student.id, 'present')}
-                        className="px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm">Present</button>
-                      <button onClick={() => markAttendance(student.id, 'absent')}
-                        className="px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm">Absent</button>
-                      <button onClick={() => markAttendance(student.id, 'late')}
-                        className="px-3 py-1 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition text-sm">Late</button>
+                      <button onClick={() => markAttendance(student.id, 'present')} className="px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm">Present</button>
+                      <button onClick={() => markAttendance(student.id, 'absent')} className="px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm">Absent</button>
+                      <button onClick={() => markAttendance(student.id, 'late')} className="px-3 py-1 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition text-sm">Late</button>
                     </div>
                   </td>
                 </tr>
@@ -2484,75 +1852,33 @@ function PerformanceAnalytics() {
   const [analyticsData, setAnalyticsData] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchAnalytics();
-  }, []);
+  useEffect(() => { fetchAnalytics(); }, []);
 
   const fetchAnalytics = async () => {
-    try {
-      const response = await api.get('/faculty/analytics');
-      if (response.data.success) {
-        setAnalyticsData(response.data.analytics || {});
-      }
-    } catch (error) {
-      console.error('Error fetching analytics:', error);
-    } finally {
-      setLoading(false);
-    }
+    try { const r = await api.get('/faculty/analytics'); if (r.data.success) setAnalyticsData(r.data.analytics || {}); }
+    catch (e) { console.error(e); }
+    finally { setLoading(false); }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent"></div>
-      </div>
-    );
-  }
-
-  if (!analyticsData) {
-    return (
-      <div className="text-center py-16 bg-white rounded-xl shadow-md">
-        <p className="text-gray-600">Unable to load analytics data.</p>
-      </div>
-    );
-  }
+  if (loading) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent"></div></div>;
+  if (!analyticsData) return <div className="text-center py-16 bg-white rounded-xl shadow-md"><p className="text-gray-600">Unable to load analytics data.</p></div>;
 
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold text-primary">Performance Analytics & Reports</h2>
-
       <div className="grid md:grid-cols-4 gap-6">
-        <div className="bg-white p-6 rounded-xl shadow-md">
-          <div className="flex items-center justify-between mb-2">
-            <TrendingUp className="text-green-500" size={24} />
+        {[
+          { icon: TrendingUp, color: 'text-green-500', label: 'Avg Performance', value: analyticsData.avgPerformance != null ? `${analyticsData.avgPerformance}%` : '—' },
+          { icon: Video, color: 'text-blue-500', label: 'Video Completion', value: analyticsData.videoCompletion != null ? `${analyticsData.videoCompletion}%` : '—' },
+          { icon: Clock, color: 'text-purple-500', label: 'Watch Time', value: analyticsData.watchTime != null ? `${analyticsData.watchTime}h` : '—' },
+          { icon: UserCheck, color: 'text-yellow-500', label: 'Engagement', value: analyticsData.engagement != null ? `${analyticsData.engagement}%` : '—' },
+        ].map(({ icon: Icon, color, label, value }) => (
+          <div key={label} className="bg-white p-6 rounded-xl shadow-md">
+            <Icon className={`${color} mb-2`} size={24} />
+            <h3 className="text-sm text-gray-600 mb-1">{label}</h3>
+            <p className="text-3xl font-bold text-gray-800">{value}</p>
           </div>
-          <h3 className="text-sm text-gray-600 mb-1">Avg Performance</h3>
-          <p className="text-3xl font-bold text-gray-800">{analyticsData.avgPerformance != null ? `${analyticsData.avgPerformance}%` : '—'}</p>
-        </div>
-
-        <div className="bg-white p-6 rounded-xl shadow-md">
-          <div className="flex items-center justify-between mb-2">
-            <Video className="text-blue-500" size={24} />
-          </div>
-          <h3 className="text-sm text-gray-600 mb-1">Video Completion</h3>
-          <p className="text-3xl font-bold text-gray-800">{analyticsData.videoCompletion != null ? `${analyticsData.videoCompletion}%` : '—'}</p>
-        </div>
-
-        <div className="bg-white p-6 rounded-xl shadow-md">
-          <div className="flex items-center justify-between mb-2">
-            <Clock className="text-purple-500" size={24} />
-          </div>
-          <h3 className="text-sm text-gray-600 mb-1">Watch Time</h3>
-          <p className="text-3xl font-bold text-gray-800">{analyticsData.watchTime != null ? `${analyticsData.watchTime}h` : '—'}</p>
-        </div>
-
-        <div className="bg-white p-6 rounded-xl shadow-md">
-          <div className="flex items-center justify-between mb-2">
-            <UserCheck className="text-yellow-500" size={24} />
-          </div>
-          <h3 className="text-sm text-gray-600 mb-1">Engagement</h3>
-          <p className="text-3xl font-bold text-gray-800">{analyticsData.engagement != null ? `${analyticsData.engagement}%` : '—'}</p>
-        </div>
+        ))}
       </div>
 
       {analyticsData.coursePerformance?.length > 0 && (
@@ -2566,24 +1892,15 @@ function PerformanceAnalytics() {
                   <span className="text-sm text-gray-600">{course.students} students</span>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <div className="flex justify-between text-sm text-gray-600 mb-1">
-                      <span>Average Score</span>
-                      <span className="font-semibold">{course.avgScore}%</span>
+                  {[
+                    { label: 'Average Score', value: course.avgScore, color: 'bg-blue-500' },
+                    { label: 'Completion Rate', value: course.completion, color: 'bg-green-500' },
+                  ].map(({ label, value, color }) => (
+                    <div key={label}>
+                      <div className="flex justify-between text-sm text-gray-600 mb-1"><span>{label}</span><span className="font-semibold">{value}%</span></div>
+                      <div className="w-full bg-gray-200 rounded-full h-2"><div className={`${color} h-2 rounded-full`} style={{ width: `${value}%` }}></div></div>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div className="bg-blue-500 h-2 rounded-full" style={{width: `${course.avgScore}%`}}></div>
-                    </div>
-                  </div>
-                  <div>
-                    <div className="flex justify-between text-sm text-gray-600 mb-1">
-                      <span>Completion Rate</span>
-                      <span className="font-semibold">{course.completion}%</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div className="bg-green-500 h-2 rounded-full" style={{width: `${course.completion}%`}}></div>
-                    </div>
-                  </div>
+                  ))}
                 </div>
               </div>
             ))}
@@ -2597,13 +1914,7 @@ function PerformanceAnalytics() {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50 border-b-2 border-gray-200">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Video Title</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Views</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Completion %</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Avg Watch Time</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Drop-off Point</th>
-                </tr>
+                <tr>{['Video Title', 'Views', 'Completion %', 'Avg Watch Time', 'Drop-off Point'].map(h => <th key={h} className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">{h}</th>)}</tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {analyticsData.videoAnalytics.map((video, idx) => (
@@ -2612,18 +1923,12 @@ function PerformanceAnalytics() {
                     <td className="px-6 py-4 text-gray-700">{video.views}</td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
-                        <div className="w-24 bg-gray-200 rounded-full h-2">
-                          <div className="bg-green-500 h-2 rounded-full" style={{width: `${video.completion}%`}}></div>
-                        </div>
+                        <div className="w-24 bg-gray-200 rounded-full h-2"><div className="bg-green-500 h-2 rounded-full" style={{ width: `${video.completion}%` }}></div></div>
                         <span className="text-sm font-semibold">{video.completion}%</span>
                       </div>
                     </td>
                     <td className="px-6 py-4 text-gray-700">{video.avgWatchTime}</td>
-                    <td className="px-6 py-4">
-                      <span className="px-3 py-1 bg-red-100 text-red-800 rounded-full text-xs font-semibold">
-                        {video.dropOffPoint}
-                      </span>
-                    </td>
+                    <td className="px-6 py-4"><span className="px-3 py-1 bg-red-100 text-red-800 rounded-full text-xs font-semibold">{video.dropOffPoint}</span></td>
                   </tr>
                 ))}
               </tbody>
@@ -2641,94 +1946,52 @@ function AnnouncementManagement() {
   const [announcements, setAnnouncements] = useState([]);
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [announcementForm, setAnnouncementForm] = useState({ title: '', message: '', course: '', priority: 'Medium', scheduleDate: '' });
 
-  const [announcementForm, setAnnouncementForm] = useState({
-    title: '',
-    message: '',
-    course: '',
-    priority: 'Medium',
-    scheduleDate: ''
-  });
-
-  useEffect(() => {
-    fetchAnnouncements();
-    fetchCourses();
-  }, []);
+  useEffect(() => { fetchAnnouncements(); fetchCourses(); }, []);
 
   const fetchAnnouncements = async () => {
-    try {
-      const response = await api.get('/faculty/announcements');
-      if (response.data.success) {
-        setAnnouncements(response.data.announcements || []);
-      }
-    } catch (error) {
-      console.error('Error fetching announcements:', error);
-    } finally {
-      setLoading(false);
-    }
+    try { const r = await api.get('/faculty/announcements'); if (r.data.success) setAnnouncements(r.data.announcements || []); }
+    catch (e) { console.error(e); }
+    finally { setLoading(false); }
   };
 
   const fetchCourses = async () => {
-    try {
-      const response = await api.get('/faculty/courses');
-      if (response.data.success) {
-        setCourses(response.data.courses || []);
-      }
-    } catch (error) {
-      console.error('Error fetching courses:', error);
-    }
+    try { const r = await api.get('/faculty/courses'); if (r.data.success) setCourses(r.data.courses || []); }
+    catch (e) { console.error(e); }
   };
 
   const handleCreateAnnouncement = async () => {
     if (!announcementForm.title || !announcementForm.message) return;
     try {
-      const response = await api.post('/faculty/announcements', announcementForm);
-      if (response.data.success) {
-        setAnnouncements([response.data.announcement, ...announcements]);
+      const r = await api.post('/faculty/announcements', announcementForm);
+      if (r.data.success) {
+        setAnnouncements([r.data.announcement, ...announcements]);
         setShowCreateModal(false);
         setAnnouncementForm({ title: '', message: '', course: '', priority: 'Medium', scheduleDate: '' });
       }
-    } catch (error) {
-      console.error('Error creating announcement:', error);
-    }
+    } catch (e) { console.error(e); }
   };
 
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this announcement?')) return;
-    try {
-      await api.delete(`/faculty/announcements/${id}`);
-      setAnnouncements(announcements.filter(a => a.id !== id));
-    } catch (error) {
-      console.error('Error deleting announcement:', error);
-    }
+    try { await api.delete(`/faculty/announcements/${id}`); setAnnouncements(announcements.filter(a => a.id !== id)); }
+    catch (e) { console.error(e); }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent"></div>
-      </div>
-    );
-  }
+  if (loading) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent"></div></div>;
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-primary">Announcements</h2>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg hover:bg-blue-700 transition"
-        >
-          <Megaphone className="h-4 w-4" />
-          New Announcement
+        <button onClick={() => setShowCreateModal(true)} className="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg hover:bg-blue-700 transition">
+          <Megaphone className="h-4 w-4" /> New Announcement
         </button>
       </div>
 
       {announcements.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-xl shadow-md">
-          <Megaphone className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-600">No announcements yet.</p>
-        </div>
+        <div className="text-center py-16 bg-white rounded-xl shadow-md"><Megaphone className="h-16 w-16 text-gray-400 mx-auto mb-4" /><p className="text-gray-600">No announcements yet.</p></div>
       ) : (
         <div className="space-y-4">
           {announcements.map((announcement) => (
@@ -2742,11 +2005,7 @@ function AnnouncementManagement() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                    announcement.priority === 'High' ? 'bg-red-100 text-red-800' :
-                    announcement.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
-                    'bg-green-100 text-green-800'
-                  }`}>
+                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${announcement.priority === 'High' ? 'bg-red-100 text-red-800' : announcement.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}`}>
                     {announcement.priority} Priority
                   </span>
                   {announcement.views != null && <span className="text-sm text-gray-600">{announcement.views} views</span>}
@@ -2754,12 +2013,8 @@ function AnnouncementManagement() {
               </div>
               <p className="text-gray-700 mb-4">{announcement.message}</p>
               <div className="flex gap-2">
-                <button className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition text-sm font-semibold">
-                  <Edit2 size={16} className="inline mr-1" />Edit
-                </button>
-                <button onClick={() => handleDelete(announcement.id)} className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition text-sm font-semibold">
-                  <Trash2 size={16} className="inline mr-1" />Delete
-                </button>
+                <button className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition text-sm font-semibold"><Edit2 size={16} className="inline mr-1" />Edit</button>
+                <button onClick={() => handleDelete(announcement.id)} className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition text-sm font-semibold"><Trash2 size={16} className="inline mr-1" />Delete</button>
               </div>
             </div>
           ))}
@@ -2776,14 +2031,12 @@ function AnnouncementManagement() {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Title *</label>
-                <input type="text" value={announcementForm.title}
-                  onChange={(e) => setAnnouncementForm({...announcementForm, title: e.target.value})}
+                <input type="text" value={announcementForm.title} onChange={(e) => setAnnouncementForm({ ...announcementForm, title: e.target.value })}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent" />
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Course</label>
-                <select value={announcementForm.course}
-                  onChange={(e) => setAnnouncementForm({...announcementForm, course: e.target.value})}
+                <select value={announcementForm.course} onChange={(e) => setAnnouncementForm({ ...announcementForm, course: e.target.value })}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent">
                   <option value="">All Courses</option>
                   {courses.map(c => <option key={c.id} value={c.id}>{c.course_name}</option>)}
@@ -2791,24 +2044,20 @@ function AnnouncementManagement() {
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Priority</label>
-                <select value={announcementForm.priority}
-                  onChange={(e) => setAnnouncementForm({...announcementForm, priority: e.target.value})}
+                <select value={announcementForm.priority} onChange={(e) => setAnnouncementForm({ ...announcementForm, priority: e.target.value })}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent">
                   <option>High</option><option>Medium</option><option>Low</option>
                 </select>
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Message *</label>
-                <textarea value={announcementForm.message}
-                  onChange={(e) => setAnnouncementForm({...announcementForm, message: e.target.value})}
-                  rows="4" className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent" />
+                <textarea value={announcementForm.message} onChange={(e) => setAnnouncementForm({ ...announcementForm, message: e.target.value })} rows="4"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent" />
               </div>
             </div>
             <div className="flex gap-3 mt-6">
-              <button onClick={handleCreateAnnouncement}
-                className="flex-1 bg-accent text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition">Post Announcement</button>
-              <button onClick={() => setShowCreateModal(false)}
-                className="px-6 bg-gray-200 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-300 transition">Cancel</button>
+              <button onClick={handleCreateAnnouncement} className="flex-1 bg-accent text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition">Post Announcement</button>
+              <button onClick={() => setShowCreateModal(false)} className="px-6 bg-gray-200 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-300 transition">Cancel</button>
             </div>
           </div>
         </div>
@@ -2827,127 +2076,56 @@ function BatchManagement() {
   const [batchStudents, setBatchStudents] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [newBatch, setNewBatch] = useState({ name: '', courses: '', schedule: '', startDate: '', endDate: '' });
 
-  const [newBatch, setNewBatch] = useState({
-    name: '',
-    courses: '',
-    schedule: '',
-    startDate: '',
-    endDate: ''
-  });
-
-  useEffect(() => {
-    fetchBatches();
-  }, []);
+  useEffect(() => { fetchBatches(); }, []);
 
   const fetchBatches = async () => {
-    try {
-      const response = await api.get('/faculty/batches');
-      if (response.data.success) {
-        setBatches(response.data.batches || []);
-      }
-    } catch (error) {
-      console.error('Error fetching batches:', error);
-    } finally {
-      setLoading(false);
-    }
+    try { const r = await api.get('/faculty/batches'); if (r.data.success) setBatches(r.data.batches || []); }
+    catch (e) { console.error(e); }
+    finally { setLoading(false); }
   };
 
   const fetchBatchStudents = async (batchId) => {
-    try {
-      const response = await api.get(`/faculty/batches/${batchId}/students`);
-      if (response.data.success) {
-        setBatchStudents(response.data.students || []);
-      }
-    } catch (error) {
-      console.error('Error fetching batch students:', error);
-    }
+    try { const r = await api.get(`/faculty/batches/${batchId}/students`); if (r.data.success) setBatchStudents(r.data.students || []); }
+    catch (e) { console.error(e); }
   };
 
   const handleCreateBatch = async () => {
-    if (!newBatch.name || !newBatch.courses || !newBatch.schedule) {
-      alert('Please fill all required fields');
-      return;
-    }
+    if (!newBatch.name || !newBatch.courses || !newBatch.schedule) { alert('Please fill all required fields'); return; }
     try {
-      const response = await api.post('/faculty/batches', {
-        ...newBatch,
-        courses: newBatch.courses.split(',').map(c => c.trim())
-      });
-      if (response.data.success) {
-        setBatches([...batches, response.data.batch]);
-        setShowCreateModal(false);
-        setNewBatch({ name: '', courses: '', schedule: '', startDate: '', endDate: '' });
-      }
-    } catch (error) {
-      console.error('Error creating batch:', error);
-      alert('Failed to create batch.');
-    }
+      const r = await api.post('/faculty/batches', { ...newBatch, courses: newBatch.courses.split(',').map(c => c.trim()) });
+      if (r.data.success) { setBatches([...batches, r.data.batch]); setShowCreateModal(false); setNewBatch({ name: '', courses: '', schedule: '', startDate: '', endDate: '' }); }
+    } catch (e) { console.error(e); alert('Failed to create batch.'); }
   };
 
   const handleDeleteBatch = async (batchId) => {
     if (!window.confirm('Are you sure you want to delete this batch?')) return;
-    try {
-      await api.delete(`/faculty/batches/${batchId}`);
-      setBatches(batches.filter(b => b.id !== batchId));
-    } catch (error) {
-      console.error('Error deleting batch:', error);
-      alert('Failed to delete batch.');
-    }
+    try { await api.delete(`/faculty/batches/${batchId}`); setBatches(batches.filter(b => b.id !== batchId)); }
+    catch (e) { console.error(e); alert('Failed to delete batch.'); }
   };
 
-  const handleViewStudents = async (batch) => {
-    setSelectedBatch(batch);
-    await fetchBatchStudents(batch.id);
-    setShowViewModal(true);
-  };
+  const handleViewStudents = async (batch) => { setSelectedBatch(batch); await fetchBatchStudents(batch.id); setShowViewModal(true); };
 
   const filteredBatches = batches.filter(batch => {
-    const matchesSearch = batch.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (batch.courses || []).some(c => c.toLowerCase().includes(searchTerm.toLowerCase()));
+    const matchesSearch = batch.name.toLowerCase().includes(searchTerm.toLowerCase()) || (batch.courses || []).some(c => c.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesStatus = filterStatus === 'all' || batch.status === filterStatus;
     return matchesSearch && matchesStatus;
   });
 
   const handleExportBatches = () => {
-    const csvContent = [
-      ['Batch Name', 'Status', 'Students', 'Courses', 'Schedule', 'Start Date', 'End Date'],
-      ...filteredBatches.map(b => [
-        b.name,
-        b.status,
-        b.students || 0,
-        (b.courses || []).join(' | '),
-        b.schedule || '',
-        b.startDate || '',
-        b.endDate || ''
-      ])
+    const csvContent = [['Batch Name', 'Status', 'Students', 'Courses', 'Schedule', 'Start Date', 'End Date'],
+      ...filteredBatches.map(b => [b.name, b.status, b.students || 0, (b.courses || []).join(' | '), b.schedule || '', b.startDate || '', b.endDate || ''])
     ].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
-
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `batches-export-${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
+    const a = document.createElement('a'); a.href = url; a.download = `batches-export-${new Date().toISOString().split('T')[0]}.csv`; a.click();
     window.URL.revokeObjectURL(url);
   };
 
-  const getStatusBadge = (status) => {
-    const styles = {
-      active: 'bg-green-100 text-green-800',
-      completed: 'bg-blue-100 text-blue-800',
-      upcoming: 'bg-yellow-100 text-yellow-800'
-    };
-    return styles[status] || styles.active;
-  };
+  const getStatusBadge = (status) => ({ active: 'bg-green-100 text-green-800', completed: 'bg-blue-100 text-blue-800', upcoming: 'bg-yellow-100 text-yellow-800' }[status] || 'bg-green-100 text-green-800');
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent"></div>
-      </div>
-    );
-  }
+  if (loading) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent"></div></div>;
 
   return (
     <div className="space-y-6">
@@ -2956,64 +2134,39 @@ function BatchManagement() {
           <h2 className="text-2xl font-bold text-gray-900">Batch Management</h2>
           <p className="text-sm text-gray-600 mt-1">Manage student batches, schedules, and enrollments</p>
         </div>
-        <button 
-          onClick={() => setShowCreateModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-700 transition shadow-md"
-        >
-          <Plus className="h-4 w-4" />
-          Create Batch
+        <button onClick={() => setShowCreateModal(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-700 transition shadow-md">
+          <Plus className="h-4 w-4" /> Create Batch
         </button>
       </div>
 
       <div className="grid md:grid-cols-4 gap-6">
-        <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-blue-500">
-          <Users className="h-10 w-10 text-blue-500 mb-3" />
-          <h3 className="text-sm font-semibold text-gray-600 mb-2">Total Batches</h3>
-          <p className="text-2xl font-bold text-gray-900">{batches.length}</p>
-        </div>
-        <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-green-500">
-          <Calendar className="h-10 w-10 text-green-500 mb-3" />
-          <h3 className="text-sm font-semibold text-gray-600 mb-2">Active Batches</h3>
-          <p className="text-2xl font-bold text-gray-900">{batches.filter(b => b.status === 'active').length}</p>
-        </div>
-        <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-purple-500">
-          <UserPlus className="h-10 w-10 text-purple-500 mb-3" />
-          <h3 className="text-sm font-semibold text-gray-600 mb-2">Total Students</h3>
-          <p className="text-2xl font-bold text-gray-900">{batches.reduce((sum, b) => sum + (b.students || 0), 0)}</p>
-        </div>
-        <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-yellow-500">
-          <BookOpen className="h-10 w-10 text-yellow-500 mb-3" />
-          <h3 className="text-sm font-semibold text-gray-600 mb-2">Courses Assigned</h3>
-          <p className="text-2xl font-bold text-gray-900">{[...new Set(batches.flatMap(b => b.courses || []))].length}</p>
-        </div>
+        {[
+          { icon: Users, border: 'border-blue-500', text: 'text-blue-500', label: 'Total Batches', value: batches.length },
+          { icon: Calendar, border: 'border-green-500', text: 'text-green-500', label: 'Active Batches', value: batches.filter(b => b.status === 'active').length },
+          { icon: UserPlus, border: 'border-purple-500', text: 'text-purple-500', label: 'Total Students', value: batches.reduce((sum, b) => sum + (b.students || 0), 0) },
+          { icon: BookOpen, border: 'border-yellow-500', text: 'text-yellow-500', label: 'Courses Assigned', value: [...new Set(batches.flatMap(b => b.courses || []))].length },
+        ].map(({ icon: Icon, border, text, label, value }) => (
+          <div key={label} className={`bg-white p-6 rounded-xl shadow-md border-l-4 ${border}`}>
+            <Icon className={`h-10 w-10 ${text} mb-3`} />
+            <h3 className="text-sm font-semibold text-gray-600 mb-2">{label}</h3>
+            <p className="text-2xl font-bold text-gray-900">{value}</p>
+          </div>
+        ))}
       </div>
 
       <div className="bg-white p-4 rounded-xl shadow-md">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-            <input
-              type="text"
-              placeholder="Search batches by name or course..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
+            <input type="text" placeholder="Search batches..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
           </div>
           <div className="flex gap-2">
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="all">All Status</option>
-              <option value="active">Active</option>
-              <option value="completed">Completed</option>
-              <option value="upcoming">Upcoming</option>
+            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+              <option value="all">All Status</option><option value="active">Active</option><option value="completed">Completed</option><option value="upcoming">Upcoming</option>
             </select>
             <button onClick={handleExportBatches} className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">
-              <Download className="h-4 w-4" />
-              Export
+              <Download className="h-4 w-4" /> Export
             </button>
           </div>
         </div>
@@ -3021,54 +2174,28 @@ function BatchManagement() {
 
       <div className="grid md:grid-cols-2 gap-6">
         {filteredBatches.length === 0 ? (
-          <div className="col-span-2 text-center py-16 bg-white rounded-xl shadow-md">
-            <Users className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-600">No batches found</p>
-          </div>
-        ) : (
-          filteredBatches.map((batch) => (
-            <div key={batch.id} className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition">
-              <div className="flex justify-between items-start mb-4">
-                <h3 className="text-xl font-bold text-gray-800">{batch.name}</h3>
-                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusBadge(batch.status)}`}>
-                  {batch.status}
-                </span>
-              </div>
-              <div className="space-y-3 mb-4">
-                <div className="flex items-center text-gray-700">
-                  <Users size={18} className="mr-2 text-blue-500" />
-                  <span className="font-semibold">{batch.students}</span>
-                  <span className="ml-1">Students</span>
-                </div>
-                <div className="flex items-center text-gray-700">
-                  <BookOpen size={18} className="mr-2 text-green-500" />
-                  <span>{(batch.courses || []).join(', ')}</span>
-                </div>
-                <div className="flex items-center text-gray-700">
-                  <Clock size={18} className="mr-2 text-purple-500" />
-                  <span>{batch.schedule}</span>
-                </div>
-                <div className="flex items-center text-gray-700">
-                  <Calendar size={18} className="mr-2 text-yellow-500" />
-                  <span>{batch.startDate} to {batch.endDate}</span>
-                </div>
-              </div>
-              <div className="flex gap-2 mt-4">
-                <button onClick={() => handleViewStudents(batch)}
-                  className="flex-1 flex items-center justify-center gap-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-700 transition text-sm font-semibold">
-                  <Eye size={16} />View Students
-                </button>
-                <button className="flex items-center justify-center gap-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition text-sm font-semibold">
-                  <Edit2 size={16} />Edit
-                </button>
-                <button onClick={() => handleDeleteBatch(batch.id)}
-                  className="flex items-center justify-center px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition">
-                  <Trash2 size={16} />
-                </button>
-              </div>
+          <div className="col-span-2 text-center py-16 bg-white rounded-xl shadow-md"><Users className="h-16 w-16 text-gray-400 mx-auto mb-4" /><p className="text-gray-600">No batches found</p></div>
+        ) : filteredBatches.map((batch) => (
+          <div key={batch.id} className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition">
+            <div className="flex justify-between items-start mb-4">
+              <h3 className="text-xl font-bold text-gray-800">{batch.name}</h3>
+              <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusBadge(batch.status)}`}>{batch.status}</span>
             </div>
-          ))
-        )}
+            <div className="space-y-3 mb-4">
+              <div className="flex items-center text-gray-700"><Users size={18} className="mr-2 text-blue-500" /><span className="font-semibold">{batch.students}</span><span className="ml-1">Students</span></div>
+              <div className="flex items-center text-gray-700"><BookOpen size={18} className="mr-2 text-green-500" /><span>{(batch.courses || []).join(', ')}</span></div>
+              <div className="flex items-center text-gray-700"><Clock size={18} className="mr-2 text-purple-500" /><span>{batch.schedule}</span></div>
+              <div className="flex items-center text-gray-700"><Calendar size={18} className="mr-2 text-yellow-500" /><span>{batch.startDate} to {batch.endDate}</span></div>
+            </div>
+            <div className="flex gap-2 mt-4">
+              <button onClick={() => handleViewStudents(batch)} className="flex-1 flex items-center justify-center gap-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-700 transition text-sm font-semibold">
+                <Eye size={16} />View Students
+              </button>
+              <button className="flex items-center justify-center gap-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition text-sm font-semibold"><Edit2 size={16} />Edit</button>
+              <button onClick={() => handleDeleteBatch(batch.id)} className="flex items-center justify-center px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition"><Trash2 size={16} /></button>
+            </div>
+          </div>
+        ))}
       </div>
 
       {showCreateModal && (
@@ -3079,39 +2206,31 @@ function BatchManagement() {
               <button onClick={() => setShowCreateModal(false)} className="text-gray-500 hover:text-gray-700"><X size={24} /></button>
             </div>
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Batch Name <span className="text-red-500">*</span></label>
-                <input type="text" value={newBatch.name} onChange={(e) => setNewBatch({...newBatch, name: e.target.value})}
-                  placeholder="e.g., Batch 2024-C" className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Courses (comma-separated) <span className="text-red-500">*</span></label>
-                <input type="text" value={newBatch.courses} onChange={(e) => setNewBatch({...newBatch, courses: e.target.value})}
-                  placeholder="e.g., CS101, CS201" className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Schedule <span className="text-red-500">*</span></label>
-                <input type="text" value={newBatch.schedule} onChange={(e) => setNewBatch({...newBatch, schedule: e.target.value})}
-                  placeholder="e.g., Mon-Fri 10 AM" className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
-              </div>
+              {[
+                { label: 'Batch Name', key: 'name', placeholder: 'e.g., Batch 2024-C', required: true },
+                { label: 'Courses (comma-separated)', key: 'courses', placeholder: 'e.g., CS101, CS201', required: true },
+                { label: 'Schedule', key: 'schedule', placeholder: 'e.g., Mon-Fri 10 AM', required: true },
+              ].map(({ label, key, placeholder, required }) => (
+                <div key={key}>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">{label} {required && <span className="text-red-500">*</span>}</label>
+                  <input type="text" value={newBatch[key]} onChange={(e) => setNewBatch({ ...newBatch, [key]: e.target.value })}
+                    placeholder={placeholder} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
+                </div>
+              ))}
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Start Date</label>
-                  <input type="date" value={newBatch.startDate} onChange={(e) => setNewBatch({...newBatch, startDate: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
+                  <input type="date" value={newBatch.startDate} onChange={(e) => setNewBatch({ ...newBatch, startDate: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">End Date</label>
-                  <input type="date" value={newBatch.endDate} onChange={(e) => setNewBatch({...newBatch, endDate: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
+                  <input type="date" value={newBatch.endDate} onChange={(e) => setNewBatch({ ...newBatch, endDate: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
                 </div>
               </div>
             </div>
             <div className="flex gap-3 mt-6">
-              <button onClick={handleCreateBatch}
-                className="flex-1 bg-blue-500 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold transition">Create Batch</button>
-              <button onClick={() => setShowCreateModal(false)}
-                className="px-6 bg-gray-200 hover:bg-gray-300 text-gray-700 py-3 rounded-lg font-semibold transition">Cancel</button>
+              <button onClick={handleCreateBatch} className="flex-1 bg-blue-500 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold transition">Create Batch</button>
+              <button onClick={() => setShowCreateModal(false)} className="px-6 bg-gray-200 hover:bg-gray-300 text-gray-700 py-3 rounded-lg font-semibold transition">Cancel</button>
             </div>
           </div>
         </div>
@@ -3127,20 +2246,13 @@ function BatchManagement() {
               </div>
               <button onClick={() => setShowViewModal(false)} className="text-gray-500 hover:text-gray-700"><X size={24} /></button>
             </div>
-
             {batchStudents.length === 0 ? (
               <p className="text-gray-400 text-center py-8">No students in this batch.</p>
             ) : (
               <div className="bg-white rounded-lg overflow-hidden border border-gray-200">
                 <table className="w-full">
                   <thead className="bg-gray-50 border-b-2 border-gray-200">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">#</th>
-                      <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Name</th>
-                      <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Email</th>
-                      <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Phone</th>
-                      <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Enrolled On</th>
-                    </tr>
+                    <tr>{['#', 'Name', 'Email', 'Phone', 'Enrolled On'].map(h => <th key={h} className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">{h}</th>)}</tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {batchStudents.map((student, index) => (
@@ -3148,41 +2260,23 @@ function BatchManagement() {
                         <td className="px-6 py-4 text-sm text-gray-900">{index + 1}</td>
                         <td className="px-6 py-4">
                           <div className="flex items-center">
-                            <div className="h-8 w-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-sm mr-3">
-                              {student.name?.charAt(0)}
-                            </div>
+                            <div className="h-8 w-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-sm mr-3">{student.name?.charAt(0)}</div>
                             <span className="font-medium text-gray-900">{student.name}</span>
                           </div>
                         </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center text-sm text-gray-700">
-                            <Mail size={14} className="mr-2 text-gray-400" />{student.email}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center text-sm text-gray-700">
-                            <Phone size={14} className="mr-2 text-gray-400" />{student.phone}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-600">
-                          {new Date(student.enrollmentDate).toLocaleDateString()}
-                        </td>
+                        <td className="px-6 py-4"><div className="flex items-center text-sm text-gray-700"><Mail size={14} className="mr-2 text-gray-400" />{student.email}</div></td>
+                        <td className="px-6 py-4"><div className="flex items-center text-sm text-gray-700"><Phone size={14} className="mr-2 text-gray-400" />{student.phone}</div></td>
+                        <td className="px-6 py-4 text-sm text-gray-600">{new Date(student.enrollmentDate).toLocaleDateString()}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
             )}
-
             <div className="flex gap-3 mt-6">
-              <button className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">
-                <Download size={18} />Export Student List
-              </button>
-              <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
-                <UserPlus size={18} />Add Student
-              </button>
-              <button onClick={() => setShowViewModal(false)}
-                className="ml-auto px-6 bg-gray-200 hover:bg-gray-300 text-gray-700 py-2 rounded-lg font-semibold transition">Close</button>
+              <button className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"><Download size={18} />Export Student List</button>
+              <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"><UserPlus size={18} />Add Student</button>
+              <button onClick={() => setShowViewModal(false)} className="ml-auto px-6 bg-gray-200 hover:bg-gray-300 text-gray-700 py-2 rounded-lg font-semibold transition">Close</button>
             </div>
           </div>
         </div>
@@ -3197,128 +2291,68 @@ function LiveClassScheduling() {
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
-  const [scheduleForm, setScheduleForm] = useState({
-    title: '', course: '', date: '', time: '', duration: '', platform: 'Zoom', link: ''
-  });
+  const [scheduleForm, setScheduleForm] = useState({ title: '', course: '', date: '', time: '', duration: '', platform: 'Zoom', link: '' });
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    fetchLiveClasses();
-    fetchCourses();
-  }, []);
+  useEffect(() => { fetchLiveClasses(); fetchCourses(); }, []);
 
   const fetchLiveClasses = async () => {
-    try {
-      const response = await api.get('/faculty/live-classes');
-      if (response.data.success) {
-        setLiveClasses(response.data.liveClasses || []);
-      }
-    } catch (error) {
-      console.error('Error fetching live classes:', error);
-    } finally {
-      setLoading(false);
-    }
+    try { const r = await api.get('/faculty/live-classes'); if (r.data.success) setLiveClasses(r.data.liveClasses || []); }
+    catch (e) { console.error(e); }
+    finally { setLoading(false); }
   };
 
   const fetchCourses = async () => {
-    try {
-      const response = await api.get('/faculty/courses');
-      if (response.data.success) {
-        setCourses(response.data.courses || []);
-      }
-    } catch (error) {
-      console.error('Error fetching courses:', error);
-    }
+    try { const r = await api.get('/faculty/courses'); if (r.data.success) setCourses(r.data.courses || []); }
+    catch (e) { console.error(e); }
   };
 
   const handleScheduleClass = async () => {
-    if (!scheduleForm.title || !scheduleForm.course || !scheduleForm.date || !scheduleForm.time) {
-      alert('Please fill all required fields');
-      return;
-    }
+    if (!scheduleForm.title || !scheduleForm.course || !scheduleForm.date || !scheduleForm.time) { alert('Please fill all required fields'); return; }
     setSaving(true);
     try {
-      const response = await api.post('/faculty/live-classes', scheduleForm);
-      if (response.data.success) {
-        setLiveClasses([response.data.liveClass, ...liveClasses]);
-        setShowScheduleModal(false);
-        setScheduleForm({ title: '', course: '', date: '', time: '', duration: '', platform: 'Zoom', link: '' });
-      }
-    } catch (error) {
-      console.error('Error scheduling class:', error);
-      alert(error.response?.data?.message || 'Failed to schedule class.');
-    } finally {
-      setSaving(false);
-    }
+      const r = await api.post('/faculty/live-classes', scheduleForm);
+      if (r.data.success) { setLiveClasses([r.data.liveClass, ...liveClasses]); setShowScheduleModal(false); setScheduleForm({ title: '', course: '', date: '', time: '', duration: '', platform: 'Zoom', link: '' }); }
+    } catch (e) { console.error(e); alert(e.response?.data?.message || 'Failed to schedule class.'); }
+    finally { setSaving(false); }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent"></div>
-      </div>
-    );
-  }
+  if (loading) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent"></div></div>;
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-primary">Live Class Scheduling</h2>
         <button onClick={() => setShowScheduleModal(true)} className="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg hover:bg-blue-700 transition">
-          <MonitorPlay className="h-4 w-4" />
-          Schedule Live Class
+          <MonitorPlay className="h-4 w-4" /> Schedule Live Class
         </button>
       </div>
 
       {liveClasses.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-xl shadow-md">
-          <MonitorPlay className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-600">No live classes scheduled.</p>
-        </div>
+        <div className="text-center py-16 bg-white rounded-xl shadow-md"><MonitorPlay className="h-16 w-16 text-gray-400 mx-auto mb-4" /><p className="text-gray-600">No live classes scheduled.</p></div>
       ) : (
         <div className="space-y-4">
           {liveClasses.map((liveClass) => (
             <div key={liveClass.id} className="bg-white p-6 rounded-xl shadow-md">
               <div className="flex justify-between items-start mb-4">
-                <div>
-                  <h3 className="text-xl font-bold text-gray-800">{liveClass.title}</h3>
-                  <p className="text-sm text-gray-500">{liveClass.course}</p>
-                </div>
-                <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-semibold">
-                  {liveClass.status}
-                </span>
+                <div><h3 className="text-xl font-bold text-gray-800">{liveClass.title}</h3><p className="text-sm text-gray-500">{liveClass.course}</p></div>
+                <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-semibold">{liveClass.status}</span>
               </div>
               <div className="grid md:grid-cols-4 gap-4 mb-4">
-                <div className="flex items-center text-gray-600">
-                  <Calendar size={16} className="mr-2" />
-                  <span className="text-sm">{liveClass.date}</span>
-                </div>
-                <div className="flex items-center text-gray-600">
-                  <Clock size={16} className="mr-2" />
-                  <span className="text-sm">{liveClass.time} ({liveClass.duration} min)</span>
-                </div>
-                <div className="flex items-center text-gray-600">
-                  <MonitorPlay size={16} className="mr-2" />
-                  <span className="text-sm">{liveClass.platform}</span>
-                </div>
-                <div className="flex items-center">
-                  <a href={liveClass.link} target="_blank" rel="noopener noreferrer"
-                    className="text-sm text-accent hover:underline">Join Link</a>
-                </div>
+                <div className="flex items-center text-gray-600"><Calendar size={16} className="mr-2" /><span className="text-sm">{liveClass.date}</span></div>
+                <div className="flex items-center text-gray-600"><Clock size={16} className="mr-2" /><span className="text-sm">{liveClass.time} ({liveClass.duration} min)</span></div>
+                <div className="flex items-center text-gray-600"><MonitorPlay size={16} className="mr-2" /><span className="text-sm">{liveClass.platform}</span></div>
+                <div className="flex items-center"><a href={liveClass.link} target="_blank" rel="noopener noreferrer" className="text-sm text-accent hover:underline">Join Link</a></div>
               </div>
               <div className="flex gap-2">
                 <button className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm font-semibold">Start Class</button>
-                <button className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition text-sm font-semibold">
-                  <Edit2 className="h-4 w-4 inline mr-1" />
-                    Edit
-                </button>
+                <button className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition text-sm font-semibold"><Edit2 className="h-4 w-4 inline mr-1" />Edit</button>
               </div>
             </div>
           ))}
         </div>
       )}
 
-      {/* Schedule Live Class Modal */}
       {showScheduleModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl p-8 max-w-2xl w-full shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -3329,73 +2363,47 @@ function LiveClassScheduling() {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Class Title *</label>
-                <input type="text" value={scheduleForm.title}
-                  onChange={e => setScheduleForm({ ...scheduleForm, title: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent"
-                  placeholder="e.g. Introduction to Arrays" />
+                <input type="text" value={scheduleForm.title} onChange={e => setScheduleForm({ ...scheduleForm, title: e.target.value })} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent" placeholder="e.g. Introduction to Arrays" />
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Course *</label>
-                <select value={scheduleForm.course}
-                  onChange={e => setScheduleForm({ ...scheduleForm, course: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent">
+                <select value={scheduleForm.course} onChange={e => setScheduleForm({ ...scheduleForm, course: e.target.value })} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent">
                   <option value="">Select Course</option>
-                  {courses.map(c => (
-                    <option key={c.id} value={c.id}>{c.code} - {c.course_name}</option>
-                  ))}
+                  {courses.map(c => <option key={c.id} value={c.id}>{c.code} - {c.course_name}</option>)}
                 </select>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Date *</label>
-                  <input type="date" value={scheduleForm.date}
-                    onChange={e => setScheduleForm({ ...scheduleForm, date: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent" />
+                  <input type="date" value={scheduleForm.date} onChange={e => setScheduleForm({ ...scheduleForm, date: e.target.value })} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent" />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Time *</label>
-                  <input type="time" value={scheduleForm.time}
-                    onChange={e => setScheduleForm({ ...scheduleForm, time: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent" />
+                  <input type="time" value={scheduleForm.time} onChange={e => setScheduleForm({ ...scheduleForm, time: e.target.value })} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Duration (minutes)</label>
-                  <input type="number" value={scheduleForm.duration}
-                    onChange={e => setScheduleForm({ ...scheduleForm, duration: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent"
-                    placeholder="60" />
+                  <input type="number" value={scheduleForm.duration} onChange={e => setScheduleForm({ ...scheduleForm, duration: e.target.value })} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent" placeholder="60" />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Platform</label>
-                  <select value={scheduleForm.platform}
-                    onChange={e => setScheduleForm({ ...scheduleForm, platform: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent">
-                    <option value="Zoom">Zoom</option>
-                    <option value="Google Meet">Google Meet</option>
-                    <option value="Microsoft Teams">Microsoft Teams</option>
-                    <option value="Jitsi">Jitsi</option>
+                  <select value={scheduleForm.platform} onChange={e => setScheduleForm({ ...scheduleForm, platform: e.target.value })} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent">
+                    <option value="Zoom">Zoom</option><option value="Google Meet">Google Meet</option><option value="Microsoft Teams">Microsoft Teams</option><option value="Jitsi">Jitsi</option>
                   </select>
                 </div>
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Meeting Link</label>
-                <input type="url" value={scheduleForm.link}
-                  onChange={e => setScheduleForm({ ...scheduleForm, link: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent"
-                  placeholder="https://zoom.us/j/..." />
+                <input type="url" value={scheduleForm.link} onChange={e => setScheduleForm({ ...scheduleForm, link: e.target.value })} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent" placeholder="https://zoom.us/j/..." />
               </div>
             </div>
             <div className="flex gap-3 mt-6">
-              <button onClick={handleScheduleClass} disabled={saving}
-                className="flex-1 bg-accent text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition disabled:opacity-50">
+              <button onClick={handleScheduleClass} disabled={saving} className="flex-1 bg-accent text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition disabled:opacity-50">
                 {saving ? 'Scheduling...' : 'Schedule Class'}
               </button>
-              <button onClick={() => setShowScheduleModal(false)}
-                className="px-6 bg-gray-200 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-300 transition">
-                Cancel
-              </button>
+              <button onClick={() => setShowScheduleModal(false)} className="px-6 bg-gray-200 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-300 transition">Cancel</button>
             </div>
           </div>
         </div>
@@ -3413,173 +2421,101 @@ function StudentManagement() {
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
 
-  useEffect(() => {
-    fetchStudents();
-  }, []);
+  useEffect(() => { fetchStudents(); }, []);
 
   const fetchStudents = async () => {
-    try {
-      const response = await api.get('/faculty/students');
-      if (response.data.success) {
-        setStudents(response.data.students || []);
-      }
-    } catch (error) {
-      console.error('Error fetching students:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleViewDetails = (student) => {
-    setSelectedStudent(student);
-    setShowDetailsModal(true);
+    try { const r = await api.get('/faculty/students'); if (r.data.success) setStudents(r.data.students || []); }
+    catch (e) { console.error(e); }
+    finally { setLoading(false); }
   };
 
   const filteredStudents = students.filter(student => {
-    const matchesSearch = student.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         student.email.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = student.full_name.toLowerCase().includes(searchTerm.toLowerCase()) || student.email.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCourse = filterCourse === 'all' || student.course === filterCourse;
     return matchesSearch && matchesCourse;
   });
 
   const courses = [...new Set(students.map(s => s.course))];
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent"></div>
-      </div>
-    );
-  }
+  const AvatarSVG = () => (
+    <svg viewBox="0 0 100 100" className="w-full h-full" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="50" cy="50" r="48" stroke="#111" strokeWidth="3.5" fill="white" />
+      <circle cx="50" cy="37" r="17" fill="#111" />
+      <ellipse cx="50" cy="80" rx="27" ry="17" fill="#111" />
+    </svg>
+  );
+
+  if (loading) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent"></div></div>;
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-primary">Student Management</h2>
-        <button className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition">
-          <Download size={18} />
-          Export Data
-        </button>
+        <button className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition"><Download size={18} />Export Data</button>
       </div>
 
       <div className="grid md:grid-cols-4 gap-6">
-        <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-blue-500">
-          <Users className="h-10 w-10 text-blue-500 mb-3" />
-          <h3 className="text-sm font-semibold text-gray-600 mb-2">Total Students</h3>
-          <p className="text-2xl font-bold text-primary">{students.length}</p>
-        </div>
-        <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-green-500">
-          <CheckCircle className="h-10 w-10 text-green-500 mb-3" />
-          <h3 className="text-sm font-semibold text-gray-600 mb-2">Active Students</h3>
-          <p className="text-2xl font-bold text-primary">
-            {students.filter(s => new Date(s.last_active) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)).length}
-          </p>
-        </div>
-        <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-yellow-500">
-          <TrendingUp className="h-10 w-10 text-yellow-500 mb-3" />
-          <h3 className="text-sm font-semibold text-gray-600 mb-2">Avg Progress</h3>
-          <p className="text-2xl font-bold text-primary">
-            {students.length > 0 ? Math.round(students.reduce((acc, s) => acc + (s.progress || 0), 0) / students.length) : 0}%
-          </p>
-        </div>
-        <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-purple-500">
-          <Award className="h-10 w-10 text-purple-500 mb-3" />
-          <h3 className="text-sm font-semibold text-gray-600 mb-2">Avg Quiz Score</h3>
-          <p className="text-2xl font-bold text-primary">
-            {students.length > 0 ? Math.round(students.reduce((acc, s) => acc + (s.quiz_average || 0), 0) / students.length) : 0}%
-          </p>
-        </div>
+        {[
+          { icon: Users, border: 'border-blue-500', text: 'text-blue-500', label: 'Total Students', value: students.length },
+          { icon: CheckCircle, border: 'border-green-500', text: 'text-green-500', label: 'Active Students', value: students.filter(s => new Date(s.last_active) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)).length },
+          { icon: TrendingUp, border: 'border-yellow-500', text: 'text-yellow-500', label: 'Avg Progress', value: `${students.length > 0 ? Math.round(students.reduce((acc, s) => acc + (s.progress || 0), 0) / students.length) : 0}%` },
+          { icon: Award, border: 'border-purple-500', text: 'text-purple-500', label: 'Avg Quiz Score', value: `${students.length > 0 ? Math.round(students.reduce((acc, s) => acc + (s.quiz_average || 0), 0) / students.length) : 0}%` },
+        ].map(({ icon: Icon, border, text, label, value }) => (
+          <div key={label} className={`bg-white p-6 rounded-xl shadow-md border-l-4 ${border}`}>
+            <Icon className={`h-10 w-10 ${text} mb-3`} />
+            <h3 className="text-sm font-semibold text-gray-600 mb-2">{label}</h3>
+            <p className="text-2xl font-bold text-primary">{value}</p>
+          </div>
+        ))}
       </div>
 
       <div className="bg-white p-4 rounded-xl shadow-md">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-            <input
-              type="text"
-              placeholder="Search students..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent"
-            />
+            <input type="text" placeholder="Search students..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent" />
           </div>
-          <select
-            value={filterCourse}
-            onChange={(e) => setFilterCourse(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent"
-          >
+          <select value={filterCourse} onChange={(e) => setFilterCourse(e.target.value)} className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent">
             <option value="all">All Courses</option>
-            {courses.map(course => (
-              <option key={course} value={course}>{course}</option>
-            ))}
+            {courses.map(course => <option key={course} value={course}>{course}</option>)}
           </select>
         </div>
       </div>
 
       {filteredStudents.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-xl shadow-md">
-          <Users className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-600">No students found.</p>
-        </div>
+        <div className="text-center py-16 bg-white rounded-xl shadow-md"><Users className="h-16 w-16 text-gray-400 mx-auto mb-4" /><p className="text-gray-600">No students found.</p></div>
       ) : (
         <div className="bg-white rounded-xl shadow-md overflow-hidden">
           <table className="w-full">
             <thead className="bg-gray-50 border-b-2 border-gray-200">
-              <tr>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Student</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Course</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Progress</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Assignments</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Quiz Avg</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Last Active</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Actions</th>
-              </tr>
+              <tr>{['Student', 'Course', 'Progress', 'Assignments', 'Quiz Avg', 'Last Active', 'Actions'].map(h => <th key={h} className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">{h}</th>)}</tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {filteredStudents.map((student) => (
                 <tr key={student.id} className="hover:bg-gray-50 transition">
                   <td className="px-6 py-4">
                     <div className="flex items-center">
-                      <div className="h-10 w-10 rounded-full border-2 border-gray-300 bg-white flex items-center justify-center overflow-hidden">
-                        <svg viewBox="0 0 100 100" className="w-full h-full" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <circle cx="50" cy="50" r="48" stroke="#111" strokeWidth="3.5" fill="white"/>
-                          <circle cx="50" cy="37" r="17" fill="#111"/>
-                          <ellipse cx="50" cy="80" rx="27" ry="17" fill="#111"/>
-                        </svg>
-                      </div>
-                      <div className="ml-3">
-                        <p className="font-medium text-gray-900">{student.full_name}</p>
-                        <p className="text-sm text-gray-600">{student.email}</p>
-                      </div>
+                      <div className="h-10 w-10 rounded-full border-2 border-gray-300 bg-white flex items-center justify-center overflow-hidden"><AvatarSVG /></div>
+                      <div className="ml-3"><p className="font-medium text-gray-900">{student.full_name}</p><p className="text-sm text-gray-600">{student.email}</p></div>
                     </div>
                   </td>
                   <td className="px-6 py-4 text-sm">{student.course}</td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
-                      <div className="flex-1 bg-gray-200 rounded-full h-2 w-24">
-                        <div className="bg-blue-600 h-2 rounded-full transition-all" style={{ width: `${student.progress || 0}%` }}></div>
-                      </div>
+                      <div className="flex-1 bg-gray-200 rounded-full h-2 w-24"><div className="bg-blue-600 h-2 rounded-full transition-all" style={{ width: `${student.progress || 0}%` }}></div></div>
                       <span className="text-sm font-semibold">{student.progress || 0}%</span>
                     </div>
                   </td>
                   <td className="px-6 py-4 text-sm">{student.assignments_completed}/{student.total_assignments}</td>
                   <td className="px-6 py-4">
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                      student.quiz_average >= 80 ? 'bg-green-100 text-green-800' :
-                      student.quiz_average >= 60 ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-red-100 text-red-800'
-                    }`}>
+                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${student.quiz_average >= 80 ? 'bg-green-100 text-green-800' : student.quiz_average >= 60 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}`}>
                       {student.quiz_average}%
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">
-                    {new Date(student.last_active).toLocaleDateString()}
-                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-600">{new Date(student.last_active).toLocaleDateString()}</td>
                   <td className="px-6 py-4">
-                    <button onClick={() => handleViewDetails(student)}
-                      className="text-blue-600 hover:text-blue-800 font-semibold text-sm flex items-center gap-1">
-                      <Eye size={16} />View
-                    </button>
+                    <button onClick={() => { setSelectedStudent(student); setShowDetailsModal(true); }} className="text-blue-600 hover:text-blue-800 font-semibold text-sm flex items-center gap-1"><Eye size={16} />View</button>
                   </td>
                 </tr>
               ))}
@@ -3598,11 +2534,7 @@ function StudentManagement() {
             <div className="space-y-6">
               <div className="flex items-center gap-4 pb-6 border-b">
                 <div className="h-16 w-16 rounded-full border-2 border-gray-300 bg-white flex items-center justify-center overflow-hidden">
-                  <svg viewBox="0 0 100 100" className="w-full h-full" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="50" cy="50" r="48" stroke="#111" strokeWidth="3.5" fill="white"/>
-                    <circle cx="50" cy="37" r="17" fill="#111"/>
-                    <ellipse cx="50" cy="80" rx="27" ry="17" fill="#111"/>
-                  </svg>
+                  <AvatarSVG />
                 </div>
                 <div>
                   <h4 className="text-xl font-bold text-gray-900">{selectedStudent.full_name}</h4>
@@ -3613,37 +2545,20 @@ function StudentManagement() {
               <div>
                 <h5 className="font-semibold text-gray-800 mb-3">Course Information</h5>
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <p className="text-sm text-gray-600">Course</p>
-                    <p className="font-semibold">{selectedStudent.course}</p>
-                  </div>
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <p className="text-sm text-gray-600">Enrolled On</p>
-                    <p className="font-semibold">{new Date(selectedStudent.enrollment_date).toLocaleDateString()}</p>
-                  </div>
+                  <div className="bg-gray-50 p-4 rounded-lg"><p className="text-sm text-gray-600">Course</p><p className="font-semibold">{selectedStudent.course}</p></div>
+                  <div className="bg-gray-50 p-4 rounded-lg"><p className="text-sm text-gray-600">Enrolled On</p><p className="font-semibold">{new Date(selectedStudent.enrollment_date).toLocaleDateString()}</p></div>
                 </div>
               </div>
               <div>
                 <h5 className="font-semibold text-gray-800 mb-3">Performance</h5>
                 <div className="space-y-4">
                   <div>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span>Overall Progress</span>
-                      <span className="font-semibold">{selectedStudent.progress}%</span>
-                    </div>
-                    <div className="bg-gray-200 rounded-full h-3">
-                      <div className="bg-blue-600 h-3 rounded-full" style={{ width: `${selectedStudent.progress}%` }}></div>
-                    </div>
+                    <div className="flex justify-between text-sm mb-1"><span>Overall Progress</span><span className="font-semibold">{selectedStudent.progress}%</span></div>
+                    <div className="bg-gray-200 rounded-full h-3"><div className="bg-blue-600 h-3 rounded-full" style={{ width: `${selectedStudent.progress}%` }}></div></div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-gray-50 p-4 rounded-lg">
-                      <p className="text-sm text-gray-600">Assignments</p>
-                      <p className="font-semibold text-lg">{selectedStudent.assignments_completed}/{selectedStudent.total_assignments}</p>
-                    </div>
-                    <div className="bg-gray-50 p-4 rounded-lg">
-                      <p className="text-sm text-gray-600">Quiz Average</p>
-                      <p className="font-semibold text-lg">{selectedStudent.quiz_average}%</p>
-                    </div>
+                    <div className="bg-gray-50 p-4 rounded-lg"><p className="text-sm text-gray-600">Assignments</p><p className="font-semibold text-lg">{selectedStudent.assignments_completed}/{selectedStudent.total_assignments}</p></div>
+                    <div className="bg-gray-50 p-4 rounded-lg"><p className="text-sm text-gray-600">Quiz Average</p><p className="font-semibold text-lg">{selectedStudent.quiz_average}%</p></div>
                   </div>
                 </div>
               </div>
@@ -3668,61 +2583,29 @@ function DoubtClearing() {
   const [showReplyModal, setShowReplyModal] = useState(false);
   const [reply, setReply] = useState('');
 
-  useEffect(() => {
-    fetchDoubts();
-  }, []);
+  useEffect(() => { fetchDoubts(); }, []);
 
   const fetchDoubts = async () => {
-    try {
-      const response = await api.get('/faculty/doubts');
-      if (response.data.success) {
-        setDoubts(response.data.doubts || []);
-      }
-    } catch (error) {
-      console.error('Error fetching doubts:', error);
-    } finally {
-      setLoading(false);
-    }
+    try { const r = await api.get('/faculty/doubts'); if (r.data.success) setDoubts(r.data.doubts || []); }
+    catch (e) { console.error(e); }
+    finally { setLoading(false); }
   };
 
   const handleReply = async () => {
-    if (!reply.trim()) {
-      alert('Please enter a reply');
-      return;
-    }
+    if (!reply.trim()) { alert('Please enter a reply'); return; }
     try {
       await api.post(`/faculty/doubts/${selectedDoubt.id}/reply`, { reply });
-      setDoubts(doubts.map(d => 
-        d.id === selectedDoubt.id 
-          ? { ...d, status: 'resolved', reply, replied_at: new Date().toISOString() }
-          : d
-      ));
+      setDoubts(doubts.map(d => d.id === selectedDoubt.id ? { ...d, status: 'resolved', reply, replied_at: new Date().toISOString() } : d));
       setShowReplyModal(false);
       setReply('');
-    } catch (error) {
-      console.error('Error sending reply:', error);
-      alert('Error sending reply');
-    }
+    } catch (e) { console.error(e); alert('Error sending reply'); }
   };
 
   const filteredDoubts = doubts.filter(d => filter === 'all' || d.status === filter);
 
-  const getPriorityColor = (priority) => {
-    switch(priority) {
-      case 'high': return 'bg-red-100 text-red-800';
-      case 'medium': return 'bg-yellow-100 text-yellow-800';
-      case 'low': return 'bg-green-100 text-green-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
+  const getPriorityColor = (priority) => ({ high: 'bg-red-100 text-red-800', medium: 'bg-yellow-100 text-yellow-800', low: 'bg-green-100 text-green-800' }[priority] || 'bg-gray-100 text-gray-800');
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent"></div>
-      </div>
-    );
-  }
+  if (loading) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent"></div></div>;
 
   return (
     <div className="space-y-6">
@@ -3730,78 +2613,59 @@ function DoubtClearing() {
         <h2 className="text-2xl font-bold text-primary">Doubt Clearing</h2>
         <div className="flex gap-2">
           {['all', 'pending', 'resolved'].map(f => (
-            <button key={f} onClick={() => setFilter(f)}
-              className={`px-4 py-2 rounded-lg transition capitalize ${filter === f ? 'bg-accent text-white' : 'bg-gray-200 hover:bg-gray-300'}`}>
-              {f}
-            </button>
+            <button key={f} onClick={() => setFilter(f)} className={`px-4 py-2 rounded-lg transition capitalize ${filter === f ? 'bg-accent text-white' : 'bg-gray-200 hover:bg-gray-300'}`}>{f}</button>
           ))}
         </div>
       </div>
 
       <div className="grid md:grid-cols-3 gap-6">
-        <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-yellow-500">
-          <AlertCircle className="h-10 w-10 text-yellow-500 mb-3" />
-          <h3 className="text-sm font-semibold text-gray-600 mb-2">Pending Doubts</h3>
-          <p className="text-2xl font-bold text-primary">{doubts.filter(d => d.status === 'pending').length}</p>
-        </div>
-        <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-green-500">
-          <CheckCircle className="h-10 w-10 text-green-500 mb-3" />
-          <h3 className="text-sm font-semibold text-gray-600 mb-2">Resolved</h3>
-          <p className="text-2xl font-bold text-primary">{doubts.filter(d => d.status === 'resolved').length}</p>
-        </div>
-        <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-blue-500">
-          <MessageSquare className="h-10 w-10 text-blue-500 mb-3" />
-          <h3 className="text-sm font-semibold text-gray-600 mb-2">Total Queries</h3>
-          <p className="text-2xl font-bold text-primary">{doubts.length}</p>
-        </div>
+        {[
+          { icon: AlertCircle, border: 'border-yellow-500', text: 'text-yellow-500', label: 'Pending Doubts', value: doubts.filter(d => d.status === 'pending').length },
+          { icon: CheckCircle, border: 'border-green-500', text: 'text-green-500', label: 'Resolved', value: doubts.filter(d => d.status === 'resolved').length },
+          { icon: MessageSquare, border: 'border-blue-500', text: 'text-blue-500', label: 'Total Queries', value: doubts.length },
+        ].map(({ icon: Icon, border, text, label, value }) => (
+          <div key={label} className={`bg-white p-6 rounded-xl shadow-md border-l-4 ${border}`}>
+            <Icon className={`h-10 w-10 ${text} mb-3`} />
+            <h3 className="text-sm font-semibold text-gray-600 mb-2">{label}</h3>
+            <p className="text-2xl font-bold text-primary">{value}</p>
+          </div>
+        ))}
       </div>
 
       <div className="space-y-4">
         {filteredDoubts.length === 0 ? (
-          <div className="text-center py-16 bg-white rounded-xl shadow-md">
-            <MessageSquare className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-600">No {filter} doubts</p>
-          </div>
-        ) : (
-          filteredDoubts.map((doubt) => (
-            <div key={doubt.id} className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition">
-              <div className="flex justify-between items-start mb-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <h3 className="text-lg font-bold text-gray-800">{doubt.subject}</h3>
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getPriorityColor(doubt.priority)}`}>
-                      {doubt.priority}
-                    </span>
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                      doubt.status === 'resolved' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {doubt.status}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-4 text-sm text-gray-600 mb-3">
-                    <span className="flex items-center gap-1"><User size={14} />{doubt.student_name}</span>
-                    <span className="flex items-center gap-1"><BookOpen size={14} />{doubt.course}</span>
-                    <span className="flex items-center gap-1"><Clock size={14} />{new Date(doubt.created_at).toLocaleString()}</span>
-                  </div>
-                  <p className="text-gray-700 mb-3">{doubt.question}</p>
-                  {doubt.status === 'resolved' && doubt.reply && (
-                    <div className="bg-green-50 border-l-4 border-green-500 p-4 rounded mt-3">
-                      <p className="text-sm font-semibold text-gray-800 mb-1">Your Reply:</p>
-                      <p className="text-sm text-gray-700">{doubt.reply}</p>
-                      <p className="text-xs text-gray-500 mt-2">Replied on {new Date(doubt.replied_at).toLocaleString()}</p>
-                    </div>
-                  )}
+          <div className="text-center py-16 bg-white rounded-xl shadow-md"><MessageSquare className="h-16 w-16 text-gray-400 mx-auto mb-4" /><p className="text-gray-600">No {filter} doubts</p></div>
+        ) : filteredDoubts.map((doubt) => (
+          <div key={doubt.id} className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition">
+            <div className="flex justify-between items-start mb-4">
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-2">
+                  <h3 className="text-lg font-bold text-gray-800">{doubt.subject}</h3>
+                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getPriorityColor(doubt.priority)}`}>{doubt.priority}</span>
+                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${doubt.status === 'resolved' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>{doubt.status}</span>
                 </div>
+                <div className="flex items-center gap-4 text-sm text-gray-600 mb-3">
+                  <span className="flex items-center gap-1"><User size={14} />{doubt.student_name}</span>
+                  <span className="flex items-center gap-1"><BookOpen size={14} />{doubt.course}</span>
+                  <span className="flex items-center gap-1"><Clock size={14} />{new Date(doubt.created_at).toLocaleString()}</span>
+                </div>
+                <p className="text-gray-700 mb-3">{doubt.question}</p>
+                {doubt.status === 'resolved' && doubt.reply && (
+                  <div className="bg-green-50 border-l-4 border-green-500 p-4 rounded mt-3">
+                    <p className="text-sm font-semibold text-gray-800 mb-1">Your Reply:</p>
+                    <p className="text-sm text-gray-700">{doubt.reply}</p>
+                    <p className="text-xs text-gray-500 mt-2">Replied on {new Date(doubt.replied_at).toLocaleString()}</p>
+                  </div>
+                )}
               </div>
-              {doubt.status === 'pending' && (
-                <button onClick={() => { setSelectedDoubt(doubt); setShowReplyModal(true); }}
-                  className="bg-accent hover:bg-blue-600 text-white px-6 py-2 rounded-lg font-semibold transition flex items-center gap-2">
-                  <MessageSquare size={18} />Reply to Doubt
-                </button>
-              )}
             </div>
-          ))
-        )}
+            {doubt.status === 'pending' && (
+              <button onClick={() => { setSelectedDoubt(doubt); setShowReplyModal(true); }} className="bg-accent hover:bg-blue-600 text-white px-6 py-2 rounded-lg font-semibold transition flex items-center gap-2">
+                <MessageSquare size={18} />Reply to Doubt
+              </button>
+            )}
+          </div>
+        ))}
       </div>
 
       {showReplyModal && selectedDoubt && (
@@ -3813,9 +2677,7 @@ function DoubtClearing() {
             </div>
             <div className="bg-gray-50 p-6 rounded-lg mb-6">
               <h4 className="font-semibold text-gray-800 mb-2">{selectedDoubt.subject}</h4>
-              <p className="text-sm text-gray-600 mb-3">
-                Asked by <span className="font-semibold">{selectedDoubt.student_name}</span> in <span className="font-semibold">{selectedDoubt.course}</span>
-              </p>
+              <p className="text-sm text-gray-600 mb-3">Asked by <span className="font-semibold">{selectedDoubt.student_name}</span> in <span className="font-semibold">{selectedDoubt.course}</span></p>
               <p className="text-gray-700">{selectedDoubt.question}</p>
             </div>
             <div className="mb-6">
@@ -3825,10 +2687,8 @@ function DoubtClearing() {
                 placeholder="Type your detailed explanation here..." />
             </div>
             <div className="flex gap-3">
-              <button onClick={handleReply}
-                className="flex-1 bg-accent hover:bg-blue-600 text-white py-3 rounded-lg font-semibold transition">Send Reply</button>
-              <button onClick={() => setShowReplyModal(false)}
-                className="px-6 bg-gray-200 hover:bg-gray-300 text-gray-700 py-3 rounded-lg font-semibold transition">Cancel</button>
+              <button onClick={handleReply} className="flex-1 bg-accent hover:bg-blue-600 text-white py-3 rounded-lg font-semibold transition">Send Reply</button>
+              <button onClick={() => setShowReplyModal(false)} className="px-6 bg-gray-200 hover:bg-gray-300 text-gray-700 py-3 rounded-lg font-semibold transition">Cancel</button>
             </div>
           </div>
         </div>
@@ -3860,8 +2720,7 @@ function DiscussionForum() {
         api.get('/faculty/courses').catch(() => ({ data: { courses: [] } }))
       ]);
       if (threadsRes.data.success) setThreads(threadsRes.data.threads || []);
-      const enrolled = coursesRes.data.courses || [];
-      setCourses([{ id: 'general', course_name: 'General' }, ...enrolled]);
+      setCourses([{ id: 'general', course_name: 'General' }, ...(coursesRes.data.courses || [])]);
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
   };
@@ -3869,20 +2728,14 @@ function DiscussionForum() {
   const handleCreateThread = async (e) => {
     e.preventDefault();
     setPosting(true);
-    try {
-      const res = await api.post('/forum/threads', newThread);
-      setThreads([res.data.thread, ...threads]);
-      setShowNewThread(false);
-      setNewThread({ title: '', content: '', course: 'General' });
-    } catch { alert('Error creating thread'); }
+    try { const res = await api.post('/forum/threads', newThread); setThreads([res.data.thread, ...threads]); setShowNewThread(false); setNewThread({ title: '', content: '', course: 'General' }); }
+    catch { alert('Error creating thread'); }
     finally { setPosting(false); }
   };
 
   const openThread = async (thread) => {
-    try {
-      const res = await api.get(`/forum/threads/${thread.id}`);
-      setSelectedThread(res.data.thread);
-    } catch { setSelectedThread(thread); }
+    try { const res = await api.get(`/forum/threads/${thread.id}`); setSelectedThread(res.data.thread); }
+    catch { setSelectedThread(thread); }
   };
 
   const handleReply = async () => {
@@ -3938,9 +2791,7 @@ function DiscussionForum() {
                 </div>
                 <div className="flex items-center gap-2">
                   {reply.is_answer && <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-semibold">✓ Answer</span>}
-                  {!reply.is_answer && (
-                    <button onClick={() => handleMarkAnswer(reply.id)} className="text-xs text-gray-400 hover:text-green-600 border border-gray-200 hover:border-green-400 px-2 py-1 rounded-lg transition">Mark as Answer</button>
-                  )}
+                  {!reply.is_answer && <button onClick={() => handleMarkAnswer(reply.id)} className="text-xs text-gray-400 hover:text-green-600 border border-gray-200 hover:border-green-400 px-2 py-1 rounded-lg transition">Mark as Answer</button>}
                 </div>
               </div>
               <p className="text-gray-700">{reply.content}</p>
@@ -3949,8 +2800,8 @@ function DiscussionForum() {
         </div>
         <div className="bg-white rounded-xl shadow-md p-6">
           <h4 className="font-bold text-gray-800 mb-3">Post a Reply</h4>
-          <textarea value={replyContent} onChange={e => setReplyContent(e.target.value)} rows={4}
-            placeholder="Write your reply..." className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400 resize-none" />
+          <textarea value={replyContent} onChange={e => setReplyContent(e.target.value)} rows={4} placeholder="Write your reply..."
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400 resize-none" />
           <button onClick={handleReply} disabled={submittingReply || !replyContent.trim()}
             className="mt-3 bg-orange-500 hover:bg-orange-600 text-white px-6 py-2.5 rounded-lg font-semibold disabled:opacity-50 flex items-center gap-2">
             <Send size={16} /> {submittingReply ? 'Posting...' : 'Post Reply'}
@@ -3975,10 +2826,7 @@ function DiscussionForum() {
         ))}
       </div>
       {filtered.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-xl shadow-md">
-          <MessageSquare className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-          <p className="text-gray-500 text-lg">No discussions yet</p>
-        </div>
+        <div className="text-center py-16 bg-white rounded-xl shadow-md"><MessageSquare className="h-16 w-16 text-gray-300 mx-auto mb-4" /><p className="text-gray-500 text-lg">No discussions yet</p></div>
       ) : (
         <div className="space-y-4">
           {filtered.map(thread => (
@@ -4020,13 +2868,13 @@ function DiscussionForum() {
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">Title</label>
-                <input value={newThread.title} onChange={e => setNewThread({ ...newThread, title: e.target.value })}
-                  placeholder="Your question or topic..." className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                <input value={newThread.title} onChange={e => setNewThread({ ...newThread, title: e.target.value })} placeholder="Your question or topic..."
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400" />
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">Content</label>
-                <textarea value={newThread.content} onChange={e => setNewThread({ ...newThread, content: e.target.value })}
-                  rows={5} placeholder="Describe in detail..." className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400 resize-none" />
+                <textarea value={newThread.content} onChange={e => setNewThread({ ...newThread, content: e.target.value })} rows={5} placeholder="Describe in detail..."
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400 resize-none" />
               </div>
               <div className="flex gap-3">
                 <button onClick={handleCreateThread} disabled={posting || !newThread.title || !newThread.content}
@@ -4045,152 +2893,41 @@ function DiscussionForum() {
 
 // ==================== SYSTEM SETTINGS COMPONENT ====================
 function SystemSettings() {
-  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('general');
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState({ type: '', text: '' });
 
-  const [generalSettings, setGeneralSettings] = useState({
-    institution_name: '',
-    academic_year: '',
-    semester: '',
-    default_language: 'en',
-    timezone: 'Asia/Kolkata',
-    date_format: 'DD/MM/YYYY',
-    time_format: '24h'
-  });
+  const [generalSettings, setGeneralSettings] = useState({ institution_name: '', academic_year: '', semester: '', default_language: 'en', timezone: 'Asia/Kolkata', date_format: 'DD/MM/YYYY', time_format: '24h' });
+  const [notificationSettings, setNotificationSettings] = useState({ email_notifications: false, student_query_alerts: false, assignment_submission_alerts: false, exam_reminders: false, course_updates: false, system_announcements: false, daily_digest: false, weekly_report: false });
+  const [courseSettings, setCourseSettings] = useState({ auto_enroll: false, allow_late_submissions: false, late_penalty_percentage: 0, max_late_days: 0, default_passing_grade: 40, attendance_required: 75, enable_discussion_forum: false, enable_peer_review: false });
+  const [securitySettings, setSecuritySettings] = useState({ two_factor_auth: false, session_timeout: 30, password_expiry_days: 90, force_password_change: false, allow_multiple_sessions: true, ip_whitelist_enabled: false, login_attempt_limit: 5 });
+  const [integrationSettings, setIntegrationSettings] = useState({ google_classroom: false, microsoft_teams: false, zoom_enabled: false, zoom_api_key: '', email_service: 'smtp', smtp_host: '', smtp_port: '', smtp_username: '', storage_provider: 'local', max_upload_size: 100 });
 
-  const [notificationSettings, setNotificationSettings] = useState({
-    email_notifications: false,
-    student_query_alerts: false,
-    assignment_submission_alerts: false,
-    exam_reminders: false,
-    course_updates: false,
-    system_announcements: false,
-    daily_digest: false,
-    weekly_report: false
-  });
-
-  const [courseSettings, setCourseSettings] = useState({
-    auto_enroll: false,
-    allow_late_submissions: false,
-    late_penalty_percentage: 0,
-    max_late_days: 0,
-    default_passing_grade: 40,
-    attendance_required: 75,
-    enable_discussion_forum: false,
-    enable_peer_review: false
-  });
-
-  const [securitySettings, setSecuritySettings] = useState({
-    two_factor_auth: false,
-    session_timeout: 30,
-    password_expiry_days: 90,
-    force_password_change: false,
-    allow_multiple_sessions: true,
-    ip_whitelist_enabled: false,
-    login_attempt_limit: 5
-  });
-
-  const [integrationSettings, setIntegrationSettings] = useState({
-    google_classroom: false,
-    microsoft_teams: false,
-    zoom_enabled: false,
-    zoom_api_key: '',
-    email_service: 'smtp',
-    smtp_host: '',
-    smtp_port: '',
-    smtp_username: '',
-    storage_provider: 'local',
-    max_upload_size: 100
-  });
-
-  useEffect(() => {
-    fetchSettings();
-  }, []);
+  useEffect(() => { fetchSettings(); }, []);
 
   const fetchSettings = async () => {
     try {
-      const response = await api.get('/faculty/settings');
-      if (response.data.success) {
-        const s = response.data.settings;
+      const r = await api.get('/faculty/settings');
+      if (r.data.success) {
+        const s = r.data.settings;
         if (s.general) setGeneralSettings(s.general);
         if (s.notifications) setNotificationSettings(s.notifications);
         if (s.course) setCourseSettings(s.course);
         if (s.security) setSecuritySettings(s.security);
         if (s.integrations) setIntegrationSettings(s.integrations);
       }
-    } catch (error) {
-      console.error('Error fetching settings:', error);
-    } finally {
-      setLoading(false);
-    }
+    } catch (e) { console.error(e); }
+    finally { setLoading(false); }
   };
 
-  const showMessage = (type, text) => {
-    setMessage({ type, text });
-    setTimeout(() => setMessage({ type: '', text: '' }), 3000);
-  };
+  const showMessage = (type, text) => { setMessage({ type, text }); setTimeout(() => setMessage({ type: '', text: '' }), 3000); };
 
-  const handleSaveGeneral = async () => {
+  const handleSave = async (endpoint, data) => {
     setSaving(true);
-    try {
-      await api.put('/faculty/settings/general', generalSettings);
-      showMessage('success', 'General settings updated successfully!');
-    } catch (error) {
-      showMessage('error', 'Error updating settings');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleSaveNotifications = async () => {
-    setSaving(true);
-    try {
-      await api.put('/faculty/settings/notifications', notificationSettings);
-      showMessage('success', 'Notification settings updated successfully!');
-    } catch (error) {
-      showMessage('error', 'Error updating settings');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleSaveCourse = async () => {
-    setSaving(true);
-    try {
-      await api.put('/faculty/settings/course', courseSettings);
-      showMessage('success', 'Course settings updated successfully!');
-    } catch (error) {
-      showMessage('error', 'Error updating settings');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleSaveSecurity = async () => {
-    setSaving(true);
-    try {
-      await api.put('/faculty/settings/security', securitySettings);
-      showMessage('success', 'Security settings updated successfully!');
-    } catch (error) {
-      showMessage('error', 'Error updating settings');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleSaveIntegrations = async () => {
-    setSaving(true);
-    try {
-      await api.put('/faculty/settings/integrations', integrationSettings);
-      showMessage('success', 'Integration settings updated successfully!');
-    } catch (error) {
-      showMessage('error', 'Error updating settings');
-    } finally {
-      setSaving(false);
-    }
+    try { await api.put(`/faculty/settings/${endpoint}`, data); showMessage('success', 'Settings updated successfully!'); }
+    catch (e) { showMessage('error', 'Error updating settings'); }
+    finally { setSaving(false); }
   };
 
   const tabs = [
@@ -4201,120 +2938,105 @@ function SystemSettings() {
     { id: 'integrations', label: 'Integrations', icon: Zap }
   ];
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent"></div>
+  const ToggleItem = ({ checked, onChange, label, desc }) => (
+    <div className="flex items-center justify-between p-4 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition">
+      <div>
+        <p className="font-semibold text-gray-800 text-sm">{label}</p>
+        <p className="text-xs text-gray-500 mt-0.5">{desc}</p>
       </div>
-    );
-  }
+      <button onClick={onChange} className={`relative inline-flex items-center w-14 h-8 rounded-full transition-colors flex-shrink-0 ${checked ? 'bg-green-500' : 'bg-gray-300'}`}>
+        <span className={`inline-block w-6 h-6 bg-white rounded-full shadow transform transition-transform ${checked ? 'translate-x-7' : 'translate-x-1'}`} />
+      </button>
+    </div>
+  );
+
+  if (loading) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent"></div></div>;
 
   return (
-    <div className="settings-page">
-      <div className="settings-header">
-        <h1 className="settings-page-title">System Settings</h1>
-      </div>
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold text-gray-900">System Settings</h2>
 
       {message.text && (
-        <div className={`settings-message ${message.type === 'success' ? 'success' : 'error'}`}>
+        <div className={`flex items-center gap-3 p-4 rounded-xl border ${message.type === 'success' ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
           {message.type === 'success' ? <CheckCircle size={20} /> : <AlertCircle size={20} />}
-          <span>{message.text}</span>
+          <span className="font-medium">{message.text}</span>
         </div>
       )}
 
-      <div className="settings-card">
-        <div className="settings-tabs">
+      <div className="bg-white rounded-xl shadow-md overflow-hidden">
+        <div className="flex border-b border-gray-200 bg-gray-50 overflow-x-auto">
           {tabs.map(tab => {
             const Icon = tab.icon;
             return (
               <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                className={`settings-tab ${activeTab === tab.id ? 'active' : ''}`}>
-                <Icon size={18} />
-                <span>{tab.label}</span>
+                className={`flex items-center gap-2 px-6 py-4 text-sm font-medium whitespace-nowrap border-b-2 transition ${activeTab === tab.id ? 'border-blue-600 text-blue-600 bg-white' : 'border-transparent text-gray-500 hover:text-gray-800 hover:bg-gray-100'}`}>
+                <Icon size={18} />{tab.label}
               </button>
             );
           })}
         </div>
 
-        <div className="settings-content">
+        <div className="p-8 max-w-3xl">
           {activeTab === 'general' && (
-            <div className="settings-section">
-              <h3 className="settings-section-title">General Settings</h3>
-              <div className="settings-grid">
-                <div className="settings-form-group">
-                  <label>Institution Name</label>
-                  <input type="text" value={generalSettings.institution_name}
-                    onChange={(e) => setGeneralSettings({...generalSettings, institution_name: e.target.value})}
-                    className="settings-input" />
-                </div>
-                <div className="settings-form-group">
-                  <label>Academic Year</label>
-                  <input type="text" value={generalSettings.academic_year}
-                    onChange={(e) => setGeneralSettings({...generalSettings, academic_year: e.target.value})}
-                    className="settings-input" />
-                </div>
-                <div className="settings-form-group">
-                  <label>Current Semester</label>
-                  <select value={generalSettings.semester}
-                    onChange={(e) => setGeneralSettings({...generalSettings, semester: e.target.value})}
-                    className="settings-input">
-                    <option value="Spring 2025">Spring 2025</option>
-                    <option value="Fall 2024">Fall 2024</option>
-                    <option value="Summer 2025">Summer 2025</option>
+            <div className="space-y-6">
+              <h3 className="text-lg font-bold text-gray-800 pb-3 border-b border-gray-200">General Settings</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {[
+                  { label: 'Institution Name', key: 'institution_name', type: 'input' },
+                  { label: 'Academic Year', key: 'academic_year', type: 'input' },
+                ].map(({ label, key }) => (
+                  <div key={key}>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">{label}</label>
+                    <input type="text" value={generalSettings[key]} onChange={e => setGeneralSettings({ ...generalSettings, [key]: e.target.value })}
+                      className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-blue-400 transition" />
+                  </div>
+                ))}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Semester</label>
+                  <select value={generalSettings.semester} onChange={e => setGeneralSettings({ ...generalSettings, semester: e.target.value })}
+                    className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-blue-400 transition bg-white">
+                    <option value="Spring 2025">Spring 2025</option><option value="Fall 2024">Fall 2024</option><option value="Summer 2025">Summer 2025</option>
                   </select>
                 </div>
-                <div className="settings-form-group">
-                  <label>Default Language</label>
-                  <select value={generalSettings.default_language}
-                    onChange={(e) => setGeneralSettings({...generalSettings, default_language: e.target.value})}
-                    className="settings-input">
-                    <option value="en">English</option>
-                    <option value="hi">Hindi</option>
-                    <option value="es">Spanish</option>
-                    <option value="fr">French</option>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Language</label>
+                  <select value={generalSettings.default_language} onChange={e => setGeneralSettings({ ...generalSettings, default_language: e.target.value })}
+                    className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-blue-400 transition bg-white">
+                    <option value="en">English</option><option value="hi">Hindi</option><option value="es">Spanish</option>
                   </select>
                 </div>
-                <div className="settings-form-group">
-                  <label>Timezone</label>
-                  <select value={generalSettings.timezone}
-                    onChange={(e) => setGeneralSettings({...generalSettings, timezone: e.target.value})}
-                    className="settings-input">
-                    <option value="Asia/Kolkata">IST (Asia/Kolkata)</option>
-                    <option value="America/New_York">EST (America/New_York)</option>
-                    <option value="Europe/London">GMT (Europe/London)</option>
-                    <option value="Asia/Tokyo">JST (Asia/Tokyo)</option>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Timezone</label>
+                  <select value={generalSettings.timezone} onChange={e => setGeneralSettings({ ...generalSettings, timezone: e.target.value })}
+                    className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-blue-400 transition bg-white">
+                    <option value="Asia/Kolkata">IST (Asia/Kolkata)</option><option value="America/New_York">EST (America/New_York)</option><option value="Europe/London">GMT (Europe/London)</option>
                   </select>
                 </div>
-                <div className="settings-form-group">
-                  <label>Date Format</label>
-                  <select value={generalSettings.date_format}
-                    onChange={(e) => setGeneralSettings({...generalSettings, date_format: e.target.value})}
-                    className="settings-input">
-                    <option value="DD/MM/YYYY">DD/MM/YYYY</option>
-                    <option value="MM/DD/YYYY">MM/DD/YYYY</option>
-                    <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Date Format</label>
+                  <select value={generalSettings.date_format} onChange={e => setGeneralSettings({ ...generalSettings, date_format: e.target.value })}
+                    className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-blue-400 transition bg-white">
+                    <option value="DD/MM/YYYY">DD/MM/YYYY</option><option value="MM/DD/YYYY">MM/DD/YYYY</option><option value="YYYY-MM-DD">YYYY-MM-DD</option>
                   </select>
                 </div>
-                <div className="settings-form-group">
-                  <label>Time Format</label>
-                  <select value={generalSettings.time_format}
-                    onChange={(e) => setGeneralSettings({...generalSettings, time_format: e.target.value})}
-                    className="settings-input">
-                    <option value="24h">24 Hour</option>
-                    <option value="12h">12 Hour (AM/PM)</option>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Time Format</label>
+                  <select value={generalSettings.time_format} onChange={e => setGeneralSettings({ ...generalSettings, time_format: e.target.value })}
+                    className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-blue-400 transition bg-white">
+                    <option value="24h">24 Hour</option><option value="12h">12 Hour (AM/PM)</option>
                   </select>
                 </div>
               </div>
-              <button onClick={handleSaveGeneral} disabled={saving} className="settings-save-btn">
+              <button onClick={() => handleSave('general', generalSettings)} disabled={saving} className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition disabled:opacity-50">
                 {saving ? 'Saving...' : 'Save General Settings'}
               </button>
             </div>
           )}
 
           {activeTab === 'notifications' && (
-            <div className="settings-section">
-              <h3 className="settings-section-title">Notification Preferences</h3>
-              <div className="settings-toggle-list">
+            <div className="space-y-6">
+              <h3 className="text-lg font-bold text-gray-800 pb-3 border-b border-gray-200">Notification Preferences</h3>
+              <div className="space-y-3">
                 {[
                   { key: 'email_notifications', label: 'Email Notifications', desc: 'Receive updates via email' },
                   { key: 'student_query_alerts', label: 'Student Query Alerts', desc: 'Get notified when students ask questions' },
@@ -4323,245 +3045,136 @@ function SystemSettings() {
                   { key: 'course_updates', label: 'Course Updates', desc: 'Notifications about course changes' },
                   { key: 'system_announcements', label: 'System Announcements', desc: 'Important system notifications' },
                   { key: 'daily_digest', label: 'Daily Digest', desc: 'Daily summary of activities' },
-                  { key: 'weekly_report', label: 'Weekly Report', desc: 'Weekly performance reports' }
+                  { key: 'weekly_report', label: 'Weekly Report', desc: 'Weekly performance reports' },
                 ].map(pref => (
-                  <div key={pref.key} className="settings-toggle-item">
-                    <div className="settings-toggle-info">
-                      <p className="settings-toggle-label">{pref.label}</p>
-                      <p className="settings-toggle-desc">{pref.desc}</p>
-                    </div>
-                    <button
-                      onClick={() => setNotificationSettings({...notificationSettings, [pref.key]: !notificationSettings[pref.key]})}
-                      className={`settings-toggle-switch ${notificationSettings[pref.key] ? 'active' : ''}`}>
-                      <span className="settings-toggle-slider" />
-                    </button>
-                  </div>
+                  <ToggleItem key={pref.key} checked={notificationSettings[pref.key]} label={pref.label} desc={pref.desc}
+                    onChange={() => setNotificationSettings({ ...notificationSettings, [pref.key]: !notificationSettings[pref.key] })} />
                 ))}
               </div>
-              <button onClick={handleSaveNotifications} disabled={saving} className="settings-save-btn">
+              <button onClick={() => handleSave('notifications', notificationSettings)} disabled={saving} className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition disabled:opacity-50">
                 {saving ? 'Saving...' : 'Save Notification Settings'}
               </button>
             </div>
           )}
 
           {activeTab === 'course' && (
-            <div className="settings-section">
-              <h3 className="settings-section-title">Course Management Settings</h3>
-              <div className="settings-toggle-list">
+            <div className="space-y-6">
+              <h3 className="text-lg font-bold text-gray-800 pb-3 border-b border-gray-200">Course Management Settings</h3>
+              <div className="space-y-3">
                 {[
                   { key: 'auto_enroll', label: 'Auto Enrollment', desc: 'Automatically enroll students in courses' },
                   { key: 'allow_late_submissions', label: 'Allow Late Submissions', desc: 'Enable late assignment submissions' },
                   { key: 'enable_discussion_forum', label: 'Discussion Forum', desc: 'Enable course discussion boards' },
-                  { key: 'enable_peer_review', label: 'Peer Review', desc: "Allow students to review each other's work" }
+                  { key: 'enable_peer_review', label: 'Peer Review', desc: "Allow students to review each other's work" },
                 ].map(pref => (
-                  <div key={pref.key} className="settings-toggle-item">
-                    <div className="settings-toggle-info">
-                      <p className="settings-toggle-label">{pref.label}</p>
-                      <p className="settings-toggle-desc">{pref.desc}</p>
-                    </div>
-                    <button
-                      onClick={() => setCourseSettings({...courseSettings, [pref.key]: !courseSettings[pref.key]})}
-                      className={`settings-toggle-switch ${courseSettings[pref.key] ? 'active' : ''}`}>
-                      <span className="settings-toggle-slider" />
-                    </button>
+                  <ToggleItem key={pref.key} checked={courseSettings[pref.key]} label={pref.label} desc={pref.desc}
+                    onChange={() => setCourseSettings({ ...courseSettings, [pref.key]: !courseSettings[pref.key] })} />
+                ))}
+              </div>
+              <div className="grid grid-cols-2 gap-4 mt-4">
+                {[
+                  { label: 'Late Penalty (%)', key: 'late_penalty_percentage' },
+                  { label: 'Max Late Days', key: 'max_late_days' },
+                  { label: 'Default Passing Grade (%)', key: 'default_passing_grade' },
+                  { label: 'Required Attendance (%)', key: 'attendance_required' },
+                ].map(({ label, key }) => (
+                  <div key={key}>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">{label}</label>
+                    <input type="number" value={courseSettings[key]} onChange={e => setCourseSettings({ ...courseSettings, [key]: e.target.value })}
+                      className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-blue-400 transition" />
                   </div>
                 ))}
               </div>
-              <div className="settings-grid" style={{marginTop: '1.5rem'}}>
-                <div className="settings-form-group">
-                  <label>Late Penalty (%)</label>
-                  <input type="number" value={courseSettings.late_penalty_percentage}
-                    onChange={(e) => setCourseSettings({...courseSettings, late_penalty_percentage: e.target.value})}
-                    className="settings-input" min="0" max="100" />
-                </div>
-                <div className="settings-form-group">
-                  <label>Max Late Days</label>
-                  <input type="number" value={courseSettings.max_late_days}
-                    onChange={(e) => setCourseSettings({...courseSettings, max_late_days: e.target.value})}
-                    className="settings-input" min="0" />
-                </div>
-                <div className="settings-form-group">
-                  <label>Default Passing Grade (%)</label>
-                  <input type="number" value={courseSettings.default_passing_grade}
-                    onChange={(e) => setCourseSettings({...courseSettings, default_passing_grade: e.target.value})}
-                    className="settings-input" min="0" max="100" />
-                </div>
-                <div className="settings-form-group">
-                  <label>Required Attendance (%)</label>
-                  <input type="number" value={courseSettings.attendance_required}
-                    onChange={(e) => setCourseSettings({...courseSettings, attendance_required: e.target.value})}
-                    className="settings-input" min="0" max="100" />
-                </div>
-              </div>
-              <button onClick={handleSaveCourse} disabled={saving} className="settings-save-btn">
+              <button onClick={() => handleSave('course', courseSettings)} disabled={saving} className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition disabled:opacity-50">
                 {saving ? 'Saving...' : 'Save Course Settings'}
               </button>
             </div>
           )}
 
           {activeTab === 'security' && (
-            <div className="settings-section">
-              <h3 className="settings-section-title">Security Settings</h3>
-              <div className="settings-toggle-list">
+            <div className="space-y-6">
+              <h3 className="text-lg font-bold text-gray-800 pb-3 border-b border-gray-200">Security Settings</h3>
+              <div className="space-y-3">
                 {[
                   { key: 'two_factor_auth', label: 'Two-Factor Authentication', desc: 'Require 2FA for all users' },
                   { key: 'force_password_change', label: 'Force Password Change', desc: 'Require password change on first login' },
                   { key: 'allow_multiple_sessions', label: 'Multiple Sessions', desc: 'Allow users to login from multiple devices' },
-                  { key: 'ip_whitelist_enabled', label: 'IP Whitelisting', desc: 'Restrict access to specific IP addresses' }
+                  { key: 'ip_whitelist_enabled', label: 'IP Whitelisting', desc: 'Restrict access to specific IP addresses' },
                 ].map(pref => (
-                  <div key={pref.key} className="settings-toggle-item">
-                    <div className="settings-toggle-info">
-                      <p className="settings-toggle-label">{pref.label}</p>
-                      <p className="settings-toggle-desc">{pref.desc}</p>
-                    </div>
-                    <button
-                      onClick={() => setSecuritySettings({...securitySettings, [pref.key]: !securitySettings[pref.key]})}
-                      className={`settings-toggle-switch ${securitySettings[pref.key] ? 'active' : ''}`}>
-                      <span className="settings-toggle-slider" />
-                    </button>
+                  <ToggleItem key={pref.key} checked={securitySettings[pref.key]} label={pref.label} desc={pref.desc}
+                    onChange={() => setSecuritySettings({ ...securitySettings, [pref.key]: !securitySettings[pref.key] })} />
+                ))}
+              </div>
+              <div className="grid grid-cols-2 gap-4 mt-4">
+                {[
+                  { label: 'Session Timeout (min)', key: 'session_timeout' },
+                  { label: 'Password Expiry (days)', key: 'password_expiry_days' },
+                  { label: 'Login Attempt Limit', key: 'login_attempt_limit' },
+                ].map(({ label, key }) => (
+                  <div key={key}>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">{label}</label>
+                    <input type="number" value={securitySettings[key]} onChange={e => setSecuritySettings({ ...securitySettings, [key]: e.target.value })}
+                      className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-blue-400 transition" />
                   </div>
                 ))}
               </div>
-              <div className="settings-grid" style={{marginTop: '1.5rem'}}>
-                <div className="settings-form-group">
-                  <label>Session Timeout (minutes)</label>
-                  <input type="number" value={securitySettings.session_timeout}
-                    onChange={(e) => setSecuritySettings({...securitySettings, session_timeout: e.target.value})}
-                    className="settings-input" min="5" />
-                </div>
-                <div className="settings-form-group">
-                  <label>Password Expiry (days)</label>
-                  <input type="number" value={securitySettings.password_expiry_days}
-                    onChange={(e) => setSecuritySettings({...securitySettings, password_expiry_days: e.target.value})}
-                    className="settings-input" min="30" />
-                </div>
-                <div className="settings-form-group">
-                  <label>Login Attempt Limit</label>
-                  <input type="number" value={securitySettings.login_attempt_limit}
-                    onChange={(e) => setSecuritySettings({...securitySettings, login_attempt_limit: e.target.value})}
-                    className="settings-input" min="3" />
-                </div>
-              </div>
-              <button onClick={handleSaveSecurity} disabled={saving} className="settings-save-btn">
+              <button onClick={() => handleSave('security', securitySettings)} disabled={saving} className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition disabled:opacity-50">
                 {saving ? 'Saving...' : 'Save Security Settings'}
               </button>
             </div>
           )}
 
           {activeTab === 'integrations' && (
-            <div className="settings-section">
-              <h3 className="settings-section-title">Third-Party Integrations</h3>
-              <div className="settings-toggle-list">
+            <div className="space-y-6">
+              <h3 className="text-lg font-bold text-gray-800 pb-3 border-b border-gray-200">Third-Party Integrations</h3>
+              <div className="space-y-3">
                 {[
                   { key: 'google_classroom', label: 'Google Classroom', desc: 'Sync with Google Classroom' },
                   { key: 'microsoft_teams', label: 'Microsoft Teams', desc: 'Enable Teams integration' },
-                  { key: 'zoom_enabled', label: 'Zoom Meetings', desc: 'Enable Zoom for live classes' }
+                  { key: 'zoom_enabled', label: 'Zoom Meetings', desc: 'Enable Zoom for live classes' },
                 ].map(pref => (
-                  <div key={pref.key} className="settings-toggle-item">
-                    <div className="settings-toggle-info">
-                      <p className="settings-toggle-label">{pref.label}</p>
-                      <p className="settings-toggle-desc">{pref.desc}</p>
-                    </div>
-                    <button
-                      onClick={() => setIntegrationSettings({...integrationSettings, [pref.key]: !integrationSettings[pref.key]})}
-                      className={`settings-toggle-switch ${integrationSettings[pref.key] ? 'active' : ''}`}>
-                      <span className="settings-toggle-slider" />
-                    </button>
-                  </div>
+                  <ToggleItem key={pref.key} checked={integrationSettings[pref.key]} label={pref.label} desc={pref.desc}
+                    onChange={() => setIntegrationSettings({ ...integrationSettings, [pref.key]: !integrationSettings[pref.key] })} />
                 ))}
               </div>
               {integrationSettings.zoom_enabled && (
-                <div className="settings-form-group" style={{marginTop: '1.5rem', marginBottom: '1.5rem'}}>
-                  <label>Zoom API Key</label>
-                  <input type="text" value={integrationSettings.zoom_api_key}
-                    onChange={(e) => setIntegrationSettings({...integrationSettings, zoom_api_key: e.target.value})}
-                    className="settings-input" placeholder="Enter Zoom API Key" />
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Zoom API Key</label>
+                  <input type="text" value={integrationSettings.zoom_api_key} onChange={e => setIntegrationSettings({ ...integrationSettings, zoom_api_key: e.target.value })}
+                    className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-blue-400 transition" placeholder="Enter Zoom API Key" />
                 </div>
               )}
-              <div className="settings-grid">
-                <div className="settings-form-group">
-                  <label>Email Service</label>
-                  <select value={integrationSettings.email_service}
-                    onChange={(e) => setIntegrationSettings({...integrationSettings, email_service: e.target.value})}
-                    className="settings-input">
-                    <option value="smtp">SMTP</option>
-                    <option value="sendgrid">SendGrid</option>
-                    <option value="mailgun">Mailgun</option>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Email Service</label>
+                  <select value={integrationSettings.email_service} onChange={e => setIntegrationSettings({ ...integrationSettings, email_service: e.target.value })}
+                    className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-blue-400 transition bg-white">
+                    <option value="smtp">SMTP</option><option value="sendgrid">SendGrid</option><option value="mailgun">Mailgun</option>
                   </select>
                 </div>
-                <div className="settings-form-group">
-                  <label>Storage Provider</label>
-                  <select value={integrationSettings.storage_provider}
-                    onChange={(e) => setIntegrationSettings({...integrationSettings, storage_provider: e.target.value})}
-                    className="settings-input">
-                    <option value="local">Local Storage</option>
-                    <option value="aws_s3">AWS S3</option>
-                    <option value="google_cloud">Google Cloud</option>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Storage Provider</label>
+                  <select value={integrationSettings.storage_provider} onChange={e => setIntegrationSettings({ ...integrationSettings, storage_provider: e.target.value })}
+                    className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-blue-400 transition bg-white">
+                    <option value="local">Local Storage</option><option value="aws_s3">AWS S3</option><option value="google_cloud">Google Cloud</option>
                   </select>
                 </div>
-                <div className="settings-form-group">
-                  <label>Max Upload Size (MB)</label>
-                  <input type="number" value={integrationSettings.max_upload_size}
-                    onChange={(e) => setIntegrationSettings({...integrationSettings, max_upload_size: e.target.value})}
-                    className="settings-input" min="1" />
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Max Upload Size (MB)</label>
+                  <input type="number" value={integrationSettings.max_upload_size} onChange={e => setIntegrationSettings({ ...integrationSettings, max_upload_size: e.target.value })}
+                    className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-blue-400 transition" />
                 </div>
               </div>
-              <button onClick={handleSaveIntegrations} disabled={saving} className="settings-save-btn">
+              <button onClick={() => handleSave('integrations', integrationSettings)} disabled={saving} className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition disabled:opacity-50">
                 {saving ? 'Saving...' : 'Save Integration Settings'}
               </button>
             </div>
           )}
         </div>
       </div>
-
-      <style jsx>{`
-        .settings-page { max-width: 1400px; margin: 0 auto; }
-        .settings-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
-        .settings-page-title { font-size: 1.75rem; font-weight: 700; color: #1F2937; }
-        .settings-message { display: flex; align-items: center; gap: 0.75rem; padding: 1rem 1.25rem; border-radius: 8px; margin-bottom: 1.5rem; font-size: 0.9375rem; }
-        .settings-message.success { background-color: #D1FAE5; color: #065F46; }
-        .settings-message.error { background-color: #FEE2E2; color: #991B1B; }
-        .settings-card { background: white; border-radius: 12px; box-shadow: 0 1px 3px 0 rgba(0,0,0,0.1); border: 1px solid #E5E7EB; overflow: hidden; }
-        .settings-tabs { display: flex; border-bottom: 2px solid #E5E7EB; overflow-x: auto; background: #F9FAFB; }
-        .settings-tab { display: flex; align-items: center; gap: 0.5rem; padding: 1rem 1.5rem; background: none; border: none; border-bottom: 3px solid transparent; color: #6B7280; font-weight: 500; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
-        .settings-tab:hover { background-color: #F3F4F6; color: #1F2937; }
-        .settings-tab.active { color: #0B5FCC; border-bottom-color: #0B5FCC; background-color: white; }
-        .settings-tab span { font-size: 0.875rem; }
-        .settings-content { padding: 2rem; }
-        .settings-section { max-width: 900px; }
-        .settings-section-title { font-size: 1.25rem; font-weight: 700; color: #1F2937; margin-bottom: 1.5rem; padding-bottom: 0.75rem; border-bottom: 2px solid #E5E7EB; }
-        .settings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; }
-        .settings-form-group { display: flex; flex-direction: column; }
-        .settings-form-group label { font-size: 0.875rem; font-weight: 600; color: #374151; margin-bottom: 0.5rem; }
-        .settings-input { width: 100%; padding: 0.75rem 1rem; border: 2px solid #D1D5DB; border-radius: 8px; font-size: 0.9375rem; transition: all 0.2s; }
-        .settings-input:focus { outline: none; border-color: #0B5FCC; box-shadow: 0 0 0 3px rgba(11,95,204,0.1); }
-        .settings-toggle-list { display: flex; flex-direction: column; gap: 0.75rem; }
-        .settings-toggle-item { display: flex; align-items: center; justify-content: space-between; padding: 1.25rem; background-color: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 8px; transition: all 0.2s; }
-        .settings-toggle-item:hover { background-color: #F3F4F6; border-color: #D1D5DB; }
-        .settings-toggle-info { flex: 1; }
-        .settings-toggle-label { font-size: 0.9375rem; font-weight: 600; color: #1F2937; margin-bottom: 0.25rem; }
-        .settings-toggle-desc { font-size: 0.8125rem; color: #6B7280; }
-        .settings-toggle-switch { position: relative; display: inline-flex; align-items: center; width: 3.5rem; height: 2rem; background-color: #D1D5DB; border-radius: 9999px; border: none; cursor: pointer; transition: background-color 0.3s; flex-shrink: 0; }
-        .settings-toggle-switch:hover { background-color: #9CA3AF; }
-        .settings-toggle-switch.active { background-color: #10B981; }
-        .settings-toggle-switch.active:hover { background-color: #059669; }
-        .settings-toggle-slider { display: block; width: 1.5rem; height: 1.5rem; background-color: white; border-radius: 50%; transform: translateX(0.25rem); transition: transform 0.3s; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
-        .settings-toggle-switch.active .settings-toggle-slider { transform: translateX(1.75rem); }
-        .settings-save-btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.875rem 1.5rem; background-color: #0B5FCC; color: white; border: none; border-radius: 8px; font-size: 0.9375rem; font-weight: 600; cursor: pointer; transition: all 0.2s; margin-top: 1.5rem; }
-        .settings-save-btn:hover { background-color: #094ba8; box-shadow: 0 4px 12px rgba(11,95,204,0.3); }
-        .settings-save-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-        @media (max-width: 768px) {
-          .settings-tabs { overflow-x: scroll; }
-          .settings-tab { padding: 0.875rem 1rem; }
-          .settings-content { padding: 1.5rem 1rem; }
-          .settings-grid { grid-template-columns: 1fr; }
-          .settings-toggle-item { flex-direction: column; align-items: flex-start; gap: 1rem; }
-        }
-      `}</style>
     </div>
   );
 }
-
 // ==================== MAIN FACULTY DASHBOARD COMPONENT ====================
 export default function FacultyDashboard() {
   const location = useLocation();
