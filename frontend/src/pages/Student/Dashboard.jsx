@@ -2,7 +2,7 @@
 // Same color layout as FacultyDashboard with Overview + all sections
 
 import { useState, useEffect } from 'react';
-import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
+import { Routes, Route, Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
 import CoursePlayer from './CoursePlayer';
@@ -18,7 +18,8 @@ import {
   Github, Linkedin, Twitter, Link as LinkIcon, Menu,
   ShoppingBag, ThumbsUp, GraduationCap, ChevronDown,
   RefreshCw, Users, Zap, Home, TrendingDown, BookMarked,
-  CheckSquare, PlaySquare, MonitorPlay, Layers, ClipboardList, Timer, Trophy, FilePen, Upload 
+  CheckSquare, PlaySquare, MonitorPlay, Layers, ClipboardList, Timer, Trophy, FilePen, Upload,
+  FolderOpen, HardDrive, Archive, FilePlus, ChevronLeft 
 } from 'lucide-react';
 
 // ==================== CIRCULAR PROGRESS ====================
@@ -513,7 +514,7 @@ function MyCourses() {
                   </div>
 
                   {/* Actions */}
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 mb-2">
                     <Link
                       to={`/student/course/${course.id}`}
                       className="flex-1 bg-orange-500 hover:bg-orange-600 text-white text-center py-2.5 rounded-lg font-semibold transition text-sm flex items-center justify-center gap-2"
@@ -532,6 +533,14 @@ function MyCourses() {
                       </button>
                     )}
                   </div>
+
+                  {/* Materials Button — separate from YouTube */}
+                  <Link
+                    to={`/student/course/${course.id}/materials`}
+                    className="w-full flex items-center justify-center gap-2 py-2 rounded-lg border-2 border-blue-200 text-blue-600 hover:bg-blue-50 hover:border-blue-400 transition text-sm font-semibold"
+                  >
+                    <FolderOpen size={15} /> Course Materials
+                  </Link>
                 </div>
 
               </div>
@@ -2257,6 +2266,236 @@ function StudentAssignments() {
   );
 }
 
+// ==================== COURSE MATERIALS PAGE ====================
+function CourseMaterials() {
+  const { courseId } = useParams();
+  const navigate = useNavigate();
+  const [materials, setMaterials] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [activeItem, setActiveItem] = useState(null);
+  const [completedIds, setCompletedIds] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(`mat_${courseId}`) || '[]'); } catch { return []; }
+  });
+  const [courseName, setCourseName] = useState('');
+
+  const TYPE_CONFIG = {
+    video: { icon: Video,    color: 'from-red-500 to-rose-600',    badge: 'bg-red-100 text-red-700',    label: 'Video' },
+    pdf:   { icon: FileText, color: 'from-blue-500 to-blue-600',   badge: 'bg-blue-100 text-blue-700',  label: 'PDF' },
+    ppt:   { icon: FilePlus, color: 'from-orange-500 to-amber-500',badge: 'bg-orange-100 text-orange-700',label: 'Slides' },
+    scorm: { icon: Archive,  color: 'from-green-500 to-emerald-600',badge: 'bg-green-100 text-green-700',label: 'SCORM' },
+  };
+
+  const resolveUrl = (p) => {
+    if (!p) return null;
+    if (p.startsWith('http')) return p;
+    const base = (import.meta?.env?.VITE_API_URL || 'https://upskillize-lms-backend.onrender.com/api').replace(/\/api$/, '');
+    return base + p;
+  };
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [matRes, courseRes] = await Promise.allSettled([
+          api.get(`/faculty/course-content/${courseId}`),
+          api.get(`/courses/${courseId}`)
+        ]);
+        if (matRes.status === 'fulfilled' && matRes.value.data.success) {
+          const items = matRes.value.data.content || [];
+          setMaterials(items);
+          if (items.length > 0) setActiveItem(items[0]);
+        }
+        if (courseRes.status === 'fulfilled' && courseRes.value.data.success) {
+          setCourseName(courseRes.value.data.course?.course_name || '');
+        }
+      } catch(e) { console.error(e); }
+      finally { setLoading(false); }
+    };
+    load();
+  }, [courseId]);
+
+  const markDone = (id) => {
+    if (completedIds.includes(id)) return;
+    const updated = [...completedIds, id];
+    setCompletedIds(updated);
+    try { localStorage.setItem(`mat_${courseId}`, JSON.stringify(updated)); } catch {}
+  };
+
+  const progress = materials.length > 0 ? Math.round((completedIds.length / materials.length) * 100) : 0;
+
+  if (loading) return (
+    <div className="flex items-center justify-center h-64">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500" />
+    </div>
+  );
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center gap-4">
+        <button onClick={() => navigate('/student/courses')}
+          className="flex items-center gap-1 text-gray-500 hover:text-gray-800 transition text-sm font-medium">
+          <ChevronLeft size={18} /> Back to My Courses
+        </button>
+        <div className="flex-1">
+          <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <FolderOpen size={26} className="text-blue-500" /> Course Materials
+          </h2>
+          {courseName && <p className="text-sm text-gray-500 mt-0.5">{courseName}</p>}
+        </div>
+        <button onClick={() => navigate(`/student/course/${courseId}`)}
+          className="flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-semibold transition">
+          <PlayCircle size={16} /> Watch Videos
+        </button>
+      </div>
+
+      {materials.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 bg-white rounded-xl shadow-md">
+          <FolderOpen size={56} className="text-gray-200 mb-4" />
+          <p className="text-xl font-bold text-gray-400">No materials uploaded yet</p>
+          <p className="text-gray-400 text-sm mt-1">The instructor hasn't uploaded content for this course.</p>
+        </div>
+      ) : (
+        <div className="grid lg:grid-cols-3 gap-6">
+
+          {/* Left — Viewer */}
+          <div className="lg:col-span-2 space-y-4">
+            {activeItem && (() => {
+              const cfg = TYPE_CONFIG[activeItem.type] || TYPE_CONFIG.pdf;
+              const Icon = cfg.icon;
+              const url = resolveUrl(activeItem.file_path);
+              return (
+                <>
+                  {/* Viewer */}
+                  <div className="bg-black rounded-xl overflow-hidden shadow-2xl">
+                    {activeItem.type === 'video' && url ? (
+                      <div className="relative" style={{paddingTop:'56.25%'}}>
+                        <video src={url} controls className="absolute inset-0 w-full h-full"
+                          onEnded={() => markDone(activeItem.id)} />
+                      </div>
+                    ) : activeItem.type === 'pdf' && url ? (
+                      <div className="relative bg-white" style={{paddingTop:'56.25%'}}>
+                        <iframe src={url} className="absolute inset-0 w-full h-full border-0" title={activeItem.title} />
+                      </div>
+                    ) : activeItem.type === 'ppt' && url ? (
+                      <div className="relative bg-white" style={{paddingTop:'56.25%'}}>
+                        <iframe
+                          src={`https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`}
+                          className="absolute inset-0 w-full h-full border-0" title={activeItem.title} />
+                      </div>
+                    ) : (
+                      <div className="relative" style={{paddingTop:'56.25%'}}>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900">
+                          <div className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${cfg.color} flex items-center justify-center mb-4`}>
+                            <Icon size={36} className="text-white" />
+                          </div>
+                          {url && (
+                            <a href={url} download target="_blank" rel="noopener noreferrer" onClick={() => markDone(activeItem.id)}
+                              className={`flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r ${cfg.color} text-white font-bold`}>
+                              <Download size={18} /> Download File
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Info Card */}
+                  <div className="bg-white rounded-xl shadow-md p-5">
+                    <div className="flex items-start justify-between gap-4 flex-wrap">
+                      <div className="flex-1">
+                        <span className={`inline-block text-xs font-bold px-2 py-1 rounded-full mb-2 ${cfg.badge}`}>{cfg.label}</span>
+                        <h3 className="text-xl font-bold text-gray-900">{activeItem.title}</h3>
+                        {activeItem.description && <p className="text-gray-500 text-sm mt-2">{activeItem.description}</p>}
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        {url && (
+                          <a href={url} download target="_blank" rel="noopener noreferrer"
+                            className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-semibold transition">
+                            <Download size={15} /> Download
+                          </a>
+                        )}
+                        {!completedIds.includes(activeItem.id) ? (
+                          <button onClick={() => markDone(activeItem.id)}
+                            className="flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-semibold transition">
+                            <CheckCircle size={15} /> Mark Complete
+                          </button>
+                        ) : (
+                          <div className="flex items-center gap-2 px-4 py-2 bg-green-50 text-green-600 rounded-lg text-sm font-semibold border border-green-200">
+                            <CheckCircle size={15} /> Completed!
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Prev / Next */}
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => { const i = materials.findIndex(m => m.id === activeItem.id); if (i > 0) setActiveItem(materials[i-1]); }}
+                      disabled={materials.findIndex(m => m.id === activeItem.id) === 0}
+                      className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 py-2.5 rounded-lg font-semibold transition disabled:opacity-40 flex items-center justify-center gap-2 text-sm">
+                      <ChevronLeft size={18} /> Previous
+                    </button>
+                    <button
+                      onClick={() => {
+                        const i = materials.findIndex(m => m.id === activeItem.id);
+                        if (i < materials.length - 1) { markDone(activeItem.id); setActiveItem(materials[i+1]); }
+                      }}
+                      disabled={materials.findIndex(m => m.id === activeItem.id) === materials.length - 1}
+                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg font-semibold transition disabled:opacity-40 flex items-center justify-center gap-2 text-sm">
+                      Next <ChevronRight size={18} />
+                    </button>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+
+          {/* Right — Sidebar list */}
+          <div className="bg-white rounded-xl shadow-md overflow-hidden flex flex-col">
+            {/* Progress header */}
+            <div className="p-4 bg-gradient-to-r from-blue-600 to-blue-800">
+              <div className="flex justify-between text-xs text-blue-100 mb-1">
+                <span>{completedIds.length}/{materials.length} completed</span>
+                <span className="font-bold text-white">{progress}%</span>
+              </div>
+              <div className="w-full bg-blue-900/40 rounded-full h-2">
+                <div className="bg-green-400 h-2 rounded-full transition-all" style={{width:`${progress}%`}} />
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto divide-y divide-gray-100">
+              {materials.map((item, idx) => {
+                const cfg  = TYPE_CONFIG[item.type] || TYPE_CONFIG.pdf;
+                const Icon = cfg.icon;
+                const isActive = activeItem?.id === item.id;
+                const isDone   = completedIds.includes(item.id);
+                return (
+                  <button key={item.id} onClick={() => setActiveItem(item)}
+                    className={`w-full flex items-center gap-3 p-3 text-left transition
+                      ${isActive ? 'bg-blue-50' : 'hover:bg-gray-50'}`}>
+                    <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${cfg.color} flex items-center justify-center flex-shrink-0`}>
+                      {isDone ? <CheckCircle size={16} className="text-white" /> : <Icon size={16} className="text-white" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-semibold truncate ${isActive ? 'text-blue-800' : 'text-gray-800'}`}>
+                        {idx+1}. {item.title}
+                      </p>
+                      <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-full ${cfg.badge}`}>{cfg.label}</span>
+                    </div>
+                    {isActive && <span className="text-xs bg-blue-500 text-white px-1.5 py-0.5 rounded font-bold flex-shrink-0">NOW</span>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function StudentDashboard() {
   const location = useLocation();
   const { user, logout } = useAuth();
@@ -2515,6 +2754,7 @@ export default function StudentDashboard() {
               <Route path="/" element={<Overview />} />
               <Route path="/courses" element={<MyCourses />} />
               <Route path="/course/:courseId" element={<CoursePlayer />} />
+              <Route path="/course/:courseId/materials" element={<CourseMaterials />} />
               <Route path="/browse" element={<BrowseCourses />} />
               <Route path="/certificates" element={<Certificates />} />
               <Route path="/progress" element={<Progress />} />
