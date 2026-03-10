@@ -366,9 +366,9 @@ function MyCourses() {
   };
 
   const filteredCourses = courses.filter(c => {
-    const matchesSearch = c.course_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const matchesSearch = (c.course_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                          (c.code || '').toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesFilter = filter === 'all' || c.status.toLowerCase() === filter;
+    const matchesFilter = filter === 'all' || (c.status || '').toLowerCase() === filter;
     return matchesSearch && matchesFilter;
   });
 
@@ -2771,8 +2771,8 @@ function BatchManagement() {
   };
 
   const filteredBatches = batches.filter(batch => {
-    const matchesSearch = batch.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (batch.courses || []).some(c => c.toLowerCase().includes(searchTerm.toLowerCase()));
+    const matchesSearch = (batch.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (batch.courses || []).some(c => (c || '').toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesStatus = filterStatus === 'all' || batch.status === filterStatus;
     return matchesSearch && matchesStatus;
   });
@@ -3304,8 +3304,8 @@ function StudentManagement() {
   };
 
   const filteredStudents = students.filter(student => {
-    const matchesSearch = student.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         student.email.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = (student.full_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (student.email || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCourse = filterCourse === 'all' || student.course === filterCourse;
     return matchesSearch && matchesCourse;
   });
