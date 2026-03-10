@@ -380,10 +380,15 @@ router.post('/content/upload', authMiddleware, (req, res, next) => {
     const file_path = req.file ? '/uploads/content/' + req.file.filename : '';
     const file_size = req.file ? (req.file.size / 1024 / 1024).toFixed(1) + ' MB' : '';
 
-    // Ensure display_order column exists (safe migration)
+    // Ensure display_order column exists BEFORE insert (safe migration)
     try {
-      await sequelize.query(`ALTER TABLE faculty_content ADD COLUMN display_order INT DEFAULT 1`);
-    } catch(e) { /* column already exists, ignore */ }
+      await sequelize.query('ALTER TABLE faculty_content ADD COLUMN display_order INT DEFAULT 1');
+    } catch(e) { /* column already exists — ignore */ }
+
+    // Also ensure duration column exists
+    try {
+      await sequelize.query('ALTER TABLE faculty_content ADD COLUMN duration VARCHAR(100)');
+    } catch(e) { /* already exists */ }
 
     const [result] = await sequelize.query(`
       INSERT INTO faculty_content (title, description, type, course_id, faculty_id, file_path, file_size, duration, display_order)
@@ -894,7 +899,7 @@ router.get('/analytics', authMiddleware, async (req, res) => {
       if (moduleIds.length > 0) {
         const lessons = await Lesson.findAll({
           where: { course_module_id: { [Op.in]: moduleIds } },
-          attributes: ['id', 'duration']   // 'title' removed — does not exist in DB
+          attributes: ['id']   // 'title' and 'duration' removed — columns do not exist in lessons table
         });
         const lessonIds = lessons.map(l => l.id);
 
