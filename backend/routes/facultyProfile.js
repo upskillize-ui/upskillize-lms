@@ -1274,4 +1274,50 @@ router.post('/doubts/:id/reply', authMiddleware, async (req, res) => {
   }
 });
 
+
+// ── STUDENT: GET COURSE CONTENT ───────────────────────────
+// Called by student portal CoursePlayer to load faculty-uploaded materials
+router.get('/course-content/:courseId', authMiddleware, async (req, res) => {
+  try {
+    const { sequelize } = require('../config/database');
+    const courseId = req.params.courseId;
+
+    // Ensure table + columns exist
+    await sequelize.query(`
+      CREATE TABLE IF NOT EXISTS faculty_content (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        title VARCHAR(255),
+        description TEXT,
+        type VARCHAR(100) DEFAULT 'video',
+        course_id INT,
+        faculty_id INT NOT NULL,
+        file_path VARCHAR(500),
+        file_size VARCHAR(100),
+        duration VARCHAR(100),
+        display_order INT DEFAULT 1,
+        status VARCHAR(50) DEFAULT 'published',
+        views INT DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    const [content] = await sequelize.query(`
+      SELECT fc.id, fc.title, fc.description, fc.type, fc.file_path,
+             fc.file_size, fc.duration, fc.display_order, fc.views,
+             fc.created_at,
+             u.full_name AS instructor_name
+      FROM faculty_content fc
+      LEFT JOIN faculty f ON fc.faculty_id = f.id
+      LEFT JOIN users u ON f.user_id = u.id
+      WHERE fc.course_id = ? AND fc.status = 'published'
+      ORDER BY fc.display_order ASC, fc.created_at ASC
+    `, { replacements: [courseId] });
+
+    res.json({ success: true, content: content || [] });
+  } catch (error) {
+    console.error('GET /faculty/course-content error:', error.message);
+    res.json({ success: true, content: [] });
+  }
+});
+
 module.exports = router;
