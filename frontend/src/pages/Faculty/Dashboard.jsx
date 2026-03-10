@@ -594,7 +594,7 @@ function ContentUpload() {
                 <select value={selectedCourse} onChange={e => setSelectedCourse(e.target.value)}
                   className="w-full px-3.5 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-400 transition bg-white">
                   <option value="">Choose a course</option>
-                  {courses.map(c => <option key={c.id} value={c.id}>{c.code} – {c.course_name}</option>)}
+                  {courses.map(c => <option key={c.id} value={c.id}>{c.code || c.course_code} – {c.course_name}</option>)}
                 </select>
               </div>
 
