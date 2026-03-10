@@ -680,111 +680,122 @@ router.get('/analytics', authMiddleware, async (req, res) => {
     }
 
     // Average performance from Results
-    const exams = await Exam.findAll({
-      where: { course_id: courseIds },
-      attributes: ['id']
-    });
-    const examIds = exams.map(e => e.id);
-
     let avgPerformance = 0;
-    if (examIds.length > 0) {
-      const results = await Result.findAll({
-        where: { exam_id: examIds },
-        attributes: ['score', 'total_marks']
-      });
-      if (results.length > 0) {
-        const total = results.reduce((s, r) =>
-          s + (r.total_marks > 0 ? (r.score / r.total_marks) * 100 : 0), 0);
-        avgPerformance = Math.round(total / results.length);
-      }
-    }
-
-    // Video watch stats
-    const modules = await CourseModule.findAll({
-      where: { course_id: courseIds },
-      attributes: ['id']
-    });
-    const moduleIds = modules.map(m => m.id);
-
-    let videoCompletion = 0, watchTime = 0, videoAnalytics = [];
-    if (moduleIds.length > 0) {
-      const lessons = await Lesson.findAll({
-        where: { course_module_id: moduleIds },
-        attributes: ['id', 'title', 'duration']
-      });
-      const lessonIds = lessons.map(l => l.id);
-
-      if (lessonIds.length > 0) {
-        const watchHistory = await VideoWatchHistory.findAll({
-          where: { lesson_id: lessonIds },
-          attributes: ['lesson_id', 'total_watch_time', 'completed']
-        });
-
-        const totalSeconds = watchHistory.reduce((s, w) => s + (w.total_watch_time || 0), 0);
-        watchTime = Math.round(totalSeconds / 3600);
-
-        const completed = watchHistory.filter(w => w.completed).length;
-        videoCompletion = watchHistory.length > 0
-          ? Math.round((completed / watchHistory.length) * 100) : 0;
-
-        // Per-lesson analytics
-        videoAnalytics = lessons.slice(0, 10).map(lesson => {
-          const views = watchHistory.filter(w => w.lesson_id === lesson.id);
-          const avgSecs = views.length > 0
-            ? Math.round(views.reduce((s, w) => s + (w.total_watch_time || 0), 0) / views.length) : 0;
-          const completionRate = views.length > 0
-            ? Math.round((views.filter(w => w.completed).length / views.length) * 100) : 0;
-          return {
-            title: lesson.title || `Lesson ${lesson.id}`,
-            views: views.length,
-            completion: completionRate,
-            avgWatchTime: `${Math.floor(avgSecs / 60)}m ${avgSecs % 60}s`,
-            dropOffPoint: completionRate < 50 ? 'Early' : completionRate < 80 ? 'Middle' : 'Late'
-          };
-        });
-      }
-    }
-
-    // Enrollment engagement
-    const totalEnrollments = await Enrollment.count({ where: { course_id: courseIds } });
-    const activeEnrollments = await Enrollment.count({
-      where: {
-        course_id: courseIds,
-        completion_status: { [Op.in]: ['in_progress', 'enrolled'] }
-      }
-    });
-    const engagement = totalEnrollments > 0
-      ? Math.round((activeEnrollments / totalEnrollments) * 100) : 0;
-
-    // Per-course breakdown
-    const coursePerformance = await Promise.all(courses.map(async (course) => {
-      const enrollCount = await Enrollment.count({ where: { course_id: course.id } });
-      const completed = await Enrollment.count({
-        where: { course_id: course.id, completion_status: 'completed' }
-      });
-      const courseExams = await Exam.findAll({
-        where: { course_id: course.id },
+    try {
+      const exams = await Exam.findAll({
+        where: { course_id: { [Op.in]: courseIds } },
         attributes: ['id']
       });
-      let avgScore = 0;
-      if (courseExams.length > 0) {
-        const courseResults = await Result.findAll({
-          where: { exam_id: courseExams.map(e => e.id) },
+      const examIds = exams.map(e => e.id);
+      if (examIds.length > 0) {
+        const results = await Result.findAll({
+          where: { exam_id: { [Op.in]: examIds } },
           attributes: ['score', 'total_marks']
         });
-        if (courseResults.length > 0) {
-          const t = courseResults.reduce((s, r) =>
+        if (results.length > 0) {
+          const total = results.reduce((s, r) =>
             s + (r.total_marks > 0 ? (r.score / r.total_marks) * 100 : 0), 0);
-          avgScore = Math.round(t / courseResults.length);
+          avgPerformance = Math.round(total / results.length);
         }
       }
-      return {
-        course: course.course_name,
-        students: enrollCount,
-        avgScore,
-        completion: enrollCount > 0 ? Math.round((completed / enrollCount) * 100) : 0
-      };
-    }));
+    } catch (e) { console.error('Analytics exam error:', e.message); }
+
+    // Video watch stats
+    let videoCompletion = 0, watchTime = 0, videoAnalytics = [];
+    try {
+      const modules = await CourseModule.findAll({
+        where: { course_id: { [Op.in]: courseIds } },
+        attributes: ['id']
+      });
+      const moduleIds = modules.map(m => m.id);
+
+      if (moduleIds.length > 0) {
+        const lessons = await Lesson.findAll({
+          where: { course_module_id: { [Op.in]: moduleIds } },
+          attributes: ['id', 'title', 'duration']
+        });
+        const lessonIds = lessons.map(l => l.id);
+
+        if (lessonIds.length > 0) {
+          const watchHistory = await VideoWatchHistory.findAll({
+            where: { lesson_id: { [Op.in]: lessonIds } },
+            attributes: ['lesson_id', 'total_watch_time', 'completed']
+          });
+
+          const totalSeconds = watchHistory.reduce((s, w) => s + (w.total_watch_time || 0), 0);
+          watchTime = Math.round(totalSeconds / 3600);
+
+          const completed = watchHistory.filter(w => w.completed).length;
+          videoCompletion = watchHistory.length > 0
+            ? Math.round((completed / watchHistory.length) * 100) : 0;
+
+          videoAnalytics = lessons.slice(0, 10).map(lesson => {
+            const views = watchHistory.filter(w => w.lesson_id === lesson.id);
+            const avgSecs = views.length > 0
+              ? Math.round(views.reduce((s, w) => s + (w.total_watch_time || 0), 0) / views.length) : 0;
+            const completionRate = views.length > 0
+              ? Math.round((views.filter(w => w.completed).length / views.length) * 100) : 0;
+            return {
+              title: lesson.title || `Lesson ${lesson.id}`,
+              views: views.length,
+              completion: completionRate,
+              avgWatchTime: `${Math.floor(avgSecs / 60)}m ${avgSecs % 60}s`,
+              dropOffPoint: completionRate < 50 ? 'Early' : completionRate < 80 ? 'Middle' : 'Late'
+            };
+          });
+        }
+      }
+    } catch (e) { console.error('Analytics video error:', e.message); }
+
+    // Enrollment engagement
+    let engagement = 0;
+    try {
+      const totalEnrollments = await Enrollment.count({ where: { course_id: { [Op.in]: courseIds } } });
+      const activeEnrollments = await Enrollment.count({
+        where: {
+          course_id: { [Op.in]: courseIds },
+          completion_status: { [Op.in]: ['in_progress', 'enrolled'] }
+        }
+      });
+      engagement = totalEnrollments > 0
+        ? Math.round((activeEnrollments / totalEnrollments) * 100) : 0;
+    } catch (e) { console.error('Analytics engagement error:', e.message); }
+
+    // Per-course breakdown
+    let coursePerformance = [];
+    try {
+      coursePerformance = await Promise.all(courses.map(async (course) => {
+        try {
+          const enrollCount = await Enrollment.count({ where: { course_id: course.id } });
+          const completed = await Enrollment.count({
+            where: { course_id: course.id, completion_status: 'completed' }
+          });
+          const courseExams = await Exam.findAll({
+            where: { course_id: course.id }, attributes: ['id']
+          });
+          let avgScore = 0;
+          if (courseExams.length > 0) {
+            const courseResults = await Result.findAll({
+              where: { exam_id: { [Op.in]: courseExams.map(e => e.id) } },
+              attributes: ['score', 'total_marks']
+            });
+            if (courseResults.length > 0) {
+              const t = courseResults.reduce((s, r) =>
+                s + (r.total_marks > 0 ? (r.score / r.total_marks) * 100 : 0), 0);
+              avgScore = Math.round(t / courseResults.length);
+            }
+          }
+          return {
+            course: course.course_name,
+            students: enrollCount,
+            avgScore,
+            completion: enrollCount > 0 ? Math.round((completed / enrollCount) * 100) : 0
+          };
+        } catch (e) {
+          return { course: course.course_name, students: 0, avgScore: 0, completion: 0 };
+        }
+      }));
+    } catch (e) { console.error('Analytics coursePerformance error:', e.message); }
 
     res.json({
       success: true,
@@ -795,7 +806,7 @@ router.get('/analytics', authMiddleware, async (req, res) => {
     });
   } catch (error) {
     console.error('GET /faculty/analytics error:', error);
-    res.status(500).json({ success: false, message: 'Error fetching analytics' });
+    res.status(500).json({ success: false, message: error.message });
   }
 });
 
@@ -1007,6 +1018,78 @@ router.get('/batches/:id/students', authMiddleware, async (req, res) => {
   } catch (error) {
     console.error('GET /faculty/batches/:id/students error:', error);
     res.json({ success: true, students: [] });
+  }
+});
+
+// ============================================================
+// GET  /faculty/doubts
+// POST /faculty/doubts/:id/reply
+// ============================================================
+router.get('/doubts', authMiddleware, async (req, res) => {
+  try {
+    const { sequelize } = require('../config/database');
+
+    await sequelize.query(`
+      CREATE TABLE IF NOT EXISTS doubts (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        subject VARCHAR(255),
+        question TEXT,
+        student_id INT,
+        course_id INT,
+        priority VARCHAR(50) DEFAULT 'medium',
+        status VARCHAR(50) DEFAULT 'pending',
+        reply TEXT,
+        replied_at TIMESTAMP NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
+    if (!faculty) return res.json({ success: true, doubts: [] });
+
+    const courses = await Course.findAll({
+      where: { faculty_id: faculty.id },
+      attributes: ['id', 'course_name']
+    });
+    const courseIds = courses.map(c => c.id);
+    if (courseIds.length === 0) return res.json({ success: true, doubts: [] });
+
+    const [rows] = await sequelize.query(`
+      SELECT d.*,
+        COALESCE(u.full_name, 'Unknown Student') as student_name,
+        COALESCE(c.course_name, 'General') as course
+      FROM doubts d
+      LEFT JOIN students s ON s.id = d.student_id
+      LEFT JOIN users u ON u.id = s.user_id
+      LEFT JOIN courses c ON c.id = d.course_id
+      WHERE d.course_id IN (${courseIds.map(() => '?').join(',')})
+      ORDER BY d.created_at DESC
+    `, { replacements: courseIds });
+
+    res.json({ success: true, doubts: rows });
+  } catch (error) {
+    console.error('GET /faculty/doubts error:', error);
+    res.json({ success: true, doubts: [] });
+  }
+});
+
+router.post('/doubts/:id/reply', authMiddleware, async (req, res) => {
+  try {
+    const { sequelize } = require('../config/database');
+    const { reply } = req.body;
+    if (!reply?.trim()) {
+      return res.status(400).json({ success: false, message: 'Reply is required' });
+    }
+
+    await sequelize.query(
+      `UPDATE doubts SET reply = ?, status = 'resolved', replied_at = NOW() WHERE id = ?`,
+      { replacements: [reply.trim(), req.params.id] }
+    );
+
+    res.json({ success: true, message: 'Reply sent successfully' });
+  } catch (error) {
+    console.error('POST /faculty/doubts/:id/reply error:', error);
+    res.status(500).json({ success: false, message: 'Error sending reply' });
   }
 });
 
