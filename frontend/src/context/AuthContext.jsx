@@ -236,6 +236,16 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // ✅ Update User — merges partial updates into current user state + localStorage
+  // Used by Profile.jsx after saving personal/professional/contact/social info
+  const updateUser = (updates) => {
+    setUser(prev => {
+      const updated = { ...prev, ...updates };
+      localStorage.setItem('user', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
   const value = {
     user,
     token,
@@ -246,6 +256,7 @@ export const AuthProvider = ({ children }) => {
     logout,
     forgotPassword,
     resetPassword,
+    updateUser, // ✅ added — required by Profile.jsx to refresh UI after profile save
     isAuthenticated: !!user,
     isAdmin: user?.role === 'admin',
     isFaculty: user?.role === 'faculty',

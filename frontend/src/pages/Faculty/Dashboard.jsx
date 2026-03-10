@@ -311,6 +311,9 @@ function MyCourses() {
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingCourse, setEditingCourse] = useState(null);
+  const [editForm, setEditForm] = useState({ course_name: '', code: '', description: '', status: 'active', duration_hours: '', schedule: '' });
   const [filter, setFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -328,6 +331,37 @@ function MyCourses() {
       console.error('Error fetching courses:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const openEditModal = (course) => {
+    setEditingCourse(course);
+    setEditForm({
+      course_name: course.course_name || '',
+      code: course.code || '',
+      description: course.description || '',
+      status: course.status || 'active',
+      duration_hours: course.duration_hours || '',
+      schedule: course.schedule || ''
+    });
+    setShowEditModal(true);
+  };
+
+  const handleEditCourse = async () => {
+    if (!editForm.course_name.trim()) {
+      alert('Course name is required');
+      return;
+    }
+    try {
+      const response = await api.put(`/faculty/courses/${editingCourse.id}`, editForm);
+      if (response.data.success) {
+        setCourses(courses.map(c => c.id === editingCourse.id ? { ...c, ...editForm } : c));
+        setShowEditModal(false);
+        setEditingCourse(null);
+      }
+    } catch (error) {
+      console.error('Error updating course:', error);
+      alert(error.response?.data?.message || 'Failed to update course.');
     }
   };
 
@@ -442,7 +476,9 @@ function MyCourses() {
                   >
                     Manage
                   </Link>
-                  <button className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 rounded-lg font-semibold transition text-sm">
+                  <button
+                    onClick={() => openEditModal(course)}
+                    className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 rounded-lg font-semibold transition text-sm">
                     Edit
                   </button>
                 </div>
@@ -451,11 +487,83 @@ function MyCourses() {
           ))}
         </div>
       )}
+
+      {/* Edit Course Modal */}
+      {showEditModal && editingCourse && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-8 max-w-2xl w-full shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-2xl font-bold text-primary">Edit Course</h3>
+              <button onClick={() => setShowEditModal(false)} className="text-gray-400 hover:text-gray-600"><X className="h-6 w-6" /></button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Course Name *</label>
+                <input type="text" value={editForm.course_name}
+                  onChange={e => setEditForm({ ...editForm, course_name: e.target.value })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent"
+                  placeholder="e.g. Introduction to Python" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Course Code</label>
+                  <input type="text" value={editForm.code}
+                    onChange={e => setEditForm({ ...editForm, code: e.target.value })}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent"
+                    placeholder="e.g. CS101" />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Status</label>
+                  <select value={editForm.status}
+                    onChange={e => setEditForm({ ...editForm, status: e.target.value })}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent">
+                    <option value="active">Active</option>
+                    <option value="draft">Draft</option>
+                    <option value="archived">Archived</option>
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Duration (hours)</label>
+                  <input type="number" value={editForm.duration_hours}
+                    onChange={e => setEditForm({ ...editForm, duration_hours: e.target.value })}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent"
+                    placeholder="40" />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Schedule</label>
+                  <input type="text" value={editForm.schedule}
+                    onChange={e => setEditForm({ ...editForm, schedule: e.target.value })}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent"
+                    placeholder="e.g. Mon-Wed 10AM" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Description</label>
+                <textarea value={editForm.description}
+                  onChange={e => setEditForm({ ...editForm, description: e.target.value })}
+                  rows="4"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent"
+                  placeholder="Course description..." />
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button onClick={handleEditCourse}
+                className="flex-1 bg-accent text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition">
+                Save Changes
+              </button>
+              <button onClick={() => setShowEditModal(false)}
+                className="px-6 bg-gray-200 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-300 transition">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
-
-// ==================== CONTENT UPLOAD COMPONENT ====================
 function ContentUpload() {
   const [uploadType, setUploadType] = useState('video');
   const [selectedCourse, setSelectedCourse] = useState('');
@@ -2669,6 +2777,29 @@ function BatchManagement() {
     return matchesSearch && matchesStatus;
   });
 
+  const handleExportBatches = () => {
+    const csvContent = [
+      ['Batch Name', 'Status', 'Students', 'Courses', 'Schedule', 'Start Date', 'End Date'],
+      ...filteredBatches.map(b => [
+        b.name,
+        b.status,
+        b.students || 0,
+        (b.courses || []).join(' | '),
+        b.schedule || '',
+        b.startDate || '',
+        b.endDate || ''
+      ])
+    ].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `batches-export-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
   const getStatusBadge = (status) => {
     const styles = {
       active: 'bg-green-100 text-green-800',
@@ -2748,7 +2879,7 @@ function BatchManagement() {
               <option value="completed">Completed</option>
               <option value="upcoming">Upcoming</option>
             </select>
-            <button className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">
+            <button onClick={handleExportBatches} className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">
               <Download className="h-4 w-4" />
               Export
             </button>
@@ -2933,6 +3064,11 @@ function LiveClassScheduling() {
   const [liveClasses, setLiveClasses] = useState([]);
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [scheduleForm, setScheduleForm] = useState({
+    title: '', course: '', date: '', time: '', duration: '', platform: 'Zoom', link: ''
+  });
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     fetchLiveClasses();
@@ -2963,6 +3099,27 @@ function LiveClassScheduling() {
     }
   };
 
+  const handleScheduleClass = async () => {
+    if (!scheduleForm.title || !scheduleForm.course || !scheduleForm.date || !scheduleForm.time) {
+      alert('Please fill all required fields');
+      return;
+    }
+    setSaving(true);
+    try {
+      const response = await api.post('/faculty/live-classes', scheduleForm);
+      if (response.data.success) {
+        setLiveClasses([response.data.liveClass, ...liveClasses]);
+        setShowScheduleModal(false);
+        setScheduleForm({ title: '', course: '', date: '', time: '', duration: '', platform: 'Zoom', link: '' });
+      }
+    } catch (error) {
+      console.error('Error scheduling class:', error);
+      alert(error.response?.data?.message || 'Failed to schedule class.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -2975,7 +3132,7 @@ function LiveClassScheduling() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-primary">Live Class Scheduling</h2>
-        <button className="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg hover:bg-blue-700 transition">
+        <button onClick={() => setShowScheduleModal(true)} className="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg hover:bg-blue-700 transition">
           <MonitorPlay className="h-4 w-4" />
           Schedule Live Class
         </button>
@@ -3026,6 +3183,89 @@ function LiveClassScheduling() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Schedule Live Class Modal */}
+      {showScheduleModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-8 max-w-2xl w-full shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-2xl font-bold text-primary">Schedule Live Class</h3>
+              <button onClick={() => setShowScheduleModal(false)} className="text-gray-400 hover:text-gray-600"><X className="h-6 w-6" /></button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Class Title *</label>
+                <input type="text" value={scheduleForm.title}
+                  onChange={e => setScheduleForm({ ...scheduleForm, title: e.target.value })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent"
+                  placeholder="e.g. Introduction to Arrays" />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Course *</label>
+                <select value={scheduleForm.course}
+                  onChange={e => setScheduleForm({ ...scheduleForm, course: e.target.value })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent">
+                  <option value="">Select Course</option>
+                  {courses.map(c => (
+                    <option key={c.id} value={c.id}>{c.code} - {c.course_name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Date *</label>
+                  <input type="date" value={scheduleForm.date}
+                    onChange={e => setScheduleForm({ ...scheduleForm, date: e.target.value })}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent" />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Time *</label>
+                  <input type="time" value={scheduleForm.time}
+                    onChange={e => setScheduleForm({ ...scheduleForm, time: e.target.value })}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Duration (minutes)</label>
+                  <input type="number" value={scheduleForm.duration}
+                    onChange={e => setScheduleForm({ ...scheduleForm, duration: e.target.value })}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent"
+                    placeholder="60" />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Platform</label>
+                  <select value={scheduleForm.platform}
+                    onChange={e => setScheduleForm({ ...scheduleForm, platform: e.target.value })}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent">
+                    <option value="Zoom">Zoom</option>
+                    <option value="Google Meet">Google Meet</option>
+                    <option value="Microsoft Teams">Microsoft Teams</option>
+                    <option value="Jitsi">Jitsi</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Meeting Link</label>
+                <input type="url" value={scheduleForm.link}
+                  onChange={e => setScheduleForm({ ...scheduleForm, link: e.target.value })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent"
+                  placeholder="https://zoom.us/j/..." />
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button onClick={handleScheduleClass} disabled={saving}
+                className="flex-1 bg-accent text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition disabled:opacity-50">
+                {saving ? 'Scheduling...' : 'Schedule Class'}
+              </button>
+              <button onClick={() => setShowScheduleModal(false)}
+                className="px-6 bg-gray-200 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-300 transition">
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -3623,7 +3863,7 @@ function DiscussionForum() {
                 <ChevronRight size={20} className="text-gray-400 flex-shrink-0 ml-4" />
               </div>
               <div className="flex items-center gap-4 mt-3 text-xs text-gray-400">
-                <span className="flex items-center gap-1"><User size={12} /> {thread.author}</span>
+                <span className="flex items-center gap-1"><User size={12} /> {thread.author_name || thread.author}</span>
                 <span className="flex items-center gap-1"><MessageCircle size={12} /> {thread.replyCount || 0} replies</span>
                 <span className="flex items-center gap-1"><Clock size={12} /> {thread.createdAt ? new Date(thread.createdAt).toLocaleDateString() : ''}</span>
               </div>
