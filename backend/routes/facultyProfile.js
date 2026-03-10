@@ -329,6 +329,7 @@ router.get('/content', authMiddleware, async (req, res) => {
         file_path VARCHAR(500),
         file_size VARCHAR(100),
         duration VARCHAR(100),
+        display_order INT DEFAULT 1,
         status VARCHAR(50) DEFAULT 'published',
         views INT DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -351,30 +352,43 @@ router.get('/content', authMiddleware, async (req, res) => {
 });
 
 // ── CONTENT UPLOAD POST ────────────────────────────────────
-router.post('/content/upload', authMiddleware, contentUpload.single('file'), async (req, res) => {
+router.post('/content/upload', authMiddleware, (req, res, next) => {
+  // Run multer, but don't crash if no file — record metadata only
+  contentUpload.single('file')(req, res, (err) => {
+    if (err && err.code !== 'LIMIT_UNEXPECTED_FILE') {
+      return res.status(400).json({ success: false, message: err.message });
+    }
+    next();
+  });
+}, async (req, res) => {
   try {
     const { sequelize } = require('../config/database');
     const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
     if (!faculty) return res.status(404).json({ success: false, message: 'Faculty not found' });
 
-    // Fields come from multipart/form-data via req.body (parsed by multer)
-    const title       = req.body.title       || '';
-    const description = req.body.description || '';
-    const type        = req.body.type        || 'video';
-    const course_id   = req.body.course      || req.body.course_id || null;  // frontend sends 'course'
-    const duration    = req.body.duration    || '';
-    const order       = req.body.order       || 1;
+    // Fields come from multipart/form-data (parsed by multer into req.body)
+    const title       = (req.body.title       || '').trim();
+    const description = (req.body.description || '').trim();
+    const type        = (req.body.type        || 'video').trim();
+    const course_id   = req.body.course || req.body.course_id || null;
+    const duration    = (req.body.duration    || '').toString();
+    const order       = parseInt(req.body.order) || 1;
 
     if (!title) return res.status(400).json({ success: false, message: 'Title is required' });
 
-    // File info from multer
+    // File saved by multer (may be undefined if no file provided)
     const file_path = req.file ? '/uploads/content/' + req.file.filename : '';
     const file_size = req.file ? (req.file.size / 1024 / 1024).toFixed(1) + ' MB' : '';
+
+    // Ensure display_order column exists (safe migration)
+    try {
+      await sequelize.query(`ALTER TABLE faculty_content ADD COLUMN display_order INT DEFAULT 1`);
+    } catch(e) { /* column already exists, ignore */ }
 
     const [result] = await sequelize.query(`
       INSERT INTO faculty_content (title, description, type, course_id, faculty_id, file_path, file_size, duration, display_order)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, { replacements: [title, description, type, course_id, faculty.id, file_path, file_size, duration, order] });
+    `, { replacements: [title, description, type, course_id || null, faculty.id, file_path, file_size, duration, order] });
 
     // Get course name for response
     let courseName = '';
@@ -396,8 +410,8 @@ router.post('/content/upload', authMiddleware, contentUpload.single('file'), asy
       }
     });
   } catch (error) {
-    console.error('POST /faculty/content/upload error:', error);
-    res.status(500).json({ success: false, message: 'Error uploading content: ' + error.message });
+    console.error('POST /faculty/content/upload error:', error.message);
+    res.status(500).json({ success: false, message: 'Upload error: ' + error.message });
   }
 });
 
