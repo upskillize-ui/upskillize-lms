@@ -59,6 +59,38 @@ const contentUpload = multer({
 });
 
 
+// ── SHARED HELPER: ensure faculty_content table exists ─────
+// Called once at startup so every route avoids repeating DDL
+let _contentTableReady = false;
+async function ensureContentTable(sequelize) {
+  if (_contentTableReady) return;
+  await sequelize.query(`
+    CREATE TABLE IF NOT EXISTS faculty_content (
+      id            INT AUTO_INCREMENT PRIMARY KEY,
+      title         VARCHAR(255),
+      description   TEXT,
+      type          VARCHAR(100)  DEFAULT 'video',
+      course_id     INT,
+      faculty_id    INT NOT NULL,
+      file_path     VARCHAR(500),
+      file_size     VARCHAR(100),
+      duration      VARCHAR(100),
+      display_order INT           DEFAULT 1,
+      status        VARCHAR(50)   DEFAULT 'published',
+      views         INT           DEFAULT 0,
+      created_at    TIMESTAMP     DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  // One-time safe column additions (idempotent)
+  for (const sql of [
+    'ALTER TABLE faculty_content ADD COLUMN display_order INT DEFAULT 1',
+    'ALTER TABLE faculty_content ADD COLUMN duration VARCHAR(100)',
+  ]) {
+    try { await sequelize.query(sql); } catch (_) { /* already exists */ }
+  }
+  _contentTableReady = true;
+}
+
 // ── PROFILE PHOTO ──────────────────────────────────────────
 router.post('/profile/upload-photo', authMiddleware, upload.single('profile_photo'), async (req, res) => {
   try {
@@ -247,7 +279,7 @@ router.get('/courses', authMiddleware, async (req, res) => {
 
     const courses = await Course.findAll({
       where: { faculty_id: faculty.id, is_active: true },
-      attributes: ['id', 'course_name', 'course_code'],
+      attributes: ['id', 'course_name', ['course_code', 'code']], // alias so frontend c.code works
       order: [['course_name', 'ASC']]
     });
 
@@ -318,23 +350,7 @@ router.get('/content', authMiddleware, async (req, res) => {
     const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
     if (!faculty) return res.json({ success: true, content: [] });
 
-    await sequelize.query(`
-      CREATE TABLE IF NOT EXISTS faculty_content (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        title VARCHAR(255),
-        description TEXT,
-        type VARCHAR(100) DEFAULT 'video',
-        course_id INT,
-        faculty_id INT NOT NULL,
-        file_path VARCHAR(500),
-        file_size VARCHAR(100),
-        duration VARCHAR(100),
-        display_order INT DEFAULT 1,
-        status VARCHAR(50) DEFAULT 'published',
-        views INT DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
+    await ensureContentTable(sequelize);
 
     const [rows] = await sequelize.query(`
       SELECT fc.*, COALESCE(c.course_name, 'General') as course
@@ -380,15 +396,7 @@ router.post('/content/upload', authMiddleware, (req, res, next) => {
     const file_path = req.file ? '/uploads/content/' + req.file.filename : '';
     const file_size = req.file ? (req.file.size / 1024 / 1024).toFixed(1) + ' MB' : '';
 
-    // Ensure display_order column exists BEFORE insert (safe migration)
-    try {
-      await sequelize.query('ALTER TABLE faculty_content ADD COLUMN display_order INT DEFAULT 1');
-    } catch(e) { /* column already exists — ignore */ }
-
-    // Also ensure duration column exists
-    try {
-      await sequelize.query('ALTER TABLE faculty_content ADD COLUMN duration VARCHAR(100)');
-    } catch(e) { /* already exists */ }
+    await ensureContentTable(sequelize);
 
     const [result] = await sequelize.query(`
       INSERT INTO faculty_content (title, description, type, course_id, faculty_id, file_path, file_size, duration, display_order)
@@ -1282,24 +1290,7 @@ router.get('/course-content/:courseId', authMiddleware, async (req, res) => {
     const { sequelize } = require('../config/database');
     const courseId = req.params.courseId;
 
-    // Ensure table + columns exist
-    await sequelize.query(`
-      CREATE TABLE IF NOT EXISTS faculty_content (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        title VARCHAR(255),
-        description TEXT,
-        type VARCHAR(100) DEFAULT 'video',
-        course_id INT,
-        faculty_id INT NOT NULL,
-        file_path VARCHAR(500),
-        file_size VARCHAR(100),
-        duration VARCHAR(100),
-        display_order INT DEFAULT 1,
-        status VARCHAR(50) DEFAULT 'published',
-        views INT DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
+    await ensureContentTable(sequelize);
 
     const [content] = await sequelize.query(`
       SELECT fc.id, fc.title, fc.description, fc.type, fc.file_path,
@@ -1353,23 +1344,29 @@ router.delete('/content/:id', authMiddleware, async (req, res) => {
     const { sequelize } = require('../config/database');
     const { id } = req.params;
 
-    // Get file path before deleting so we can remove the file
+    // Resolve faculty_id for the logged-in user
+    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
+    if (!faculty) return res.status(403).json({ success: false, message: 'Faculty not found' });
+
+    // Get file path AND verify ownership before deleting
     const [rows] = await sequelize.query(
-      `SELECT file_path FROM faculty_content WHERE id = ?`,
-      { replacements: [id] }
+      `SELECT file_path FROM faculty_content WHERE id = ? AND faculty_id = ?`,
+      { replacements: [id, faculty.id] }
     );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Content not found or access denied' });
+    }
 
     await sequelize.query(
-      `DELETE FROM faculty_content WHERE id = ?`,
-      { replacements: [id] }
+      `DELETE FROM faculty_content WHERE id = ? AND faculty_id = ?`,
+      { replacements: [id, faculty.id] }
     );
 
-    // Optionally remove the file from disk (won't crash if missing)
-    if (rows.length > 0 && rows[0].file_path) {
-      const fs = require('fs');
-      const path = require('path');
+    // Remove physical file from disk (silent fail — may not exist on Render)
+    if (rows[0].file_path) {
       const filePath = path.join(__dirname, '..', rows[0].file_path);
-      fs.unlink(filePath, () => {}); // silent fail — file may not exist on Render
+      fs.unlink(filePath, () => {});
     }
 
     res.json({ success: true, message: 'Content deleted successfully' });
@@ -1387,23 +1384,7 @@ router.get('/student/course-content/:courseId', authMiddleware, async (req, res)
     const { sequelize } = require('../config/database');
     const courseId = req.params.courseId;
 
-    await sequelize.query(`
-      CREATE TABLE IF NOT EXISTS faculty_content (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        title VARCHAR(255),
-        description TEXT,
-        type VARCHAR(100) DEFAULT 'video',
-        course_id INT,
-        faculty_id INT NOT NULL,
-        file_path VARCHAR(500),
-        file_size VARCHAR(100),
-        duration VARCHAR(100),
-        display_order INT DEFAULT 1,
-        status VARCHAR(50) DEFAULT 'published',
-        views INT DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
+    await ensureContentTable(sequelize);
 
     const [content] = await sequelize.query(`
       SELECT fc.id, fc.title, fc.description, fc.type, fc.file_path,

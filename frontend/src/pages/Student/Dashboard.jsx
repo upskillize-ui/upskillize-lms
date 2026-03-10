@@ -721,11 +721,15 @@ function MyCourses() {
                   {/* Meta Info */}
                   <div className="flex items-center justify-between text-xs text-gray-500 mb-4">
                     <span className="flex items-center gap-1">
-                      <Clock size={13} /> {course.duration_hours}h
+                      <Clock size={13} /> {course.duration_hours ? `${course.duration_hours}h` : '—'}
                     </span>
                     <span className="flex items-center gap-1">
+<<<<<<< HEAD
                       <Calendar size={13} />{" "}
                       {new Date(enrollment.created_at).toLocaleDateString()}
+=======
+                      <Calendar size={13} /> {enrollment.created_at && !isNaN(new Date(enrollment.created_at)) ? new Date(enrollment.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Enrolled'}
+>>>>>>> da96783651194cdc5f2b61ca510b762b626e4ac2
                     </span>
                   </div>
 
@@ -3688,7 +3692,12 @@ function CourseMaterials() {
       return [];
     }
   });
+<<<<<<< HEAD
   const [courseName, setCourseName] = useState("");
+=======
+  const [courseName, setCourseName] = useState('');
+  const [lastRefreshed, setLastRefreshed] = useState(null);
+>>>>>>> da96783651194cdc5f2b61ca510b762b626e4ac2
 
   const TYPE_CONFIG = {
     video: {
@@ -3727,7 +3736,36 @@ function CourseMaterials() {
     return base + p;
   };
 
+  // ── fetchMaterials: called on mount, polling, focus, visibility ──
+  const fetchMaterials = async (silent = false) => {
+    if (!silent) setLoading(true);
+    try {
+      const [matRes, courseRes] = await Promise.allSettled([
+        api.get(`/student/course-content/${courseId}`),
+        api.get(`/courses/${courseId}`)
+      ]);
+      if (matRes.status === 'fulfilled' && matRes.value.data.success) {
+        const items = matRes.value.data.content || [];
+        setMaterials(prev => {
+          // If active item was deleted by faculty, reset to first available
+          setActiveItem(current => {
+            if (!current) return items[0] || null;
+            const stillExists = items.find(m => m.id === current.id);
+            return stillExists || items[0] || null;
+          });
+          return items;
+        });
+        setLastRefreshed(new Date());
+      }
+      if (courseRes.status === 'fulfilled' && courseRes.value.data.success) {
+        setCourseName(courseRes.value.data.course?.course_name || '');
+      }
+    } catch(e) { console.error(e); }
+    finally { setLoading(false); }
+  };
+
   useEffect(() => {
+<<<<<<< HEAD
     const load = async () => {
       try {
         const [matRes, courseRes] = await Promise.allSettled([
@@ -3747,8 +3785,25 @@ function CourseMaterials() {
       } finally {
         setLoading(false);
       }
+=======
+    fetchMaterials();
+
+    // Poll every 30 seconds so deletions by faculty appear automatically
+    const pollInterval = setInterval(() => fetchMaterials(true), 30000);
+
+    // Also refresh instantly when student returns to the tab
+    const handleFocus = () => fetchMaterials(true);
+    const handleVisibility = () => { if (document.visibilityState === 'visible') fetchMaterials(true); };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(pollInterval);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+>>>>>>> da96783651194cdc5f2b61ca510b762b626e4ac2
     };
-    load();
   }, [courseId]);
 
   const markDone = (id) => {
@@ -3786,6 +3841,7 @@ function CourseMaterials() {
           <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
             <FolderOpen size={26} className="text-blue-500" /> Course Materials
           </h2>
+<<<<<<< HEAD
           {courseName && (
             <p className="text-sm text-gray-500 mt-0.5">{courseName}</p>
           )}
@@ -3796,6 +3852,25 @@ function CourseMaterials() {
         >
           <PlayCircle size={16} /> Watch Videos
         </button>
+=======
+          {courseName && <p className="text-sm text-gray-500 mt-0.5">{courseName}</p>}
+          {lastRefreshed && (
+            <p className="text-xs text-gray-400 mt-0.5">
+              Updated {lastRefreshed.toLocaleTimeString()}
+            </p>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={() => fetchMaterials(true)}
+            className="flex items-center gap-1 px-3 py-2 border border-gray-200 text-gray-500 hover:bg-gray-50 rounded-lg text-xs font-medium transition">
+            <RefreshCw size={13} /> Refresh
+          </button>
+          <button onClick={() => navigate(`/student/course/${courseId}`)}
+            className="flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-semibold transition">
+            <PlayCircle size={16} /> Watch Videos
+          </button>
+        </div>
+>>>>>>> da96783651194cdc5f2b61ca510b762b626e4ac2
       </div>
 
       {materials.length === 0 ? (
