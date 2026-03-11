@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import StudentDashboard from "./pages/Student/Dashboard";
+import TestGen from "./pages/Student/TestGen";
 import FacultyDashboard from "./pages/Faculty/Dashboard";
 import AdminDashboard from "./pages/Admin/Dashboard";
 import Home from "./pages/Home";
@@ -63,6 +64,15 @@ function AppRoutes() {
       <Route path="/auth/callback" element={<AuthCallback />} />
 
       {/* Protected Routes - Student (TestGen lives INSIDE StudentDashboard via its own sub-router) */}
+      <Route
+        path="/student/testgen"
+        element={
+          <PrivateRoute allowedRoles={["student"]}>
+            <TestGen />
+          </PrivateRoute>
+        }
+      />
+
       <Route
         path="/student/*"
         element={

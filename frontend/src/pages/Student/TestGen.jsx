@@ -696,7 +696,7 @@ export default function TestGen() {
     setError("");
     try {
       const { data } = await api.post("/testgen/generate", form);
-      if (!data.success) throw new Error(data.message);
+
       setTestData(data);
       setPhase("test");
     } catch (e) {
@@ -716,7 +716,7 @@ export default function TestGen() {
         answers,
         timeTakenSeconds,
       });
-      if (!data.success) throw new Error(data.message);
+
       setResult(data);
       setPhase("result");
     } catch (e) {
