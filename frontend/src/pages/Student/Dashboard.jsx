@@ -439,110 +439,126 @@ function MyCourses() {
             const progress    = enrollment.progress_percentage || 0;
             const videoSrc    = COURSE_VIDEOS[course.id];
             const isVideoOpen = openVideo === enrollment.id;
+            const isCompleted = progress === 100;
+            const enrollDate  = enrollment.created_at && !isNaN(new Date(enrollment.created_at))
+              ? new Date(enrollment.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+              : null;
 
             return (
               <div
                 key={enrollment.id}
-                className="bg-white rounded-xl shadow-md hover:shadow-xl transition overflow-hidden"
+                className="bg-white rounded-2xl shadow-md hover:shadow-xl transition-all overflow-hidden flex flex-col"
               >
+                {/* Colour accent bar */}
+                <div className={`h-1.5 ${isCompleted ? 'bg-green-500' : 'bg-orange-500'}`} />
 
-                {/* ── Top Progress Bar ── */}
-                <div className="h-1.5 bg-gray-100">
-                  <div
-                    className="h-1.5 bg-gradient-to-r from-orange-400 to-orange-600 transition-all"
-                    style={{ width: `${progress}%` }}
-                  />
-                </div>
-
-                {/* ── Video Section ── */}
+                {/* Video preview (collapsible) */}
                 {videoSrc && (
-                  <div className="bg-gray-900">
-                    {isVideoOpen ? (
-                      <div className="relative">
-                        <iframe
-                          src={videoSrc}
-                          className="w-full"
-                          style={{ height: '200px' }}
-                          frameBorder="0"
-                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                          allowFullScreen
-                          title={course.course_name}
-                        />
-                        <button
-                          onClick={() => setOpenVideo(null)}
-                          className="absolute top-2 right-2 w-8 h-8 bg-black/70 text-white rounded-full flex items-center justify-center"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ) : (
+                  isVideoOpen ? (
+                    <div className="relative bg-black">
+                      <iframe
+                        src={videoSrc}
+                        className="w-full"
+                        style={{ height: '190px' }}
+                        frameBorder="0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                        title={course.course_name}
+                      />
                       <button
-                        onClick={() => setOpenVideo(enrollment.id)}
-                        className="w-full flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-blue-900 to-blue-700 text-white hover:from-blue-800 hover:to-blue-600 transition"
-                      >
-                        <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
-                          <PlayCircle size={22} className="text-white" />
-                        </div>
-                        <div className="text-left">
-                          <p className="text-xs font-bold text-yellow-300 uppercase">🎬 Course Video</p>
-                          <p className="text-xs text-blue-200">Watch overview</p>
-                        </div>
-                        <span className="ml-auto text-blue-300 text-sm font-semibold">▶ Play</span>
-                      </button>
-                    )}
-                  </div>
+                        onClick={() => setOpenVideo(null)}
+                        className="absolute top-2 right-2 w-7 h-7 bg-black/70 text-white rounded-full flex items-center justify-center text-xs hover:bg-black transition"
+                      >✕</button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setOpenVideo(enrollment.id)}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 bg-gray-900 text-white hover:bg-gray-800 transition"
+                    >
+                      <div className="w-8 h-8 rounded-full bg-orange-500 flex items-center justify-center flex-shrink-0">
+                        <PlayCircle size={18} className="text-white" />
+                      </div>
+                      <span className="text-sm font-medium text-gray-200">Watch Course Overview</span>
+                      <span className="ml-auto text-xs text-gray-400">▶ Play</span>
+                    </button>
+                  )
                 )}
 
-                {/* ── Card Body ── */}
-                <div className="p-6">
-                  <h3 className="text-lg font-bold text-gray-800 mb-2">{course.course_name}</h3>
-                  <p className="text-sm text-gray-500 line-clamp-2 mb-4">{course.description}</p>
+                {/* Card body */}
+                <div className="p-5 flex flex-col flex-1">
 
-                  {/* Circular Progress */}
-                  <div className="flex items-center justify-center mb-4">
-                    <CircularProgress percentage={progress} size={90} strokeWidth={7} />
+                  {/* Title + status badge */}
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <h3 className="text-base font-bold text-gray-900 leading-snug">{course.course_name}</h3>
+                    {isCompleted
+                      ? <span className="flex-shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700">✓ Done</span>
+                      : <span className="flex-shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full bg-orange-100 text-orange-600">In Progress</span>
+                    }
                   </div>
 
-                  {/* Meta Info */}
-                  <div className="flex items-center justify-between text-xs text-gray-500 mb-4">
-                    <span className="flex items-center gap-1">
-                      <Clock size={13} /> {course.duration_hours ? `${course.duration_hours}h` : '—'}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Calendar size={13} /> {enrollment.created_at && !isNaN(new Date(enrollment.created_at)) ? new Date(enrollment.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Enrolled'}
-                    </span>
+                  <p className="text-xs text-gray-500 line-clamp-2 mb-4">{course.description}</p>
+
+                  {/* Progress bar + percentage */}
+                  <div className="mb-4">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs text-gray-500 font-medium">Progress</span>
+                      <span className={`text-xs font-bold ${isCompleted ? 'text-green-600' : 'text-orange-500'}`}>{Math.round(progress)}%</span>
+                    </div>
+                    <div className="w-full bg-gray-100 rounded-full h-2.5">
+                      <div
+                        className={`h-2.5 rounded-full transition-all ${isCompleted ? 'bg-green-500' : 'bg-orange-500'}`}
+                        style={{ width: `${progress}%` }}
+                      />
+                    </div>
                   </div>
 
-                  {/* Actions */}
-                  <div className="flex gap-2 mb-2">
+                  {/* Meta chips */}
+                  <div className="flex items-center gap-3 text-xs text-gray-400 mb-5">
+                    {course.duration_hours && (
+                      <span className="flex items-center gap-1"><Clock size={12} /> {course.duration_hours}h</span>
+                    )}
+                    {enrollDate && (
+                      <span className="flex items-center gap-1"><Calendar size={12} /> Enrolled {enrollDate}</span>
+                    )}
+                  </div>
+
+                  <div className="flex-1" />
+
+                  {/* Primary CTA */}
+                  <Link
+                    to={`/student/course/${course.id}`}
+                    className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl font-semibold text-sm transition mb-2 ${
+                      isCompleted
+                        ? 'bg-green-500 hover:bg-green-600 text-white'
+                        : 'bg-orange-500 hover:bg-orange-600 text-white'
+                    }`}
+                  >
+                    <PlayCircle size={16} />
+                    {isCompleted ? 'Review Course' : 'Continue Learning'}
+                  </Link>
+
+                  {/* Secondary row: Materials + Withdraw */}
+                  <div className="flex gap-2">
                     <Link
-                      to={`/student/course/${course.id}`}
-                      className="flex-1 bg-orange-500 hover:bg-orange-600 text-white text-center py-2.5 rounded-lg font-semibold transition text-sm flex items-center justify-center gap-2"
+                      to={`/student/course/${course.id}/materials`}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition text-xs font-semibold"
                     >
-                      <PlayCircle size={16} />
-                      {progress === 100 ? 'Review' : 'Continue'}
+                      <FolderOpen size={14} /> Materials
                     </Link>
 
-                    {progress < 100 && (
+                    {!isCompleted && (
                       <button
                         onClick={() => handleWithdraw(enrollment.id, course.course_name)}
                         disabled={withdrawing === enrollment.id}
-                        className="px-3 bg-red-100 hover:bg-red-500 hover:text-white text-red-500 rounded-lg transition disabled:opacity-50 text-sm"
+                        title="Withdraw from course"
+                        className="px-3 py-2 rounded-xl border border-red-200 text-red-400 hover:bg-red-50 hover:border-red-400 hover:text-red-600 transition disabled:opacity-50 text-xs"
                       >
-                        {withdrawing === enrollment.id ? '...' : <X size={16} />}
+                        {withdrawing === enrollment.id ? '...' : <X size={14} />}
                       </button>
                     )}
                   </div>
 
-                  {/* Materials Button — separate from YouTube */}
-                  <Link
-                    to={`/student/course/${course.id}/materials`}
-                    className="w-full flex items-center justify-center gap-2 py-2 rounded-lg border-2 border-blue-200 text-blue-600 hover:bg-blue-50 hover:border-blue-400 transition text-sm font-semibold"
-                  >
-                    <FolderOpen size={15} /> Course Materials
-                  </Link>
                 </div>
-
               </div>
             );
           })}

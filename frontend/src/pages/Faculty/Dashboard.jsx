@@ -223,8 +223,8 @@ function MyCourses() {
   };
 
   const filteredCourses = courses.filter(c => {
-    const matchesSearch = c.course_name.toLowerCase().includes(searchTerm.toLowerCase()) || (c.code || '').toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesFilter = filter === 'all' || c.status.toLowerCase() === filter;
+    const matchesSearch = (c.course_name ?? '').toLowerCase().includes(searchTerm.toLowerCase()) || (c.code ?? '').toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesFilter = filter === 'all' || (c.status ?? '').toLowerCase() === filter;
     return matchesSearch && matchesFilter;
   });
 
@@ -2430,12 +2430,12 @@ function StudentManagement() {
   };
 
   const filteredStudents = students.filter(student => {
-    const matchesSearch = student.full_name.toLowerCase().includes(searchTerm.toLowerCase()) || student.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCourse = filterCourse === 'all' || student.course === filterCourse;
+    const matchesSearch = (student.full_name ?? '').toLowerCase().includes(searchTerm.toLowerCase()) || (student.email ?? '').toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCourse = filterCourse === 'all' || (student.course ?? '') === filterCourse;
     return matchesSearch && matchesCourse;
   });
 
-  const courses = [...new Set(students.map(s => s.course))];
+  const courses = [...new Set(students.map(s => s.course).filter(Boolean))];
 
   const AvatarSVG = () => (
     <svg viewBox="0 0 100 100" className="w-full h-full" fill="none" xmlns="http://www.w3.org/2000/svg">
