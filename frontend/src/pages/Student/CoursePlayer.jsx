@@ -130,6 +130,7 @@ const PAYMENTS_CARDS_CONTENT = {
 };
 
 const COURSE_CONTENT_MAP = {
+   1: BANKING_FOUNDATION_CONTENT,  // production Banking Foundation
   37: BANKING_FOUNDATION_CONTENT,
   10: BANKING_FOUNDATION_CONTENT,
   11: { ...BANKING_FOUNDATION_CONTENT, modules: [BANKING_FOUNDATION_CONTENT.modules[0]] },
@@ -384,7 +385,7 @@ export default function CoursePlayer() {
 
   const fetchUploadedContent = async () => {
     try {
-      const res = await api.get(`/faculty/course-content/${courseId}`);
+      const res = await api.get(`/student/course-content/${courseId}`);
       if (res.data.success) {
         const items = res.data.content || [];
         setUploadedContent(items);

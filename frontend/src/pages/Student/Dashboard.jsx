@@ -524,9 +524,9 @@ function MyCourses() {
 
                   <div className="flex-1" />
 
-                  {/* Primary CTA */}
+                  {/* Primary CTA goes to /materials (working content viewer) */}
                   <Link
-                    to={`/student/course/${course.id}`}
+                    to={`/student/course/${course.id}/materials`}
                     className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl font-semibold text-sm transition mb-2 ${
                       isCompleted
                         ? 'bg-green-500 hover:bg-green-600 text-white'
@@ -537,26 +537,19 @@ function MyCourses() {
                     {isCompleted ? 'Review Course' : 'Continue Learning'}
                   </Link>
 
-                  {/* Secondary row: Materials + Withdraw */}
-                  <div className="flex gap-2">
-                    <Link
-                      to={`/student/course/${course.id}/materials`}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition text-xs font-semibold"
-                    >
-                      <FolderOpen size={14} /> Materials
-                    </Link>
-
-                    {!isCompleted && (
+                  {/* Withdraw */}
+                  {!isCompleted && (
+                    <div className="flex justify-end">
                       <button
                         onClick={() => handleWithdraw(enrollment.id, course.course_name)}
                         disabled={withdrawing === enrollment.id}
                         title="Withdraw from course"
-                        className="px-3 py-2 rounded-xl border border-red-200 text-red-400 hover:bg-red-50 hover:border-red-400 hover:text-red-600 transition disabled:opacity-50 text-xs"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-red-200 text-red-400 hover:bg-red-50 hover:border-red-400 hover:text-red-600 transition disabled:opacity-50 text-xs font-medium"
                       >
-                        {withdrawing === enrollment.id ? '...' : <X size={14} />}
+                        <X size={13} /> {withdrawing === enrollment.id ? 'Withdrawing...' : 'Withdraw'}
                       </button>
-                    )}
-                  </div>
+                    </div>
+                  )}
 
                 </div>
               </div>
