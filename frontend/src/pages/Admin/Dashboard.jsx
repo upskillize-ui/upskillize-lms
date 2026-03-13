@@ -1384,7 +1384,7 @@ export default function AdminDashboard() {
       <aside className={`${sidebarOpen ? 'w-64' : 'w-0'} bg-gradient-to-b from-[#1e5a8e] to-[#164266] text-white transition-all duration-300 overflow-hidden flex-shrink-0 shadow-2xl`}>
         <div className="h-full flex flex-col">
           <div className="p-4 border-b border-blue-700/50 flex items-center justify-center">
-            <img src="/upskillize-logo.png" alt="Upskillize" className="h-10 w-auto" />
+            <img src="/project.png" alt="Upskillize" className="h-10 w-auto" />
           </div>
           <nav className="flex-1 py-4 overflow-y-auto">
             {navItems.map(({ path, label, icon: Icon }) => {

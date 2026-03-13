@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../services/api';
-import { Phone, Mail, Lock, User, Shield, GraduationCap, Users, Eye, EyeOff, ArrowRight, CheckCircle } from 'lucide-react';
+import { Phone, Mail, Lock, User, Shield, GraduationCap, Users, Eye, EyeOff, ArrowRight, CheckCircle, Building2, Briefcase, Award } from 'lucide-react';
 
 export default function Register() {
   const [formData, setFormData] = useState({
@@ -58,6 +58,22 @@ export default function Register() {
     { code: '+94', country: 'Sri Lanka', flag: '🇱🇰' },
     { code: '+977', country: 'Nepal', flag: '🇳🇵' }
   ];
+
+  const roles = [
+    { value: 'student',    label: 'Student',    desc: 'Enroll & learn new skills',         color: '#38bdf8', bg: 'rgba(56,189,248,0.2)',   activeBorder: '#38bdf8', activeBg: 'rgba(56,189,248,0.08)'   },
+    { value: 'faculty',    label: 'Faculty',    desc: 'Create & manage courses',            color: '#a78bfa', bg: 'rgba(167,139,250,0.2)', activeBorder: '#a78bfa', activeBg: 'rgba(167,139,250,0.08)' },
+    { value: 'institute',  label: 'Institute',  desc: 'Manage your institution',            color: '#fb923c', bg: 'rgba(251,146,60,0.2)',  activeBorder: '#fb923c', activeBg: 'rgba(251,146,60,0.08)'  },
+    { value: 'corporate',  label: 'Corporate',  desc: 'Train your workforce',               color: '#34d399', bg: 'rgba(52,211,153,0.2)',  activeBorder: '#34d399', activeBg: 'rgba(52,211,153,0.08)'  },
+    { value: 'placement',  label: 'Placement',  desc: 'Connect talent with opportunities',  color: '#f472b6', bg: 'rgba(244,114,182,0.2)', activeBorder: '#f472b6', activeBg: 'rgba(244,114,182,0.08)' },
+  ];
+
+  const roleIcons = {
+    student:   <GraduationCap size={22} />,
+    faculty:   <Users size={22} />,
+    institute: <Building2 size={22} />,
+    corporate: <Briefcase size={22} />,
+    placement: <Award size={22} />,
+  };
 
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
@@ -124,11 +140,10 @@ export default function Register() {
           background: linear-gradient(160deg, #0d1a3a 0%, #0f2952 50%, #0a0f1e 100%);
           display: flex;
           flex-direction: column;
-          justify-content: center;
-          align-items: center;
-          padding: 60px 48px;
+          padding: 0;
           position: relative;
           overflow: hidden;
+          justify-content: flex-start;
         }
 
         .reg-left::before {
@@ -149,26 +164,59 @@ export default function Register() {
           border-radius: 50%;
         }
 
+        /* TOP-LEFT LOGO */
+        .logo-area {
+          position: relative;
+          z-index: 2;
+          padding: 24px 36px 0 36px;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          flex-shrink: 0;
+        }
+
+        .logo-area img {
+          height: 44px;
+          width: auto;
+          object-fit: contain;
+        }
+
+        .logo-text {
+          display: flex;
+          flex-direction: column;
+          line-height: 1;
+        }
+
+        .logo-name {
+          font-size: 16px;
+          font-weight: 700;
+          color: #fff;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+        }
+
+        .logo-tagline {
+          font-size: 9.5px;
+          font-weight: 400;
+          color: rgba(255,255,255,0.45);
+          letter-spacing: 0.1em;
+          text-transform: uppercase;
+          margin-top: 3px;
+        }
+
+        /* LEFT INNER CONTENT */
         .left-inner {
           position: relative;
           z-index: 1;
           max-width: 420px;
           width: 100%;
-        }
-
-        .logo-area {
-          margin-bottom: 48px;
-        }
-
-        .logo-area img {
-          height: 60px;
-          width: auto;
-          object-fit: contain;
+          padding: 28px 48px 52px 48px;
+          margin: 0;
         }
 
         .reg-heading {
           font-family: 'Playfair Display', serif;
-          font-size: clamp(2rem, 3vw, 2.8rem);
+          font-size: clamp(2rem, 2vw, 2.6rem);
           font-weight: 900;
           color: #fff;
           line-height: 1.2;
@@ -241,10 +289,10 @@ export default function Register() {
 
         .already-row a:hover { color: #7dd3fc; }
 
-        /* ── RIGHT PANEL (FORM) ── */
+        /* ── RIGHT PANEL ── */
         .reg-right {
-          width: 540px;
-          min-width: 540px;
+          width: 560px;
+          min-width: 560px;
           background: #0d1525;
           display: flex;
           flex-direction: column;
@@ -265,7 +313,6 @@ export default function Register() {
           pointer-events: none;
         }
 
-        /* Server status banners */
         .status-banner {
           width: 100%;
           padding: 10px 16px;
@@ -309,7 +356,6 @@ export default function Register() {
           margin-bottom: 28px;
         }
 
-        /* Google button */
         .google-btn {
           width: 100%;
           display: flex;
@@ -355,7 +401,6 @@ export default function Register() {
           letter-spacing: 0.1em;
         }
 
-        /* Error */
         .error-box {
           background: rgba(239,68,68,0.1);
           border: 1px solid rgba(239,68,68,0.3);
@@ -366,7 +411,6 @@ export default function Register() {
           margin-bottom: 20px;
         }
 
-        /* Fields */
         .fields-grid {
           display: grid;
           grid-template-columns: 1fr 1fr;
@@ -456,59 +500,83 @@ export default function Register() {
 
         .eye-btn:hover { color: rgba(255,255,255,0.7); }
 
-        /* Role cards */
-        .role-cards {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 10px;
-          margin-bottom: 16px;
+        /* ── ROLE SECTION ── */
+        .role-section-label {
+          font-size: 11px;
+          font-weight: 600;
+          color: rgba(255,255,255,0.45);
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          margin-bottom: 12px;
+          display: flex;
+          align-items: center;
+          gap: 5px;
+        }
+
+        /* All 5 role cards in ONE single line */
+        .role-cards-grid {
+          display: flex;
+          flex-direction: row;
+          gap: 8px;
+          margin-bottom: 20px;
+        }
+
+        .role-card-wrap {
+          flex: 1;
+          min-width: 0;
         }
 
         .role-card {
           display: flex;
           flex-direction: column;
           align-items: center;
-          gap: 8px;
-          padding: 16px 12px;
+          justify-content: center;
+          gap: 7px;
+          padding: 14px 6px;
           border-radius: 12px;
           border: 1.5px solid rgba(255,255,255,0.08);
           background: rgba(255,255,255,0.03);
           cursor: pointer;
           transition: all 0.2s;
+          width: 100%;
           text-align: center;
         }
 
         .role-card input[type="radio"] { display: none; }
 
-        .role-card.active {
-          border-color: #38bdf8;
-          background: rgba(56,189,248,0.08);
-        }
-
-        .role-card.active-purple {
-          border-color: #a78bfa;
-          background: rgba(167,139,250,0.08);
+        .role-card:hover {
+          background: rgba(255,255,255,0.06);
+          border-color: rgba(255,255,255,0.18);
+          transform: translateY(-2px);
         }
 
         .role-icon {
-          width: 40px; height: 40px;
-          border-radius: 10px;
-          display: flex; align-items: center; justify-content: center;
+          width: 36px;
+          height: 36px;
+          border-radius: 9px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+          transition: all 0.2s;
         }
 
-        .role-card .role-name {
-          font-size: 13px;
+        .role-card-info {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+        }
+
+        .role-name {
+          font-size: 11.5px;
           font-weight: 600;
           color: #fff;
+          white-space: nowrap;
         }
 
-        .role-card .role-desc {
-          font-size: 11px;
-          color: rgba(255,255,255,0.35);
-          line-height: 1.4;
-        }
+        /* Hide description — icon + name only */
+        .role-desc { display: none; }
 
-        /* Submit */
         .submit-btn {
           width: 100%;
           background: linear-gradient(135deg, #1d6fa4 0%, #6d4dba 100%);
@@ -544,9 +612,7 @@ export default function Register() {
         .submit-btn span, .submit-btn svg { position: relative; z-index: 1; }
         .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-        .loading-dots {
-          display: flex; gap: 4px; align-items: center;
-        }
+        .loading-dots { display: flex; gap: 4px; align-items: center; }
 
         .loading-dots span {
           width: 5px; height: 5px;
@@ -594,6 +660,8 @@ export default function Register() {
           .reg-right { width: 100%; min-width: unset; padding: 36px 24px; }
           .fields-grid { grid-template-columns: 1fr; }
           .field-full { grid-column: 1; }
+          .role-cards-grid { grid-template-columns: 1fr 1fr; }
+          .role-card-wrap:nth-child(4), .role-card-wrap:nth-child(5) { grid-column: auto; }
         }
       `}</style>
 
@@ -601,21 +669,24 @@ export default function Register() {
 
         {/* ── LEFT PANEL ── */}
         <div className="reg-left">
-          <div className="left-inner">
-            <div className="logo-area">
-              <img
-                src="/project.png"
-                alt="Upskillize"
-                onError={(e) => { e.target.style.display = 'none'; }}
-              />
-            </div>
 
+          {/* LOGO — top-left corner */}
+          <div className="logo-area">
+            <img
+              src="/project.png"
+              alt="Upskillize"
+              onError={(e) => { e.target.style.display = 'none'; }}
+            />
+          </div>
+
+          {/* CONTENT below logo */}
+          <div className="left-inner">
             <h2 className="reg-heading">
               Start your journey<br />
               <em>Excel Beyond</em>
             </h2>
             <p className="reg-sub">
-              Join 10,000+ learners mastering Banking, Product Leadership & Financial Management with India's top experts.
+              Join learners mastering Banking, Product Leadership & Financial Management with India's top experts.
             </p>
 
             <div className="feature-list">
@@ -646,7 +717,6 @@ export default function Register() {
         <div className="reg-right">
           <div className="form-box">
 
-            {/* Server status */}
             {serverStatus === 'waking' && (
               <div className="status-banner status-waking">
                 <svg className="spin" width="14" height="14" viewBox="0 0 24 24" fill="none">
@@ -666,7 +736,6 @@ export default function Register() {
             <div className="form-title">Create account</div>
             <div className="form-sub">Join Upskillize and start learning today</div>
 
-            {/* Google */}
             <button type="button" className="google-btn" onClick={handleGoogleLogin}>
               <svg width="18" height="18" viewBox="0 0 24 24">
                 <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
@@ -684,21 +753,18 @@ export default function Register() {
             <form onSubmit={handleSubmit}>
               <div className="fields-grid">
 
-                {/* Full Name */}
                 <div className="field field-full">
                   <label><User size={11} /> Full Name *</label>
                   <input type="text" name="full_name" required value={formData.full_name}
                     onChange={handleChange} placeholder="Enter your full name" />
                 </div>
 
-                {/* Email */}
                 <div className="field field-full">
                   <label><Mail size={11} /> Email Address *</label>
                   <input type="email" name="email" required value={formData.email}
                     onChange={handleChange} placeholder="your.email@example.com" />
                 </div>
 
-                {/* Phone */}
                 <div className="field field-full">
                   <label><Phone size={11} /> Phone Number *</label>
                   <div className="phone-row">
@@ -714,7 +780,6 @@ export default function Register() {
                   <div className="phone-hint">Full: {formData.country_code} {formData.phone || '(Enter number)'}</div>
                 </div>
 
-                {/* Password */}
                 <div className="field">
                   <label><Lock size={11} /> Password *</label>
                   <div className="pw-wrap">
@@ -727,7 +792,6 @@ export default function Register() {
                   </div>
                 </div>
 
-                {/* Confirm Password */}
                 <div className="field">
                   <label><Lock size={11} /> Confirm Password *</label>
                   <div className="pw-wrap">
@@ -742,32 +806,52 @@ export default function Register() {
 
               </div>
 
-              {/* Role */}
+              {/* ── ROLE SELECTION ── */}
               <div style={{ marginBottom: '20px' }}>
-                <div style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.45)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <div className="role-section-label">
                   <Shield size={11} /> Register as *
                 </div>
-                <div className="role-cards">
-                  <label className={`role-card ${formData.role === 'student' ? 'active' : ''}`}>
-                    <input type="radio" name="role" value="student" checked={formData.role === 'student'} onChange={handleChange} />
-                    <div className="role-icon" style={{ background: formData.role === 'student' ? 'rgba(56,189,248,0.2)' : 'rgba(255,255,255,0.05)' }}>
-                      <GraduationCap size={20} color={formData.role === 'student' ? '#38bdf8' : 'rgba(255,255,255,0.4)'} />
-                    </div>
-                    <div className="role-name">Student</div>
-                    <div className="role-desc">Enroll in courses & learn new skills</div>
-                  </label>
-                  <label className={`role-card ${formData.role === 'faculty' ? 'active-purple' : ''}`}>
-                    <input type="radio" name="role" value="faculty" checked={formData.role === 'faculty'} onChange={handleChange} />
-                    <div className="role-icon" style={{ background: formData.role === 'faculty' ? 'rgba(167,139,250,0.2)' : 'rgba(255,255,255,0.05)' }}>
-                      <Users size={20} color={formData.role === 'faculty' ? '#a78bfa' : 'rgba(255,255,255,0.4)'} />
-                    </div>
-                    <div className="role-name">Faculty</div>
-                    <div className="role-desc">Create & manage courses for students</div>
-                  </label>
+                <div className="role-cards-grid">
+                  {roles.map((role) => {
+                    const isActive = formData.role === role.value;
+                    return (
+                      <div className="role-card-wrap" key={role.value}>
+                        <label
+                          className="role-card"
+                          style={isActive ? {
+                            borderColor: role.activeBorder,
+                            background: role.activeBg,
+                          } : {}}
+                        >
+                          <input
+                            type="radio"
+                            name="role"
+                            value={role.value}
+                            checked={isActive}
+                            onChange={handleChange}
+                          />
+                          <div
+                            className="role-icon"
+                            style={{
+                              background: isActive ? role.bg : 'rgba(255,255,255,0.05)',
+                              color: isActive ? role.color : 'rgba(255,255,255,0.4)',
+                            }}
+                          >
+                            {roleIcons[role.value]}
+                          </div>
+                          <div className="role-card-info">
+                            <div className="role-name" style={isActive ? { color: role.color } : {}}>
+                              {role.label}
+                            </div>
+                            <div className="role-desc">{role.desc}</div>
+                          </div>
+                        </label>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
-              {/* Submit */}
               <button type="submit" className="submit-btn"
                 disabled={loading || serverStatus === 'waking'}>
                 {serverStatus === 'waking' ? (

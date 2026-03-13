@@ -6,7 +6,6 @@ import StudentDashboard from "./pages/Student/Dashboard";
 import TestGen from "./pages/Student/TestGen";
 import FacultyDashboard from "./pages/Faculty/Dashboard";
 import AdminDashboard from "./pages/Admin/Dashboard";
-import Home from "./pages/Home";
 import BrowseCourses from "./pages/BrowseCourses";
 import CourseView from "./pages/CourseView";
 import AuthCallback from "./pages/AuthCallback";
@@ -42,8 +41,13 @@ function AppRoutes() {
 
   return (
     <Routes>
+      {/* Root — redirect to login (or dashboard if already logged in) */}
+      <Route
+        path="/"
+        element={user ? <Navigate to={`/${user.role}`} replace /> : <Navigate to="/login" replace />}
+      />
+
       {/* Public Routes */}
-      <Route path="/" element={<Home />} />
       <Route path="/courses" element={<BrowseCourses />} />
       <Route path="/course/:id" element={<CourseView />} />
 
@@ -54,16 +58,14 @@ function AppRoutes() {
       />
       <Route
         path="/register"
-        element={
-          user ? <Navigate to={`/${user.role}`} replace /> : <Register />
-        }
+        element={user ? <Navigate to={`/${user.role}`} replace /> : <Register />}
       />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/change-password" element={<ChangePassword />} />
       <Route path="/reset-password" element={<ChangePassword />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
 
-      {/* Protected Routes - Student (TestGen lives INSIDE StudentDashboard via its own sub-router) */}
+      {/* Protected Routes - Student */}
       <Route
         path="/student/testgen"
         element={
@@ -72,7 +74,6 @@ function AppRoutes() {
           </PrivateRoute>
         }
       />
-
       <Route
         path="/student/*"
         element={
@@ -102,8 +103,8 @@ function AppRoutes() {
         }
       />
 
-      {/* Catch-all — must be last */}
-      <Route path="*" element={<Navigate to="/" replace />} />
+      {/* Catch-all */}
+      <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );
 }

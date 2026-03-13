@@ -4125,7 +4125,7 @@ export default function StudentDashboard() {
         <div className="h-full flex flex-col">
           <div className="p-4 border-b border-blue-700/50 flex items-center justify-center">
             <img
-              src="/upskillize-logo.png"
+              src="/project.png"
               alt="Upskillize"
               className="h-10 w-auto"
             />

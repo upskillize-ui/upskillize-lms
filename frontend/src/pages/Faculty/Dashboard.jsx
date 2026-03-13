@@ -3257,7 +3257,7 @@ export default function FacultyDashboard() {
         <div className="h-full flex flex-col">
           <div className="p-4 border-b border-blue-700/50">
             <div className="flex items-center justify-center">
-              <img src="/upskillize-logo.png" alt="Upskillize" className="h-10 w-auto" />
+              <img src="/project.png" alt="Upskillize" className="h-10 w-auto" />
             </div>
           </div>
           <nav className="flex-1 py-4 overflow-y-auto">
