@@ -6,7 +6,7 @@ import StudentDashboard from "./pages/Student/Dashboard";
 import TestGen from "./pages/Student/TestGen";
 import FacultyDashboard from "./pages/Faculty/Dashboard";
 import AdminDashboard from "./pages/Admin/Dashboard";
-import Home from "./pages/Home";
+
 import BrowseCourses from "./pages/BrowseCourses";
 import CourseView from "./pages/CourseView";
 import AuthCallback from "./pages/AuthCallback";
@@ -43,7 +43,7 @@ function AppRoutes() {
   return (
     <Routes>
       {/* Public Routes */}
-      <Route path="/" element={<Home />} />
+
       <Route path="/courses" element={<BrowseCourses />} />
       <Route path="/course/:id" element={<CourseView />} />
 
