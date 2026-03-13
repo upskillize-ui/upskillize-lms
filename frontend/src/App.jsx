@@ -42,8 +42,19 @@ function AppRoutes() {
 
   return (
     <Routes>
-      {/* Public Routes */}
+      {/* ✅ ROOT ROUTE - Redirect to login if not authenticated */}
+      <Route
+        path="/"
+        element={
+          user ? (
+            <Navigate to={`/${user.role}`} replace />
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      />
 
+      {/* Public Routes */}
       <Route path="/courses" element={<BrowseCourses />} />
       <Route path="/course/:id" element={<CourseView />} />
 
@@ -63,7 +74,7 @@ function AppRoutes() {
       <Route path="/reset-password" element={<ChangePassword />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
 
-      {/* Protected Routes - Student (TestGen lives INSIDE StudentDashboard via its own sub-router) */}
+      {/* Protected Routes - Student */}
       <Route
         path="/student/testgen"
         element={
@@ -102,8 +113,8 @@ function AppRoutes() {
         }
       />
 
-      {/* Catch-all — must be last */}
-      <Route path="*" element={<Navigate to="/" replace />} />
+      {/* ✅ CATCH-ALL - Redirect unknown routes to login */}
+      <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );
 }
