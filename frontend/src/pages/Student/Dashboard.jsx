@@ -4209,7 +4209,7 @@ export default function StudentDashboard() {
                 onClick={() => navigate("/student/testgen")}
                 className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold rounded-lg shadow transition-all"
               >
-                TestGen
+                BrainDrill
               </button>
 
               {/* Mail */}

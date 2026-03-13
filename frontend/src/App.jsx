@@ -22,6 +22,16 @@ const LoadingSpinner = () => (
   </div>
 );
 
+// app.js
+const { globalLimiter, testGenLimiter } = require("./middleware/rateLimiter");
+App.use(globalLimiter);
+App.post(
+  "/api/mock-test/generate",
+  authMiddleware,
+  testGenLimiter,
+  mockTest.generateMockTest,
+);
+
 // Private Route Component
 const PrivateRoute = ({ children, allowedRoles }) => {
   const { user, loading } = useAuth();
