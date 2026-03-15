@@ -1,7 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
-const compression = require("compression"); // ADD THIS
+const compression = require("compression");
 const rateLimit = require("express-rate-limit");
 const cookieParser = require("cookie-parser");
 require("dotenv").config();
@@ -9,9 +9,10 @@ const facultyRoutes = require("./routes/facultyProfile");
 const passport = require("passport");
 
 const { sequelize, testConnection } = require("./config/database");
+const { authenticate: authMiddleware } = require("./middleware/auth"); // ✅ Import auth middleware
 const app = express();
 
-// Trust Render's proxy (required for rate lAimiting on Render)
+// Trust Render's proxy (required for rate limiting on Render)
 app.set("trust proxy", 1);
 
 // ✅ FIX 1: Health check FIRST — before all middleware
@@ -54,6 +55,7 @@ app.use(
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
+
 // ── Serve video/content files with cross-origin headers ─────
 // Fixes: ERR_BLOCKED_BY_RESPONSE.NotSameOrigin on <video> elements
 app.use(
@@ -104,7 +106,7 @@ app.use("/api/", limiter);
 app.use("/api/auth/login", authLimiter);
 app.use("/api/auth/register", authLimiter);
 
-// Routes
+// ── Routes ───────────────────────────────────────────────────────────────
 app.use("/api/auth", require("./routes/auth"));
 app.use("/api/courses", require("./routes/courses"));
 app.use("/api/enrollments", require("./routes/enrollments"));
@@ -121,13 +123,18 @@ app.use("/api/admin/dashboard", require("./routes/adminDashboard"));
 app.use("/api/faculty", facultyRoutes);
 app.use("/api/quizzes", require("./routes/quizzes"));
 app.use("/api/forum", require("./routes/forum"));
-app.use("/api/testgen", authMiddleware, require("./routes/testgen"));
-// 404 handler
+
+// ✅ PROTECTED ROUTES — require authentication
+app.use("/api/testgen", require("./routes/testgen"));
+
+// app.use("/api/test-sessions", require("./routes/testSessionRoutes"));
+
+// ── 404 handler ──────────────────────────────────────────────────────────
 app.use((req, res) => {
   res.status(404).json({ success: false, message: "Route not found" });
 });
 
-// Error handler
+// ── Error handler ────────────────────────────────────────────────────────
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({
@@ -156,6 +163,9 @@ const startServer = async () => {
     app.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
+      console.log(
+        `📊 Test sessions: MAX_CONCURRENT = ${process.env.MAX_CONCURRENT_TESTS || 50}`,
+      );
     });
   } catch (error) {
     console.error("❌ Failed to start server:", error);
