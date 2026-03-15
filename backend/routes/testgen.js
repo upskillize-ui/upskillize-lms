@@ -1,16 +1,10 @@
 ﻿/**
  * testgen.js — Express router
- * Connects your React frontend ↔ RAG FastAPI agent.
+ * Connects React frontend ↔ RAG FastAPI agent
  *
- * What's added vs original:
- *  ✅ Rate limiting per student (3 generates/hour, in-memory)
- *  ✅ Max concurrent test-takers (configurable, in-memory)
- *  ✅ One active test per student at a time
- *  ✅ Enrollment check before test generation
- *  ✅ Slot released on submit
- *  ✅ /status endpoint — agent health + current occupancy
- *  ✅ Input validation (topic length, sanitization)
- *  ✅ Proper error propagation from agent
+ * CRITICAL BUG FIX: module.exports was placed in the MIDDLE of the original file.
+ * This meant /submit, /ingest/lecture, /ingest/course were NEVER registered.
+ * Fixed: module.exports is now at the very end.
  */
 
 const express = require("express");
@@ -18,8 +12,7 @@ const router = express.Router();
 const axios = require("axios");
 const testSessionManager = require("../Testsessionmanager");
 
-// ✅ Import middleware using CORRECT export names from auth.js
-const authMiddleware = require("../middleware/auth"); // Default export
+const authMiddleware = require("../middleware/auth");
 const rbac = require("../middleware/rbac");
 
 const AGENT =
@@ -27,7 +20,6 @@ const AGENT =
 const TIMEOUT_GENERATE = 90_000;
 const TIMEOUT_SUBMIT = 30_000;
 
-// ── DB import ──────────────────────────────────────────────────────────────────
 let db;
 try {
   db = require("../config/database");
@@ -38,18 +30,13 @@ try {
   db = null;
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
 function studentId(req) {
-  return req.user ? String(req.user.id) : "student_demo";
+  return req.user ? String(req.user.id) : null;
 }
 
-/** Returns true if the student is enrolled in a course containing lectureId or courseId */
 async function isEnrolled(userId, lectureId, courseId) {
-  if (!db) return true; // skip if db not configured
-
+  if (!db) return true;
   try {
-    // Adjust this query to match your actual schema
     const query = courseId
       ? `SELECT 1 FROM enrollments WHERE student_id = ? AND course_id = ? LIMIT 1`
       : `SELECT 1 FROM enrollments e
@@ -57,80 +44,57 @@ async function isEnrolled(userId, lectureId, courseId) {
          JOIN course_modules cm ON cm.course_id = c.id
          JOIN lessons l ON l.course_module_id = cm.id
          WHERE e.student_id = ? AND l.id = ? LIMIT 1`;
-
     const params = courseId ? [userId, courseId] : [userId, lectureId];
     const [rows] = await db.query(query, params);
     return rows.length > 0;
   } catch (err) {
     console.error("[TestGen] Enrollment check failed:", err.message);
-    return true; // fail open — don't block student due to DB error
+    return true;
   }
 }
 
-// ── Routes ────────────────────────────────────────────────────────────────────
-
-/**
- * GET /api/testgen/health — agent health + slot availability
- */
 router.get("/health", async (req, res) => {
   try {
     const { data } = await axios.get(`${AGENT}/api/health`, { timeout: 5000 });
     const stats = testSessionManager.getStats();
-    return res.json({
-      success: true,
-      agent: data,
-      slots: {
-        activeTestTakers: stats.activeTestTakers,
-        maxConcurrent: stats.maxConcurrent,
-        availableSlots: stats.availableSlots,
-        occupancyPercent: stats.occupancyPercent,
-        timestamp: stats.timestamp,
-      },
-    });
+    return res.json({ success: true, agent: data, slots: stats });
   } catch (err) {
     const stats = testSessionManager.getStats();
-    return res.status(503).json({
-      success: false,
-      message: "Agent unavailable",
-      error: err.message,
-      slots: {
-        activeTestTakers: stats.activeTestTakers,
-        maxConcurrent: stats.maxConcurrent,
-        availableSlots: stats.availableSlots,
-        occupancyPercent: stats.occupancyPercent,
-        timestamp: stats.timestamp,
-      },
-    });
+    return res
+      .status(503)
+      .json({
+        success: false,
+        message: "Agent unavailable",
+        error: err.message,
+        slots: stats,
+      });
   }
 });
 
-/**
- * GET /api/testgen/status — current session occupancy
- */
 router.get("/status", (req, res) => {
   const stats = testSessionManager.getStats();
   res.json({
     success: true,
-    data: {
-      activeTestTakers: stats.activeTestTakers,
-      maxConcurrent: stats.maxConcurrent,
-      availableSlots: stats.availableSlots,
-      occupancyPercent: stats.occupancyPercent,
-      timestamp: stats.timestamp,
-    },
+    activeCount: stats.activeTestTakers,
+    maxAllowed: stats.maxConcurrent,
+    availableSlots: stats.availableSlots,
+    occupancyPercent: stats.occupancyPercent,
+    timestamp: stats.timestamp,
+    activeTestTakers: stats.activeTestTakers,
+    maxConcurrent: stats.maxConcurrent,
   });
 });
 
-/**
- * POST /api/testgen/generate — generate a mock test
- * Protected - Student only
- */
 router.post(
   "/generate",
   authMiddleware,
   rbac(["student"]),
   async (req, res) => {
     const sid = studentId(req);
+    if (!sid)
+      return res
+        .status(401)
+        .json({ success: false, message: "Not authenticated" });
 
     const {
       lectureId,
@@ -142,51 +106,41 @@ router.post(
       questionTypes,
     } = req.body;
 
-    // ── Input validation ───────────────────────────────────────────────────────
-    if (!topic || typeof topic !== "string" || !topic.trim()) {
+    if (!topic || typeof topic !== "string" || !topic.trim())
       return res
         .status(400)
         .json({ success: false, message: "topic is required" });
-    }
-    if (topic.trim().length > 200) {
-      return res.status(400).json({
-        success: false,
-        message: "topic must be under 200 characters",
-      });
-    }
-    if (!lectureId && !courseId) {
+    if (topic.trim().length > 200)
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: "topic must be under 200 characters",
+        });
+    if (!lectureId && !courseId)
       return res
         .status(400)
         .json({ success: false, message: "Provide lectureId or courseId" });
+
+    const rl = testSessionManager.checkRateLimit(sid);
+    if (rl.limited) {
+      res.set("Retry-After", rl.retryAfterSeconds);
+      return res.status(429).json({ success: false, message: rl.message });
     }
 
-    // ── Rate limit check ───────────────────────────────────────────────────────
-    const rateLimitCheck = testSessionManager.checkRateLimit(sid);
-    if (rateLimitCheck.limited) {
-      res.set("Retry-After", rateLimitCheck.retryAfterSeconds);
-      return res.status(429).json({
-        success: false,
-        message: rateLimitCheck.message,
-      });
-    }
-
-    // ── Enrollment check ───────────────────────────────────────────────────────
     const enrolled = await isEnrolled(sid, lectureId, courseId);
-    if (!enrolled) {
-      return res.status(403).json({
-        success: false,
-        message:
-          "You are not enrolled in this course. Please enroll before generating a test.",
-      });
-    }
+    if (!enrolled)
+      return res
+        .status(403)
+        .json({
+          success: false,
+          message: "You are not enrolled in this course.",
+        });
 
-    // ── Acquire concurrent slot ────────────────────────────────────────────────
     const slot = testSessionManager.acquireSlot(sid);
-    if (!slot.ok) {
+    if (!slot.ok)
       return res.status(429).json({ success: false, message: slot.reason });
-    }
 
-    // ── Record rate limit hit ──────────────────────────────────────────────────
     testSessionManager.recordGeneration(sid);
 
     try {
@@ -209,11 +163,8 @@ router.post(
         },
         { timeout: TIMEOUT_GENERATE },
       );
-
-      // Don't release the slot here — hold it until /submit is called.
       return res.json({ success: true, ...data });
     } catch (err) {
-      // Release slot on failure so they can try again
       testSessionManager.releaseSlot(sid);
       const status = err.response?.status || 500;
       const message = err.response?.data?.detail || err.message;
@@ -222,23 +173,22 @@ router.post(
     }
   },
 );
-module.exports = router;
 
-/**
- * POST /api/testgen/submit — submit answers, release slot
- * Protected - Student only
- */
 router.post("/submit", authMiddleware, rbac(["student"]), async (req, res) => {
   const sid = studentId(req);
+  if (!sid)
+    return res
+      .status(401)
+      .json({ success: false, message: "Not authenticated" });
 
   const { testId, questions, answers, timeTakenSeconds } = req.body;
-
-  if (!testId || !questions || !answers) {
-    return res.status(400).json({
-      success: false,
-      message: "testId, questions, and answers are required",
-    });
-  }
+  if (!testId || !questions || !answers)
+    return res
+      .status(400)
+      .json({
+        success: false,
+        message: "testId, questions, and answers are required",
+      });
 
   try {
     const { data } = await axios.post(
@@ -252,33 +202,24 @@ router.post("/submit", authMiddleware, rbac(["student"]), async (req, res) => {
       },
       { timeout: TIMEOUT_SUBMIT },
     );
-
-    // ── Release concurrent slot ────────────────────────────────────────────
     testSessionManager.releaseSlot(sid);
-
     return res.json({ success: true, ...data });
   } catch (err) {
-    // Release slot even on error
     testSessionManager.releaseSlot(sid);
     console.error(`[TestGen] submit failed for student ${sid}:`, err.message);
     return res.status(500).json({ success: false, message: err.message });
   }
 });
 
-/**
- * POST /api/testgen/ingest/lecture — trigger lecture ingestion
- * Protected - Admin/Faculty only
- */
 router.post(
   "/ingest/lecture",
   authMiddleware,
   rbac(["admin", "faculty"]),
   async (req, res) => {
-    if (!req.body.lectureId) {
+    if (!req.body.lectureId)
       return res
         .status(400)
         .json({ success: false, message: "lectureId is required" });
-    }
     try {
       const { data } = await axios.post(
         `${AGENT}/api/ingest/lecture`,
@@ -287,26 +228,20 @@ router.post(
       );
       return res.json({ success: true, ...data });
     } catch (err) {
-      console.error("[TestGen] ingest/lecture failed:", err.message);
       return res.status(500).json({ success: false, message: err.message });
     }
   },
 );
 
-/**
- * POST /api/testgen/ingest/course — trigger course ingestion
- * Protected - Admin/Faculty only
- */
 router.post(
   "/ingest/course",
   authMiddleware,
   rbac(["admin", "faculty"]),
   async (req, res) => {
-    if (!req.body.courseId) {
+    if (!req.body.courseId)
       return res
         .status(400)
         .json({ success: false, message: "courseId is required" });
-    }
     try {
       const { data } = await axios.post(
         `${AGENT}/api/ingest/course`,
@@ -315,10 +250,10 @@ router.post(
       );
       return res.json({ success: true, ...data });
     } catch (err) {
-      console.error("[TestGen] ingest/course failed:", err.message);
       return res.status(500).json({ success: false, message: err.message });
     }
   },
 );
 
+// ✅ MUST be at the END — not in the middle of the file
 module.exports = router;

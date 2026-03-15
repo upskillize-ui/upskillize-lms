@@ -9,26 +9,24 @@ const facultyRoutes = require("./routes/facultyProfile");
 const passport = require("passport");
 
 const { sequelize, testConnection } = require("./config/database");
-const { authenticate: authMiddleware } = require("./middleware/auth"); // ✅ Import auth middleware
 const app = express();
 
 // Trust Render's proxy (required for rate limiting on Render)
 app.set("trust proxy", 1);
 
-// ✅ FIX 1: Health check FIRST — before all middleware
-// ✅ Replace with — allows CORS from browser fetch
+// ✅ Health check FIRST — before all middleware
 app.get("/api/health", (req, res) => {
   res.header("Access-Control-Allow-Origin", "*");
   res.json({ status: "OK", timestamp: new Date().toISOString() });
 });
 
-// ✅ FIX 2: Add compression — reduces response size by ~70%
+// ✅ Compression — reduces response size by ~70%
 app.use(compression());
 
-// Middleware
+// Security
 app.use(helmet());
 
-// ✅ FIX 3: Fix CORS — replace placeholder with real env variable
+// ✅ CORS
 app.use(
   cors({
     origin: function (origin, callback) {
@@ -52,12 +50,12 @@ app.use(
     allowedHeaders: ["Content-Type", "Authorization"],
   }),
 );
+
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// ── Serve video/content files with cross-origin headers ─────
-// Fixes: ERR_BLOCKED_BY_RESPONSE.NotSameOrigin on <video> elements
+// ── Serve video/content files with cross-origin headers ──────────────────────
 app.use(
   "/uploads/content",
   (req, res, next) => {
@@ -69,21 +67,16 @@ app.use(
   express.static("uploads/content"),
 );
 
-// ── Serve all other uploads (profile photos, docs) normally ─
+// ── Serve all other uploads ──────────────────────────────────────────────────
 app.use("/uploads", express.static("uploads"));
 
-// ✅ FIX 4: REMOVED session middleware — you use JWT, not sessions
-// Sessions add DB/memory overhead on EVERY request for no benefit
-// app.use(session(...))  ← DELETED
-
 app.use(passport.initialize());
-// app.use(passport.session()) ← also not needed for JWT
 
-// ✅ FIX 5: Looser auth rate limit — 10 was too aggressive
+// ── Rate limiting ────────────────────────────────────────────────────────────
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
+  windowMs: 15 * 60 * 1000,
   max: 100,
-  standardHeaders: true, // Return rate limit info in headers
+  standardHeaders: true,
   legacyHeaders: false,
   message: {
     success: false,
@@ -93,7 +86,7 @@ const limiter = rateLimit({
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 20, // ✅ increased from 10 → 20 (10 was too strict for real users)
+  max: 20,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -106,7 +99,7 @@ app.use("/api/", limiter);
 app.use("/api/auth/login", authLimiter);
 app.use("/api/auth/register", authLimiter);
 
-// ── Routes ───────────────────────────────────────────────────────────────
+// ── Routes ───────────────────────────────────────────────────────────────────
 app.use("/api/auth", require("./routes/auth"));
 app.use("/api/courses", require("./routes/courses"));
 app.use("/api/enrollments", require("./routes/enrollments"));
@@ -124,17 +117,16 @@ app.use("/api/faculty", facultyRoutes);
 app.use("/api/quizzes", require("./routes/quizzes"));
 app.use("/api/forum", require("./routes/forum"));
 
-// ✅ PROTECTED ROUTES — require authentication
-app.use("/api/testgen", require("./routes/testgen"));
+// ── BrainDrill AI Agent routes ───────────────────────────────────────────────
+app.use("/api/testgen", require("./routes/testgen")); // student test generation
+app.use("/api/test-sessions", require("./routes/testSessionRoutes")); // ✅ UNCOMMENTED — admin monitor + slot stats
 
-// app.use("/api/test-sessions", require("./routes/testSessionRoutes"));
-
-// ── 404 handler ──────────────────────────────────────────────────────────
+// ── 404 handler ──────────────────────────────────────────────────────────────
 app.use((req, res) => {
   res.status(404).json({ success: false, message: "Route not found" });
 });
 
-// ── Error handler ────────────────────────────────────────────────────────
+// ── Error handler ─────────────────────────────────────────────────────────────
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({
@@ -144,15 +136,13 @@ app.use((err, req, res, next) => {
   });
 });
 
-// ✅ FIX 6: Don't run sequelize.sync() on every start in production
-// It checks every table schema — very slow with many models
+// ── Start server ──────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
 
 const startServer = async () => {
   try {
     await testConnection();
 
-    // Only sync in development — in production DB schema is already set
     if (process.env.NODE_ENV !== "production") {
       await sequelize.sync({ alter: true });
       console.log("✅ Database synced (dev mode)");
@@ -164,7 +154,10 @@ const startServer = async () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
       console.log(
-        `📊 Test sessions: MAX_CONCURRENT = ${process.env.MAX_CONCURRENT_TESTS || 50}`,
+        `📊 BrainDrill: MAX_CONCURRENT = ${process.env.MAX_CONCURRENT_TESTS || 50}`,
+      );
+      console.log(
+        `⚡ BrainDrill Agent: ${process.env.MOCK_TEST_AGENT_URL || "https://upskill25-myagent.hf.space"}`,
       );
     });
   } catch (error) {
