@@ -20,35 +20,39 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import api from "../../services/api";
 
-// ── Font injection ────────────────────────────────────────────────────────────
-if (!document.head.querySelector("[data-bd-fonts]")) {
-  const l = document.createElement("link");
-  l.rel = "stylesheet";
-  l.href =
-    "https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;1,400&family=DM+Mono:wght@400;500&family=Outfit:wght@400;500;600;700;800&display=swap";
-  l.setAttribute("data-bd-fonts", "1");
-  document.head.appendChild(l);
-}
+// ── Injected once into <head> via useEffect (safe for Vite/SSR) ───────────────
+const BD_STYLES = `
+  @keyframes bd-spin    { to { transform: rotate(360deg); } }
+  @keyframes bd-fadein  { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:none} }
+  @keyframes bd-pop     { 0%{transform:scale(0.85);opacity:0} 60%{transform:scale(1.05)} 100%{transform:scale(1);opacity:1} }
+  @keyframes bd-shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
+  .bd-enter  { animation: bd-fadein 0.35s cubic-bezier(0.23,1,0.32,1) both; }
+  .bd-pop    { animation: bd-pop    0.4s  cubic-bezier(0.23,1,0.32,1) both; }
+  .bd-qhover { transition: transform 0.15s, box-shadow 0.15s; }
+  .bd-qhover:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(0,0,0,0.35) !important; }
+  .bd-opthov:hover { border-color: rgba(232,160,69,0.55) !important; background: rgba(232,160,69,0.07) !important; }
+  .bd-navbtn:hover { background: rgba(232,160,69,0.12) !important; }
+  .bd-scr::-webkit-scrollbar { width: 4px; }
+  .bd-scr::-webkit-scrollbar-thumb { background: #2e3a52; border-radius: 2px; }
+`;
 
-// ── Global keyframes ──────────────────────────────────────────────────────────
-if (!document.head.querySelector("[data-bd-styles]")) {
-  const s = document.createElement("style");
-  s.setAttribute("data-bd-styles", "1");
-  s.textContent = `
-    @keyframes bd-spin    { to { transform: rotate(360deg); } }
-    @keyframes bd-fadein  { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:none} }
-    @keyframes bd-pop     { 0%{transform:scale(0.85);opacity:0} 60%{transform:scale(1.05)} 100%{transform:scale(1);opacity:1} }
-    @keyframes bd-shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
-    .bd-enter  { animation: bd-fadein 0.35s cubic-bezier(0.23,1,0.32,1) both; }
-    .bd-pop    { animation: bd-pop    0.4s  cubic-bezier(0.23,1,0.32,1) both; }
-    .bd-qhover { transition: transform 0.15s, box-shadow 0.15s; }
-    .bd-qhover:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(0,0,0,0.35) !important; }
-    .bd-opthov:hover { border-color: rgba(232,160,69,0.55) !important; background: rgba(232,160,69,0.07) !important; }
-    .bd-navbtn:hover { background: rgba(232,160,69,0.12) !important; }
-    .bd-scr::-webkit-scrollbar { width: 4px; }
-    .bd-scr::-webkit-scrollbar-thumb { background: #2e3a52; border-radius: 2px; }
-  `;
-  document.head.appendChild(s);
+function useInjectStyles() {
+  useEffect(() => {
+    if (!document.head.querySelector("[data-bd-fonts]")) {
+      const l = document.createElement("link");
+      l.rel = "stylesheet";
+      l.href =
+        "https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;1,400&family=DM+Mono:wght@400;500&family=Outfit:wght@400;500;600;700;800&display=swap";
+      l.setAttribute("data-bd-fonts", "1");
+      document.head.appendChild(l);
+    }
+    if (!document.head.querySelector("[data-bd-styles]")) {
+      const s = document.createElement("style");
+      s.setAttribute("data-bd-styles", "1");
+      s.textContent = BD_STYLES;
+      document.head.appendChild(s);
+    }
+  }, []);
 }
 
 const fmt = (s) =>
@@ -1706,6 +1710,7 @@ function ResultScreen({ result, onRetry }) {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function TestGen() {
+  useInjectStyles();
   const [phase, setPhase] = useState("setup");
   const [testData, setTestData] = useState(null);
   const [result, setResult] = useState(null);
