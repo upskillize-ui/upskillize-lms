@@ -618,6 +618,7 @@ function TestScreen({ testData, onSubmit, submitting }) {
     if (submittedRef.current) return;
     submittedRef.current = true;
     clearInterval(timerRef.current);
+    setShowSummary(false); // close modal immediately
     onSubmit({
       testId: testData.test_id,
       questions: testData.questions,
@@ -631,6 +632,7 @@ function TestScreen({ testData, onSubmit, submitting }) {
       () =>
         setTimeLeft((t) => {
           if (t <= 1) {
+            setShowSummary(false); // close modal if open when timer expires
             handleSubmit();
             return 0;
           }
@@ -1231,7 +1233,7 @@ function TestScreen({ testData, onSubmit, submitting }) {
               </button>
               <button
                 onClick={handleSubmit}
-                disabled={submitting}
+                disabled={submitting || submittedRef.current}
                 style={{
                   ...sx.primaryBtn,
                   flex: 1,
@@ -1239,7 +1241,9 @@ function TestScreen({ testData, onSubmit, submitting }) {
                   marginTop: 0,
                 }}
               >
-                {submitting ? "Submitting…" : "Submit ✓"}
+                {submitting || submittedRef.current
+                  ? "Submitting…"
+                  : "Submit ✓"}
               </button>
             </div>
           </div>
