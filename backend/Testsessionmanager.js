@@ -1,258 +1,211 @@
 /**
- * testSessionManager.js
- * In-memory session control for <100 concurrent students.
- * No Redis. No BullMQ. Works perfectly on Railway / Render.
+ * Testsessionmanager.js — OPTIMIZED FOR 200+ CONCURRENT STUDENTS
  *
- * Controls:
- *  - Max concurrent test-takers (configurable via MAX_CONCURRENT_TESTS env)
- *  - One active test per student at a time
- *  - Institute-level enrollment validation
- *  - Per-student rate limiting on test generation
+ * FEATURES:
+ * ✅ Support 200+ concurrent test-takers
+ * ✅ Auto-cleanup of expired sessions
+ * ✅ Rate limiting (5 tests per student per hour)
+ * ✅ Real-time statistics
+ * ✅ Performance logging
  */
 
-const MAX_CONCURRENT = parseInt(process.env.MAX_CONCURRENT_TESTS || "50");
-const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
-const RATE_LIMIT_MAX = parseInt(process.env.TESTGEN_RATE_LIMIT || "3"); // 3 generates/hour/student
-const SESSION_TTL_MS = 90 * 60 * 1000; // 90 min max test duration
+const DEFAULT_MAX_CONCURRENT = parseInt(
+  process.env.MAX_CONCURRENT_TESTS || 200,
+);
+const RATE_LIMIT_TESTS_PER_HOUR = parseInt(process.env.TESTGEN_RATE_LIMIT || 5);
+const SESSION_TTL = parseInt(process.env.TEST_SESSION_TTL || 1800); // 30 minutes
 
-// active sessions: Map<studentId, { startedAt: Date, expiresAt: Date }>
-const activeSessions = new Map();
+class TestSessionManager {
+  constructor() {
+    this.activeSessions = new Map(); // Current test sessions
+    this.sessionTimeouts = new Map(); // Auto-cleanup timers
+    this.generationHistory = new Map(); // Rate limit tracking
+    this.maxConcurrent = DEFAULT_MAX_CONCURRENT;
 
-// rate limit buckets: Map<studentId, number[]> (timestamps of recent requests)
-const rateBuckets = new Map();
+    this.startCleanupRoutine();
+    this.logConfig();
+  }
 
-// ── Cleanup Interval ───────────────────────────────────────────────────────────
-/**
- * Purge sessions that expired (no explicit submit)
- */
-function _purgeExpired() {
-  const now = Date.now();
-  let purgedCount = 0;
+  logConfig() {
+    console.log(`
+╔════════════════════════════════════════╗
+║  TestGen Session Manager Initialized   ║
+╠════════════════════════════════════════╣
+║ Max Concurrent:   ${this.maxConcurrent.toString().padEnd(23)} ║
+║ Rate Limit:       ${RATE_LIMIT_TESTS_PER_HOUR} tests/hour${" ".repeat(21 - RATE_LIMIT_TESTS_PER_HOUR.toString().length)} ║
+║ Session TTL:      ${SESSION_TTL}s (${(SESSION_TTL / 60).toFixed(0)} min)${" ".repeat(20 - SESSION_TTL.toString().length)} ║
+║ Auto-Cleanup:     Every 60 seconds${" ".repeat(23 - "Every 60 seconds".length)} ║
+╚════════════════════════════════════════╝
+    `);
+  }
 
-  for (const [id, session] of activeSessions.entries()) {
-    if (session.expiresAt <= now) {
-      activeSessions.delete(id);
-      purgedCount++;
+  /**
+   * Check if student is rate-limited
+   * Returns: { limited: boolean, message: string, remaining: number, retryAfterSeconds: number }
+   */
+  checkRateLimit(studentId) {
+    const now = Date.now();
+    const oneHourAgo = now - 60 * 60 * 1000;
+
+    if (!this.generationHistory.has(studentId)) {
+      this.generationHistory.set(studentId, []);
+    }
+
+    const history = this.generationHistory.get(studentId);
+    const recentTests = history.filter((time) => time > oneHourAgo);
+
+    if (recentTests.length >= RATE_LIMIT_TESTS_PER_HOUR) {
+      const oldestTest = Math.min(...recentTests);
+      const retryAfter = Math.ceil((oldestTest + 60 * 60 * 1000 - now) / 1000);
+
+      return {
+        limited: true,
+        message: `Rate limited: ${RATE_LIMIT_TESTS_PER_HOUR} tests/hour. Retry in ${Math.ceil(retryAfter / 60)} minutes.`,
+        remaining: 0,
+        retryAfterSeconds: retryAfter,
+      };
+    }
+
+    return {
+      limited: false,
+      message: `✓ ${RATE_LIMIT_TESTS_PER_HOUR - recentTests.length} tests remaining this hour`,
+      remaining: RATE_LIMIT_TESTS_PER_HOUR - recentTests.length,
+      retryAfterSeconds: 0,
+    };
+  }
+
+  /**
+   * Acquire a test slot for student
+   * Returns: { ok: boolean, reason?: string }
+   */
+  acquireSlot(studentId) {
+    // Check if student already has active session
+    if (this.activeSessions.has(studentId)) {
+      return {
+        ok: false,
+        reason:
+          "You already have an active test. Complete it or wait for timeout.",
+      };
+    }
+
+    // Check if slots available
+    if (this.activeSessions.size >= this.maxConcurrent) {
+      const waitTime = Math.ceil(SESSION_TTL / 60);
+      return {
+        ok: false,
+        reason: `All ${this.maxConcurrent} slots occupied. Wait ${waitTime} min and retry.`,
+      };
+    }
+
+    // Create session
+    const session = {
+      studentId,
+      startTime: Date.now(),
+      status: "active",
+    };
+
+    this.activeSessions.set(studentId, session);
+
+    // Schedule auto-cleanup
+    const timeout = setTimeout(() => {
+      this.releaseSlot(studentId);
+      console.log(`[AUTO-RELEASE] Slot released for student ${studentId}`);
+    }, SESSION_TTL * 1000);
+
+    this.sessionTimeouts.set(studentId, timeout);
+
+    console.log(
+      `[SLOT-ACQUIRED] Student ${studentId} | Active: ${this.activeSessions.size}/${this.maxConcurrent}`,
+    );
+
+    return { ok: true };
+  }
+
+  /**
+   * Release a test slot
+   */
+  releaseSlot(studentId) {
+    if (this.activeSessions.has(studentId)) {
+      this.activeSessions.delete(studentId);
+    }
+
+    const timeout = this.sessionTimeouts.get(studentId);
+    if (timeout) {
+      clearTimeout(timeout);
+      this.sessionTimeouts.delete(studentId);
+    }
+
+    console.log(
+      `[SLOT-RELEASED] Student ${studentId} | Active: ${this.activeSessions.size}/${this.maxConcurrent}`,
+    );
+  }
+
+  /**
+   * Record a test generation attempt for rate limiting
+   */
+  recordGeneration(studentId) {
+    if (!this.generationHistory.has(studentId)) {
+      this.generationHistory.set(studentId, []);
+    }
+
+    this.generationHistory.get(studentId).push(Date.now());
+  }
+
+  /**
+   * Cleanup expired sessions (runs every 60 seconds)
+   */
+  cleanupExpiredSessions() {
+    const now = Date.now();
+    const expired = [];
+
+    for (const [studentId, session] of this.activeSessions.entries()) {
+      const sessionAge = (now - session.startTime) / 1000;
+
+      if (sessionAge > SESSION_TTL) {
+        expired.push(studentId);
+      }
+    }
+
+    expired.forEach((studentId) => this.releaseSlot(studentId));
+
+    if (expired.length > 0) {
+      console.log(`[CLEANUP] Released ${expired.length} expired sessions`);
+    }
+
+    // Cleanup old rate limit history (older than 2 hours)
+    const twoHoursAgo = now - 2 * 60 * 60 * 1000;
+    for (const [studentId, times] of this.generationHistory.entries()) {
+      const recentTimes = times.filter((t) => t > twoHoursAgo);
+      if (recentTimes.length === 0) {
+        this.generationHistory.delete(studentId);
+      } else if (recentTimes.length < times.length) {
+        this.generationHistory.set(studentId, recentTimes);
+      }
     }
   }
 
-  if (purgedCount > 0) {
-    console.log(
-      "[testSessionManager] Purged " + purgedCount + " expired session(s)",
-    );
+  /**
+   * Start automatic cleanup routine (every 60 seconds)
+   */
+  startCleanupRoutine() {
+    setInterval(() => this.cleanupExpiredSessions(), 60000);
   }
-}
 
-/**
- * Auto-cleanup: Run every 5 minutes
- */
-function _startAutoCleanup() {
-  setInterval(
-    () => {
-      _purgeExpired();
-    },
-    5 * 60 * 1000,
-  );
-}
-
-// Start cleanup on module load
-_startAutoCleanup();
-
-// ── Public API ─────────────────────────────────────────────────────────────────
-
-/**
- * Check if a student is rate-limited for test generation.
- *
- * @param {string} studentId - Student ID
- * @returns {Object} { limited: bool, retryAfterSeconds: number, remaining: number }
- */
-function checkRateLimit(studentId) {
-  const now = Date.now();
-  const windowStart = now - RATE_LIMIT_WINDOW_MS;
-
-  // Filter bucket to only requests within the window
-  const bucket = (rateBuckets.get(studentId) || []).filter(
-    (t) => t > windowStart,
-  );
-  rateBuckets.set(studentId, bucket);
-
-  if (bucket.length >= RATE_LIMIT_MAX) {
-    const oldest = bucket[0];
-    const retryAfter = Math.ceil((oldest + RATE_LIMIT_WINDOW_MS - now) / 1000);
+  /**
+   * Get current statistics
+   */
+  getStats() {
     return {
-      limited: true,
-      retryAfterSeconds: retryAfter,
-      remaining: 0,
-      message: `You can generate ${RATE_LIMIT_MAX} tests per hour. Please wait ${Math.ceil(retryAfter / 60)} minute(s).`,
+      activeTestTakers: this.activeSessions.size,
+      maxConcurrent: this.maxConcurrent,
+      availableSlots: this.maxConcurrent - this.activeSessions.size,
+      occupancyPercent: Math.round(
+        (this.activeSessions.size / this.maxConcurrent) * 100,
+      ),
+      timestamp: new Date().toISOString(),
     };
   }
-
-  return {
-    limited: false,
-    retryAfterSeconds: 0,
-    remaining: RATE_LIMIT_MAX - bucket.length,
-    message: "Rate limit OK",
-  };
 }
 
-/**
- * Record a test generation attempt for rate limiting
- *
- * @param {string} studentId - Student ID
- */
-function recordGeneration(studentId) {
-  const bucket = rateBuckets.get(studentId) || [];
-  bucket.push(Date.now());
-  rateBuckets.set(studentId, bucket);
-}
-
-/**
- * Attempt to acquire a test slot for a student.
- *
- * @param {string} studentId - Student ID
- * @param {string} testId - Optional test ID for tracking
- * @returns {Object} { ok: bool, reason?: string, message?: string }
- */
-function acquireSlot(studentId, testId = null) {
-  _purgeExpired();
-
-  if (activeSessions.has(studentId)) {
-    return {
-      ok: false,
-      reason:
-        "You already have an active test in progress. Please submit or wait for it to expire.",
-      message: "Active test already exists for this student",
-    };
-  }
-
-  if (activeSessions.size >= MAX_CONCURRENT) {
-    return {
-      ok: false,
-      reason: `All ${MAX_CONCURRENT} test slots are currently occupied. Please try again in a few minutes.`,
-      message: "All test slots full",
-    };
-  }
-
-  const now = Date.now();
-  activeSessions.set(studentId, {
-    startedAt: now,
-    expiresAt: now + SESSION_TTL_MS,
-    testId: testId,
-  });
-
-  console.log(
-    `[testSessionManager] Slot acquired for student ${studentId}. Active: ${activeSessions.size}/${MAX_CONCURRENT}`,
-  );
-
-  return { ok: true, message: "Slot acquired successfully" };
-}
-
-/**
- * Release a student's test slot (call on submit or timeout).
- *
- * @param {string} studentId - Student ID
- * @returns {Object} { ok: bool, message: string }
- */
-function releaseSlot(studentId) {
-  const existed = activeSessions.has(studentId);
-  activeSessions.delete(studentId);
-
-  if (existed) {
-    console.log(
-      `[testSessionManager] Slot released for student ${studentId}. Active: ${activeSessions.size}/${MAX_CONCURRENT}`,
-    );
-  }
-
-  return {
-    ok: existed,
-    message: existed ? "Slot released successfully" : "No active slot found",
-  };
-}
-
-/**
- * Returns current occupancy stats (useful for admin dashboards & frontend).
- *
- * @returns {Object} Stats with activeTestTakers, maxConcurrent, availableSlots, occupancyPercent, timestamp
- */
-function getStats() {
-  _purgeExpired();
-
-  const activeCount = activeSessions.size;
-  const availableSlots = MAX_CONCURRENT - activeCount;
-  const occupancyPercent = Math.round((activeCount / MAX_CONCURRENT) * 100);
-
-  return {
-    activeTestTakers: activeCount,
-    maxConcurrent: MAX_CONCURRENT,
-    availableSlots: availableSlots,
-    occupancyPercent: occupancyPercent,
-    timestamp: new Date().toISOString(),
-  };
-}
-
-/**
- * Check if a student has an active session
- *
- * @param {string} studentId - Student ID
- * @returns {boolean} True if student has active session
- */
-function hasActiveSession(studentId) {
-  _purgeExpired();
-  return activeSessions.has(studentId);
-}
-
-/**
- * Get all active session IDs (for debugging/admin)
- *
- * @returns {Array<string>} Array of student IDs with active sessions
- */
-function getActiveSessions() {
-  _purgeExpired();
-  return Array.from(activeSessions.keys());
-}
-
-/**
- * Get detailed info about all active sessions (for debugging/admin)
- *
- * @returns {Array<Object>} Detailed session information
- */
-function getDetailedSessions() {
-  _purgeExpired();
-  const result = [];
-
-  for (const [studentId, session] of activeSessions.entries()) {
-    result.push({
-      studentId,
-      testId: session.testId || null,
-      startedAt: new Date(session.startedAt).toISOString(),
-      expiresAt: new Date(session.expiresAt).toISOString(),
-      durationMs: Date.now() - session.startedAt,
-    });
-  }
-
-  return result;
-}
-
-/**
- * Reset all sessions (for testing/debugging only)
- * WARNING: Use with caution in production
- */
-function resetAll() {
-  activeSessions.clear();
-  rateBuckets.clear();
-  console.warn("[testSessionManager] ⚠️  All sessions reset!");
-}
-
-// ── Module Exports ─────────────────────────────────────────────────────────────
-
-module.exports = {
-  checkRateLimit,
-  recordGeneration,
-  acquireSlot,
-  releaseSlot,
-  getStats,
-  hasActiveSession,
-  getActiveSessions,
-  getDetailedSessions,
-  resetAll,
-};
+// Export singleton instance
+module.exports = new TestSessionManager();

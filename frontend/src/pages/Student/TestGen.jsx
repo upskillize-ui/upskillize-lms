@@ -404,33 +404,14 @@ function SetupScreen({ onGenerate, loading, slots }) {
             }}
           >
             <div>
-              <label style={sx.miniLabel}>Number of Questions</label>
+              <label style={sx.miniLabel}>Questions</label>
               <select
                 style={sx.select}
                 value={nQ}
                 onChange={(e) => setNQ(Number(e.target.value))}
               >
-                <option value="">Select questions</option>
                 {[5, 10, 15, 20, 25, 30].map((n) => (
-                  <option key={n} value={n}>
-                    {n} questions
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label style={sx.miniLabel}>Duration</label>
-              <select
-                style={sx.select}
-                value={dur}
-                onChange={(e) => setDur(Number(e.target.value))}
-              >
-                <option value="">Select duration</option>
-                {[5, 10, 15, 20, 30, 45, 60].map((n) => (
-                  <option key={n} value={n}>
-                    {n} minutes
-                  </option>
+                  <option key={n}>{n}</option>
                 ))}
               </select>
             </div>
