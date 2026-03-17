@@ -351,7 +351,8 @@ export default function BrainDrillMonitor() {
             <span
               style={{ fontSize: 13, color: occupancyColor, fontWeight: 700 }}
             >
-              {status?.activeCount ?? 0} / {status?.maxAllowed ?? 50} slots used
+              {status?.activeCount ?? 0} / {status?.maxAllowed ?? 200} slots
+              used
             </span>
           </div>
           <div

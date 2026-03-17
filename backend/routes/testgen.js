@@ -14,7 +14,7 @@ const router = express.Router();
 const axios = require("axios");
 const authMiddleware = require("../middleware/auth");
 const rbac = require("../middleware/rbac");
-const TestSessionManager = require("../services/Testsessionmanager");
+const TestSessionManager = require("../Testsessionmanager");
 const instituteConfig = require("../services/InstituteConfigManager");
 
 const AGENT =
@@ -64,13 +64,11 @@ router.get("/health", async (req, res) => {
       slots: TestSessionManager.getStats(),
     });
   } catch (err) {
-    res
-      .status(503)
-      .json({
-        success: false,
-        message: "Agent unavailable",
-        error: err.message,
-      });
+    res.status(503).json({
+      success: false,
+      message: "Agent unavailable",
+      error: err.message,
+    });
   }
 });
 
@@ -130,24 +128,20 @@ router.post(
     ]);
 
     if (rateCheck.limited) {
-      return res
-        .status(429)
-        .json({
-          ok: false,
-          success: false,
-          message: rateCheck.message,
-          retryAfter: rateCheck.retryAfterSeconds,
-        });
+      return res.status(429).json({
+        ok: false,
+        success: false,
+        message: rateCheck.message,
+        retryAfter: rateCheck.retryAfterSeconds,
+      });
     }
 
     if (!enrolled) {
-      return res
-        .status(403)
-        .json({
-          ok: false,
-          success: false,
-          message: "Not enrolled in this course",
-        });
+      return res.status(403).json({
+        ok: false,
+        success: false,
+        message: "Not enrolled in this course",
+      });
     }
 
     // ── Acquire slot ──
@@ -217,12 +211,10 @@ router.post("/submit", authMiddleware, rbac(["student"]), async (req, res) => {
   const { testId, questions, answers, timeTakenSeconds } = req.body;
 
   if (!testId || !questions || !answers) {
-    return res
-      .status(400)
-      .json({
-        success: false,
-        message: "testId, questions, and answers required",
-      });
+    return res.status(400).json({
+      success: false,
+      message: "testId, questions, and answers required",
+    });
   }
 
   try {
