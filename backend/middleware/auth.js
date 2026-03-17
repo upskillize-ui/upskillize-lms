@@ -66,7 +66,7 @@ const requireStudent = (req, res, next) => {
 // FIXED: Export both as default AND named exports for compatibility
 module.exports = authMiddleware;
 module.exports.authMiddleware = authMiddleware;
-module.exports.authenticateToken = authenticateToken; // ← ADD THIS
+module.exports.authenticateToken = authenticateToken;
 module.exports.requireAdmin = requireAdmin;
 module.exports.requireFaculty = requireFaculty;
 module.exports.requireStudent = requireStudent;

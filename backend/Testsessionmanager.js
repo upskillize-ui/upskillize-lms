@@ -38,7 +38,7 @@ function _purgeExpired() {
 
   if (purgedCount > 0) {
     console.log(
-      "[testSessionManager] Purged " + purgedCount + " expired session(s)",
+      "[Testsessionmanager] Purged " + purgedCount + " expired session(s)",
     );
   }
 }
@@ -141,7 +141,7 @@ function acquireSlot(studentId, testId = null) {
   });
 
   console.log(
-    `[testSessionManager] Slot acquired for student ${studentId}. Active: ${activeSessions.size}/${MAX_CONCURRENT}`,
+    `[Testsessionmanager] Slot acquired for student ${studentId}. Active: ${activeSessions.size}/${MAX_CONCURRENT}`,
   );
 
   return { ok: true, message: "Slot acquired successfully" };
@@ -159,7 +159,7 @@ function releaseSlot(studentId) {
 
   if (existed) {
     console.log(
-      `[testSessionManager] Slot released for student ${studentId}. Active: ${activeSessions.size}/${MAX_CONCURRENT}`,
+      `[Testsessionmanager] Slot released for student ${studentId}. Active: ${activeSessions.size}/${MAX_CONCURRENT}`,
     );
   }
 
@@ -240,7 +240,7 @@ function getDetailedSessions() {
 function resetAll() {
   activeSessions.clear();
   rateBuckets.clear();
-  console.warn("[testSessionManager] ⚠️  All sessions reset!");
+  console.warn("[Testsessionmanager] ⚠️  All sessions reset!");
 }
 
 // ── Module Exports ─────────────────────────────────────────────────────────────
