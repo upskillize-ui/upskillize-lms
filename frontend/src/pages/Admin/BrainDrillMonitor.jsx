@@ -231,7 +231,7 @@ export default function BrainDrillMonitor() {
           <h2
             style={{ fontSize: 22, fontWeight: 800, color: T.text, margin: 0 }}
           >
-            ⚡ BrainDrill Monitor
+            ⚡ TestGen Monitor
           </h2>
           <p style={{ color: T.muted, fontSize: 13, margin: "4px 0 0" }}>
             Real-time AI mock test management

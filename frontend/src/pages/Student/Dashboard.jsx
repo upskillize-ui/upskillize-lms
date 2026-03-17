@@ -4124,11 +4124,7 @@ export default function StudentDashboard() {
       >
         <div className="h-full flex flex-col">
           <div className="p-4 border-b border-blue-700/50 flex items-center justify-center">
-            <img
-              src="/project.png"
-              alt="Upskillize"
-              className="h-10 w-auto"
-            />
+            <img src="/project.png" alt="Upskillize" className="h-10 w-auto" />
           </div>
           <div className="px-4 py-3 border-b border-blue-700/30">
             {isPurchased ? (
@@ -4209,7 +4205,7 @@ export default function StudentDashboard() {
                 onClick={() => navigate("/student/testgen")}
                 className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold rounded-lg shadow transition-all"
               >
-                BrainDrill
+                TestGen
               </button>
 
               {/* Mail */}

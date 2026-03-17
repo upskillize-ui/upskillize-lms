@@ -2378,7 +2378,7 @@ export default function AdminDashboard() {
     { path: "/admin/audit-logs", label: "Audit Logs", icon: History },
     { path: "/admin/database", label: "Database", icon: Database },
     { path: "/admin/settings", label: "Settings", icon: Settings },
-    { path: "/admin/testGen", label: "BrainDrill Monitor", icon: Zap },
+    { path: "/admin/testGen", label: "TestGen Monitor", icon: Zap },
   ];
 
   return (
