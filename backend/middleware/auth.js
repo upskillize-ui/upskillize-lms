@@ -1,87 +1,72 @@
-/**
- * middleware/auth.js — FIXED
- *
- * FIXES:
- * - Extracts role from multiple possible JWT fields (role, userRole, type)
- * - Normalizes role to lowercase immediately
- * - Better error messages for debugging
- */
+// backend/middleware/auth.js
+// FIXED VERSION - Proper exports for all route files
 
 const jwt = require("jsonwebtoken");
+const db = require("../models");
 
+// Main authentication middleware
 const authMiddleware = (req, res, next) => {
   try {
-    const authHeader = req.headers.authorization;
-
-    if (!authHeader) {
-      return res.status(401).json({
-        ok: false,
-        success: false,
-        message: "No authorization token provided",
-      });
-    }
-
-    const token = authHeader.startsWith("Bearer ")
-      ? authHeader.slice(7).trim()
-      : authHeader.trim();
+    const token = req.headers.authorization?.split(" ")[1];
 
     if (!token) {
       return res.status(401).json({
-        ok: false,
         success: false,
-        message: "Invalid authorization header format",
+        message: "No authentication token provided",
       });
     }
 
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_SECRET || "your-secret-key",
-    );
-
-    // ✅ FIX: Check multiple possible role fields in JWT payload
-    // Different auth flows may store role differently
-    const rawRole =
-      decoded.role ||
-      decoded.userRole ||
-      decoded.user_role ||
-      decoded.type ||
-      "student";
-
-    req.user = {
-      id: decoded.id || decoded.userId || decoded.user_id,
-      email: decoded.email,
-      // ✅ Always lowercase from the start — rbac.js also normalizes, double safety
-      role: rawRole.toLowerCase().trim(),
-      instituteId: decoded.instituteId || decoded.institute_id || null,
-    };
-
-    if (!req.user.id) {
-      return res.status(401).json({
-        ok: false,
-        success: false,
-        message: "Invalid token: missing user ID",
-      });
-    }
-
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded;
     next();
   } catch (error) {
-    if (error.name === "TokenExpiredError") {
-      return res
-        .status(401)
-        .json({ ok: false, success: false, message: "Token expired" });
-    }
-    if (error.name === "JsonWebTokenError") {
-      return res
-        .status(401)
-        .json({ ok: false, success: false, message: "Invalid token" });
-    }
     return res.status(401).json({
-      ok: false,
       success: false,
-      message: "Authentication failed",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+      message: "Invalid or expired token",
     });
   }
 };
 
+// Alias for compatibility
+const authenticateToken = authMiddleware;
+
+// Middleware to check if user is admin
+const requireAdmin = (req, res, next) => {
+  if (req.user.role !== "admin") {
+    return res.status(403).json({
+      success: false,
+      message: "Admin access required",
+    });
+  }
+  next();
+};
+
+// Middleware to check if user is faculty
+const requireFaculty = (req, res, next) => {
+  if (req.user.role !== "faculty" && req.user.role !== "admin") {
+    return res.status(403).json({
+      success: false,
+      message: "Faculty access required",
+    });
+  }
+  next();
+};
+
+// Middleware to check if user is student
+const requireStudent = (req, res, next) => {
+  if (req.user.role !== "student") {
+    return res.status(403).json({
+      success: false,
+      message: "Student access required",
+    });
+  }
+  next();
+};
+
+// FIXED: Export both as default AND named exports for compatibility
 module.exports = authMiddleware;
+module.exports.authMiddleware = authMiddleware;
+module.exports.authenticateToken = authenticateToken; // ← ADD THIS
+module.exports.requireAdmin = requireAdmin;
+module.exports.requireFaculty = requireFaculty;
+module.exports.requireStudent = requireStudent;
