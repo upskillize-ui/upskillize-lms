@@ -11,7 +11,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
 import api from "../../services/api";
 import Profile from "./Profile";
-import BrainDrillMonitor from "./Admin/BrainDrillMonitor";
+import BrainDrillMonitor from "./BrainDrillMonitor";
 import {
   Users,
   BookOpen,

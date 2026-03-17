@@ -978,8 +978,9 @@ export default function TestGen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [slots, setSlots] = useState(null);
+  const [testData, setTestData] = useState(null); // holds generated test
 
-  // Fetch slot status
+  // Fetch slot status every 10s
   useEffect(() => {
     const fetchSlots = async () => {
       try {
@@ -989,7 +990,6 @@ export default function TestGen() {
         console.error("Could not fetch slot status:", err);
       }
     };
-
     fetchSlots();
     const interval = setInterval(fetchSlots, 10000);
     return () => clearInterval(interval);
@@ -1000,32 +1000,60 @@ export default function TestGen() {
     setError(null);
     try {
       const response = await api.post("/testgen/generate", config);
-      if (response.data.ok || response.data.success) {
-        // Navigate to test screen or show test data
-        console.log("Test generated:", response.data);
-        // You can add navigation here or show a modal
-        // window.location.href = `/test/${response.data.test_id}`;
+      if (response.data.success) {
+        setTestData(response.data);
       } else {
         setError(
-          response.data.error ||
-            response.data.message ||
+          response.data.message ||
+            response.data.error ||
             "Failed to generate test",
         );
       }
     } catch (err) {
-      const errMsg =
+      const status = err.response?.status;
+      const msg =
         err.response?.data?.message || err.response?.data?.error || err.message;
-      setError(errMsg || "An error occurred");
+
+      // 429 = rate limited OR slot taken — show specific message
+      if (status === 429) {
+        setError(msg || "Too many requests. Please wait before trying again.");
+      } else {
+        setError(msg || "An error occurred. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
   };
 
+  const onSubmit = async (testId, questions, answers, timeTakenSeconds) => {
+    try {
+      const response = await api.post("/testgen/submit", {
+        testId,
+        questions,
+        answers,
+        timeTakenSeconds,
+      });
+      setTestData(null); // clear test after submit
+      return response.data;
+    } catch (err) {
+      console.error("Submit failed:", err.message);
+      setTestData(null); // always clear so student isn't stuck
+      throw err;
+    }
+  };
+
+  // ── Loading ──────────────────────────────────────────────────────────────────
   if (loading) {
     return <LoadingSpinner message="Generating Your Test" />;
   }
 
+  // ── Error ────────────────────────────────────────────────────────────────────
   if (error) {
+    const isRateLimit =
+      error.toLowerCase().includes("rate") ||
+      error.toLowerCase().includes("wait") ||
+      error.toLowerCase().includes("active test");
+
     return (
       <div
         style={{
@@ -1044,11 +1072,12 @@ export default function TestGen() {
             borderRadius: 12,
             padding: 40,
             maxWidth: 500,
+            width: "100%",
             boxShadow: "0 2px 12px rgba(0,0,0,0.08)",
           }}
         >
           <div style={{ fontSize: 48, marginBottom: 16, textAlign: "center" }}>
-            ⚠️
+            {isRateLimit ? "⏳" : "⚠️"}
           </div>
           <h2
             style={{
@@ -1059,7 +1088,7 @@ export default function TestGen() {
               textAlign: "center",
             }}
           >
-            Error
+            {isRateLimit ? "Please Wait" : "Error"}
           </h2>
           <p
             style={{
@@ -1072,7 +1101,7 @@ export default function TestGen() {
             {error}
           </p>
           <button
-            onClick={() => window.location.reload()}
+            onClick={() => setError(null)} // ✅ BUGFIX: clear error, don't reload page
             style={{
               width: "100%",
               padding: "12px",
@@ -1092,6 +1121,37 @@ export default function TestGen() {
     );
   }
 
+  // ── Test Generated — show test (or your own TestTaking component) ────────────
+  if (testData) {
+    // If you have a separate TestTaking component, render it here.
+    // For now we show a placeholder. Replace with your actual component:
+    // return <TestTaking testData={testData} onSubmit={onSubmit} />;
+    return (
+      <div style={{ padding: 40, textAlign: "center" }}>
+        <h2 style={{ color: COLORS.darkBlue }}>Test Ready! ✅</h2>
+        <p style={{ color: COLORS.textGray }}>
+          Test ID: {testData.test_id || testData.testId}
+        </p>
+        <button
+          onClick={() => setTestData(null)}
+          style={{
+            padding: "10px 24px",
+            borderRadius: 8,
+            border: "none",
+            background: COLORS.orange,
+            color: "#fff",
+            fontWeight: 700,
+            cursor: "pointer",
+            marginTop: 16,
+          }}
+        >
+          Back to Setup
+        </button>
+      </div>
+    );
+  }
+
+  // ── Setup Screen ─────────────────────────────────────────────────────────────
   return (
     <SetupScreen onGenerate={onGenerate} loading={loading} slots={slots} />
   );
