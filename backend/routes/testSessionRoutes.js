@@ -5,7 +5,7 @@
 
 const express = require("express");
 const router = express.Router();
-const sessionManager = require("../Testsessionmanager");
+const sessionManager = require("../services/Testsessionmanager");
 const authMiddleware = require("../middleware/auth");
 const rbac = require("../middleware/rbac");
 
