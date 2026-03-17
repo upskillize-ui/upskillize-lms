@@ -99,7 +99,7 @@ function Badge({ children, color = T.blue }) {
   );
 }
 
-export default function testGenMonitor() {
+export default function BrainDrillMonitor() {
   const [status, setStatus] = useState(null);
   const [agentHealth, setAgentHealth] = useState(null);
   const [testHistory, setTestHistory] = useState([]);
