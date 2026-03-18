@@ -1731,11 +1731,12 @@ export default function TestGen() {
         answers,
         timeTakenSeconds,
       });
-      setTestData(null); // clear test after submit
+      console.log("SUBMIT RESPONSE:", JSON.stringify(response.data, null, 2));
+      // ✅ Don't clear testData here — TestTakingScreen handles the result display
+      // setTestData(null) is only called via onForceExit after result is shown
       return response.data;
     } catch (err) {
       console.error("Submit failed:", err.message);
-      setTestData(null); // always clear so student isn't stuck
       throw err;
     }
   };
