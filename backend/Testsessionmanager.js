@@ -19,7 +19,7 @@ const SESSION_TTL_SECONDS = Math.ceil(SESSION_TTL_MS / 1000); // for Redis TTL
 // ── ✅ FIX 2: Load InstituteConfigManager for per-college limits ───────────────
 let instituteConfig = null;
 try {
-  instituteConfig = require("./InstituteConfigManager");
+  instituteConfig = require("./services/InstituteConfigManager");
   console.log(
     "[SessionMgr] ✅ InstituteConfigManager loaded — per-college limits active",
   );
@@ -33,7 +33,7 @@ try {
 // ── ✅ FIX 3: Redis client for persistent sessions ────────────────────────────
 let redis = null;
 try {
-  redis = require("./redis"); // your existing redis.js from services/
+  redis = require("./services/redis"); // your existing redis.js from services/
   console.log(
     "[SessionMgr] ✅ Redis loaded — sessions will persist across restarts",
   );
