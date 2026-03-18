@@ -7,7 +7,7 @@ try {
     maxRetriesPerRequest: null,
     lazyConnect: true,
     retryStrategy(times) {
-      if (times > 3) return null; // stop retrying
+      if (times > 3) return null;
       return Math.min(times * 100, 3000);
     },
     connectTimeout: 5000,
@@ -20,6 +20,13 @@ try {
 } catch (e) {
   console.warn("[Redis] ⚠️ Failed to initialize:", e.message);
   redis = null;
+}
+
+// 👇 Add here — triggers the connection immediately on startup
+if (redis) {
+  redis.connect().catch((err) => {
+    console.warn("[Redis] ⚠️ Could not connect:", err.message);
+  });
 }
 
 module.exports = redis;
