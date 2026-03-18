@@ -1,11 +1,11 @@
 ﻿/**
  * testgen.js — Express router
  *
- * FIXES:
- * 1. releaseSlot() now called in ALL error paths (no more stuck sessions)
- * 2. Multi-college/multi-tenant slot isolation via collegeId
- * 3. Admin endpoint to force-clear a stuck session
- * 4. Better error messages for 429 vs slot-full
+ * ✅ FIX 1: BullMQ queue for AI generation (stops 429)
+ * ✅ FIX 2: Sequelize query for enrollment check
+ * ✅ FIX 3: releaseSlot() called in ALL error paths
+ * ✅ FIX 4: await on all async session manager calls
+ * ✅ Multi-college/multi-tenant slot isolation
  */
 
 const express = require("express");
@@ -15,51 +15,71 @@ const testSessionManager = require("../Testsessionmanager");
 const authMiddleware = require("../middleware/auth");
 const rbac = require("../middleware/rbac");
 
+// ✅ FIX 1: Load BullMQ queue
+let testQueue = null;
+let queueEvents = null;
+try {
+  const queueModule = require("../services/testQueue");
+  testQueue = queueModule.testQueue;
+  queueEvents = queueModule.queueEvents;
+  console.log(
+    "[TestGen] ✅ BullMQ queue loaded — concurrent AI calls protected",
+  );
+} catch (e) {
+  console.warn(
+    "[TestGen] ⚠️ testQueue not available — direct axios fallback. Error:",
+    e.message,
+  );
+}
+
 const AGENT =
   process.env.MOCK_TEST_AGENT_URL || "https://upskill25-myagent.hf.space";
 const TIMEOUT_GENERATE = 90_000;
 const TIMEOUT_SUBMIT = 30_000;
 
-let db;
+// ✅ FIX 2: Use sequelize from db module
+let sequelize = null;
 try {
-  db = require("../config/database");
+  const db = require("../config/database");
+  sequelize = db.sequelize || db;
 } catch {
   console.warn("[TestGen] db module not found — enrollment check skipped");
-  db = null;
 }
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function studentId(req) {
   return req.user ? String(req.user.id) : null;
 }
 
-// Extract college ID from user token or request body
-// If your JWT includes college_id, use req.user.college_id
-// Otherwise fall back to a hash of courseId as the isolation key
 function getCollegeId(req) {
   if (req.user && req.user.college_id) return String(req.user.college_id);
   if (req.user && req.user.institute_id) return String(req.user.institute_id);
-  // Fallback: use courseId prefix so different colleges' courses don't share limits
   const { courseId } = req.body || {};
   if (courseId) return `course_group_${String(courseId).substring(0, 8)}`;
   return null;
 }
 
+// ✅ FIX 2: Sequelize-compatible enrollment check
 async function isEnrolled(userId, lectureId, courseId) {
-  if (!db) return true;
+  if (!sequelize) return true;
   try {
     const query = courseId
-      ? `SELECT 1 FROM enrollments WHERE student_id = ? AND course_id = ? LIMIT 1`
+      ? `SELECT 1 FROM enrollments WHERE student_id = :userId AND course_id = :courseId LIMIT 1`
       : `SELECT 1 FROM enrollments e
          JOIN courses c ON e.course_id = c.id
          JOIN course_modules cm ON cm.course_id = c.id
          JOIN lessons l ON l.course_module_id = cm.id
-         WHERE e.student_id = ? AND l.id = ? LIMIT 1`;
-    const params = courseId ? [userId, courseId] : [userId, lectureId];
-    const [rows] = await db.query(query, params);
+         WHERE e.student_id = :userId AND l.id = :lectureId LIMIT 1`;
+
+    const [rows] = await sequelize.query(query, {
+      replacements: courseId ? { userId, courseId } : { userId, lectureId },
+      type: sequelize.QueryTypes?.SELECT || "SELECT",
+    });
     return rows.length > 0;
   } catch (err) {
     console.error("[TestGen] Enrollment check failed:", err.message);
-    return true; // fail open — don't block students on DB error
+    return true; // fail open — never block students on DB error
   }
 }
 
@@ -117,37 +137,40 @@ router.post(
       questionTypes,
     } = req.body;
 
-    // ── Input validation ──────────────────────────────────────────────────────
     if (!topic || typeof topic !== "string" || !topic.trim())
       return res
         .status(400)
         .json({ success: false, message: "topic is required" });
     if (topic.trim().length > 200)
-      return res.status(400).json({
-        success: false,
-        message: "topic must be under 200 characters",
-      });
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: "topic must be under 200 characters",
+        });
     if (!lectureId && !courseId)
       return res
         .status(400)
         .json({ success: false, message: "Provide lectureId or courseId" });
 
-    // ── Rate limit check ──────────────────────────────────────────────────────
+    // Rate limit check
     const rl = testSessionManager.checkRateLimit(sid);
     if (rl.limited) {
       res.set("Retry-After", rl.retryAfterSeconds);
       return res.status(429).json({ success: false, message: rl.message });
     }
 
-    // ── Enrollment check ──────────────────────────────────────────────────────
+    // Enrollment check
     const enrolled = await isEnrolled(sid, lectureId, courseId);
     if (!enrolled)
-      return res.status(403).json({
-        success: false,
-        message: "You are not enrolled in this course.",
-      });
+      return res
+        .status(403)
+        .json({
+          success: false,
+          message: "You are not enrolled in this course.",
+        });
 
-    // ── Acquire slot (multi-college aware) ────────────────────────────────────
+    // ✅ FIX 4: await acquireSlot
     const collegeId = getCollegeId(req);
     const slot = await testSessionManager.acquireSlot(sid, null, collegeId);
     if (!slot.ok)
@@ -155,35 +178,75 @@ router.post(
 
     testSessionManager.recordGeneration(sid);
 
+    const agentPayload = {
+      topic: topic.trim(),
+      lecture_id: lectureId || null,
+      course_id: courseId || null,
+      num_questions: Math.min(Math.max(numQuestions || 10, 1), 50),
+      duration_minutes: Math.min(Math.max(durationMinutes || 30, 5), 180),
+      difficulty: ["easy", "medium", "hard", "complex"].includes(difficulty)
+        ? difficulty
+        : "medium",
+      question_types:
+        Array.isArray(questionTypes) && questionTypes.length
+          ? questionTypes
+          : ["mcq"],
+      student_id: sid,
+    };
+
     try {
-      const { data } = await axios.post(
-        `${AGENT}/api/generate-test`,
-        {
-          topic: topic.trim(),
-          lecture_id: lectureId || null,
-          course_id: courseId || null,
-          num_questions: Math.min(Math.max(numQuestions || 10, 1), 50),
-          duration_minutes: Math.min(Math.max(durationMinutes || 30, 5), 180),
-          difficulty: ["easy", "medium", "hard", "complex"].includes(difficulty)
-            ? difficulty
-            : "medium",
-          question_types:
-            Array.isArray(questionTypes) && questionTypes.length
-              ? questionTypes
-              : ["mcq"],
-          student_id: sid,
-        },
-        { timeout: TIMEOUT_GENERATE },
-      );
-      // ✅ SUCCESS: Keep slot open — student is now taking the test
-      return res.json({ success: true, ...data });
+      let responseData;
+
+      if (testQueue && queueEvents) {
+        // QUEUED PATH — safe for 100s of concurrent students
+        console.log(
+          `[TestGen] Queuing job for student=${sid} college=${collegeId || "none"}`,
+        );
+        const job = await testQueue.add("generate", agentPayload, {
+          attempts: 3,
+          backoff: { type: "exponential", delay: 2000 },
+          jobId: `gen_${sid}_${Date.now()}`,
+        });
+        responseData = await job.waitUntilFinished(
+          queueEvents,
+          TIMEOUT_GENERATE,
+        );
+        console.log(`[TestGen] ✅ Job done: student=${sid} job=${job.id}`);
+      } else {
+        // DIRECT PATH — fallback if Redis unavailable
+        console.log(`[TestGen] Direct AI call for student=${sid}`);
+        const { data } = await axios.post(
+          `${AGENT}/api/generate-test`,
+          agentPayload,
+          { timeout: TIMEOUT_GENERATE },
+        );
+        responseData = data;
+      }
+
+      return res.json({ success: true, ...responseData });
     } catch (err) {
-      // ✅ BUGFIX: Always release slot on generation failure so student isn't stuck
-      testSessionManager.releaseSlot(sid);
+      // ✅ FIX 3: ALWAYS release slot on failure
+      await testSessionManager.releaseSlot(sid);
       const status = err.response?.status || 500;
-      const message = err.response?.data?.detail || err.message;
-      console.error(`[TestGen] generate failed for student ${sid}:`, message);
-      return res.status(status).json({ success: false, message });
+      const message =
+        err.response?.data?.detail || err.message || "Unknown error";
+      console.error(`[TestGen] generate FAILED for student=${sid}:`, message);
+
+      if (
+        message.includes("timeout") ||
+        message.includes("waiting") ||
+        message.includes("timed out")
+      ) {
+        return res
+          .status(503)
+          .json({
+            success: false,
+            message: "Test generation timed out. Please try again.",
+          });
+      }
+      return res
+        .status(status >= 400 && status < 600 ? status : 500)
+        .json({ success: false, message });
     }
   },
 );
@@ -199,10 +262,12 @@ router.post("/submit", authMiddleware, rbac(["student"]), async (req, res) => {
 
   const { testId, questions, answers, timeTakenSeconds } = req.body;
   if (!testId || !questions || !answers)
-    return res.status(400).json({
-      success: false,
-      message: "testId, questions, and answers are required",
-    });
+    return res
+      .status(400)
+      .json({
+        success: false,
+        message: "testId, questions, and answers are required",
+      });
 
   try {
     const { data } = await axios.post(
@@ -216,12 +281,11 @@ router.post("/submit", authMiddleware, rbac(["student"]), async (req, res) => {
       },
       { timeout: TIMEOUT_SUBMIT },
     );
-    testSessionManager.releaseSlot(sid);
+    await testSessionManager.releaseSlot(sid);
     return res.json({ success: true, ...data });
   } catch (err) {
-    // ✅ Always release slot even on submit failure
-    testSessionManager.releaseSlot(sid);
-    console.error(`[TestGen] submit failed for student ${sid}:`, err.message);
+    await testSessionManager.releaseSlot(sid);
+    console.error(`[TestGen] submit FAILED for student=${sid}:`, err.message);
     return res.status(500).json({ success: false, message: err.message });
   }
 });
@@ -250,6 +314,16 @@ router.get(
     const sessions = testSessionManager.getDetailedSessions();
     const stats = await testSessionManager.getStats();
     res.json({ success: true, stats, sessions });
+  },
+);
+
+router.post(
+  "/admin/reset-all",
+  authMiddleware,
+  rbac(["admin"]),
+  async (req, res) => {
+    await testSessionManager.resetAll();
+    res.json({ success: true, message: "⚠️ All sessions have been reset." });
   },
 );
 
