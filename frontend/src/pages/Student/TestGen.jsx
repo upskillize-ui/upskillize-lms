@@ -1366,71 +1366,79 @@ function TestTakingScreen({ testData, onSubmit, onForceExit }) {
             </p>
           )}
 
-          {/* Options */}
+          {/* Options — safe rendering for any format from AI agent */}
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {(q.options || q.choices || []).map((opt, oIdx) => {
-              const optValue =
-                typeof opt === "object"
-                  ? opt.value || opt.text || opt.label || String(oIdx)
-                  : opt;
-              const optLabel =
-                typeof opt === "object"
-                  ? opt.text || opt.label || opt.value || opt
-                  : opt;
+            {(() => {
+              let opts = q.options || q.choices || q.answers || [];
+              if (typeof opts === "string")
+                opts = opts.split("\n").filter(Boolean);
+              if (!Array.isArray(opts) && typeof opts === "object")
+                opts = Object.values(opts);
+              if (!Array.isArray(opts)) opts = [];
 
-              const isSelected = isMultiSelect
-                ? Array.isArray(currentAnswer) &&
-                  currentAnswer.includes(optValue)
-                : currentAnswer === optValue;
+              return opts.map((opt, oIdx) => {
+                const optValue =
+                  typeof opt === "object"
+                    ? opt.value || opt.text || opt.label || String(oIdx)
+                    : String(opt);
+                const optLabel =
+                  typeof opt === "object"
+                    ? opt.text || opt.label || opt.value || String(opt)
+                    : String(opt);
+                const isSelected = isMultiSelect
+                  ? Array.isArray(currentAnswer) &&
+                    currentAnswer.includes(optValue)
+                  : currentAnswer === optValue;
 
-              return (
-                <button
-                  key={oIdx}
-                  onClick={() =>
-                    selectAnswer(currentQ, optValue, isMultiSelect)
-                  }
-                  style={{
-                    padding: "14px 18px",
-                    borderRadius: 8,
-                    border: `2px solid ${isSelected ? COLORS.orange : COLORS.border}`,
-                    background: isSelected
-                      ? "rgba(255,140,0,0.08)"
-                      : COLORS.bgWhite,
-                    color: COLORS.textDark,
-                    fontSize: 14,
-                    fontWeight: isSelected ? 600 : 400,
-                    cursor: "pointer",
-                    textAlign: "left",
-                    transition: "all 0.15s",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 12,
-                    boxShadow: isSelected
-                      ? "0 0 0 3px rgba(255,140,0,0.15)"
-                      : "none",
-                  }}
-                >
-                  <span
+                return (
+                  <button
+                    key={oIdx}
+                    onClick={() =>
+                      selectAnswer(currentQ, optValue, isMultiSelect)
+                    }
                     style={{
-                      width: 24,
-                      height: 24,
-                      borderRadius: isMultiSelect ? 4 : "50%",
+                      padding: "14px 18px",
+                      borderRadius: 8,
                       border: `2px solid ${isSelected ? COLORS.orange : COLORS.border}`,
-                      background: isSelected ? COLORS.orange : "transparent",
-                      flexShrink: 0,
+                      background: isSelected
+                        ? "rgba(255,140,0,0.08)"
+                        : COLORS.bgWhite,
+                      color: COLORS.textDark,
+                      fontSize: 14,
+                      fontWeight: isSelected ? 600 : 400,
+                      cursor: "pointer",
+                      textAlign: "left",
+                      transition: "all 0.15s",
                       display: "flex",
                       alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: 12,
-                      color: "#fff",
+                      gap: 12,
+                      boxShadow: isSelected
+                        ? "0 0 0 3px rgba(255,140,0,0.15)"
+                        : "none",
                     }}
                   >
-                    {isSelected ? "✓" : ""}
-                  </span>
-                  {String.fromCharCode(65 + oIdx)}. {optLabel}
-                </button>
-              );
-            })}
+                    <span
+                      style={{
+                        width: 24,
+                        height: 24,
+                        borderRadius: isMultiSelect ? 4 : "50%",
+                        border: `2px solid ${isSelected ? COLORS.orange : COLORS.border}`,
+                        background: isSelected ? COLORS.orange : "transparent",
+                        flexShrink: 0,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: 12,
+                        color: "#fff",
+                      }}
+                    >
+                      {isSelected ? "✓" : ""}
+                    </span>
+                    {String.fromCharCode(65 + oIdx)}. {optLabel}
+                  </button>
+                );
+              });
+            })()}
           </div>
         </div>
 
