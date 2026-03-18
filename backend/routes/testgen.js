@@ -62,21 +62,23 @@ function getCollegeId(req) {
 
 // ✅ FIX 2: Sequelize-compatible enrollment check
 async function isEnrolled(userId, lectureId, courseId) {
-  if (!sequelize) return true;
+  if (!sequelize) return true; // fail open if no DB
   try {
     const query = courseId
-      ? `SELECT 1 FROM enrollments WHERE student_id = :userId AND course_id = :courseId LIMIT 1`
-      : `SELECT 1 FROM enrollments e
+      ? `SELECT COUNT(*) as cnt FROM enrollments WHERE student_id = :userId AND course_id = :courseId`
+      : `SELECT COUNT(*) as cnt FROM enrollments e
          JOIN courses c ON e.course_id = c.id
          JOIN course_modules cm ON cm.course_id = c.id
          JOIN lessons l ON l.course_module_id = cm.id
-         WHERE e.student_id = :userId AND l.id = :lectureId LIMIT 1`;
+         WHERE e.student_id = :userId AND l.id = :lectureId`;
 
-    const [rows] = await sequelize.query(query, {
+    const [results] = await sequelize.query(query, {
       replacements: courseId ? { userId, courseId } : { userId, lectureId },
       type: sequelize.QueryTypes?.SELECT || "SELECT",
     });
-    return rows.length > 0;
+
+    const count = results?.cnt ?? results?.[0]?.cnt ?? 0;
+    return parseInt(count) > 0;
   } catch (err) {
     console.error("[TestGen] Enrollment check failed:", err.message);
     return true; // fail open — never block students on DB error
@@ -142,12 +144,10 @@ router.post(
         .status(400)
         .json({ success: false, message: "topic is required" });
     if (topic.trim().length > 200)
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "topic must be under 200 characters",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "topic must be under 200 characters",
+      });
     if (!lectureId && !courseId)
       return res
         .status(400)
@@ -163,12 +163,10 @@ router.post(
     // Enrollment check
     const enrolled = await isEnrolled(sid, lectureId, courseId);
     if (!enrolled)
-      return res
-        .status(403)
-        .json({
-          success: false,
-          message: "You are not enrolled in this course.",
-        });
+      return res.status(403).json({
+        success: false,
+        message: "You are not enrolled in this course.",
+      });
 
     // ✅ FIX 4: await acquireSlot
     const collegeId = getCollegeId(req);
@@ -237,12 +235,10 @@ router.post(
         message.includes("waiting") ||
         message.includes("timed out")
       ) {
-        return res
-          .status(503)
-          .json({
-            success: false,
-            message: "Test generation timed out. Please try again.",
-          });
+        return res.status(503).json({
+          success: false,
+          message: "Test generation timed out. Please try again.",
+        });
       }
       return res
         .status(status >= 400 && status < 600 ? status : 500)
@@ -262,12 +258,10 @@ router.post("/submit", authMiddleware, rbac(["student"]), async (req, res) => {
 
   const { testId, questions, answers, timeTakenSeconds } = req.body;
   if (!testId || !questions || !answers)
-    return res
-      .status(400)
-      .json({
-        success: false,
-        message: "testId, questions, and answers are required",
-      });
+    return res.status(400).json({
+      success: false,
+      message: "testId, questions, and answers are required",
+    });
 
   try {
     const { data } = await axios.post(
