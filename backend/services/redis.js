@@ -1,40 +1,25 @@
-/**
- * services/redis.js
- *
- * Shared Redis client for:
- * - BullMQ queue (testQueue.js)
- * - Session persistence (Testsessionmanager.js)
- *
- * Uses ioredis — same library BullMQ requires.
- */
-
 const Redis = require("ioredis");
 
-const redis = new Redis({
-  host: process.env.REDIS_HOST || "127.0.0.1",
-  port: parseInt(process.env.REDIS_PORT || "6379"),
-  password: process.env.REDIS_PASSWORD || undefined,
-  // Required by BullMQ
-  maxRetriesPerRequest: null,
-  // Reconnect automatically
-  retryStrategy(times) {
-    const delay = Math.min(times * 100, 3000);
-    return delay;
-  },
-  // Log reconnection attempts
-  lazyConnect: false,
-});
+let redis = null;
 
-redis.on("connect", () => {
-  console.log("[Redis] ✅ Connected");
-});
+try {
+  redis = new Redis(process.env.REDIS_URL || "redis://127.0.0.1:6379", {
+    maxRetriesPerRequest: null,
+    lazyConnect: true,
+    retryStrategy(times) {
+      if (times > 3) return null; // stop retrying
+      return Math.min(times * 100, 3000);
+    },
+    connectTimeout: 5000,
+  });
 
-redis.on("error", (err) => {
-  console.error("[Redis] ❌ Error:", err.message);
-});
-
-redis.on("reconnecting", () => {
-  console.warn("[Redis] 🔄 Reconnecting...");
-});
+  redis.on("connect", () => console.log("[Redis] ✅ Connected"));
+  redis.on("error", (err) =>
+    console.warn("[Redis] ⚠️ Not available:", err.message),
+  );
+} catch (e) {
+  console.warn("[Redis] ⚠️ Failed to initialize:", e.message);
+  redis = null;
+}
 
 module.exports = redis;
