@@ -971,6 +971,696 @@ function SetupScreen({ onGenerate, loading, slots }) {
 }
 
 // ============================================================================
+// TEST TAKING SCREEN
+// ============================================================================
+
+function TestTakingScreen({ testData, onSubmit, onForceExit }) {
+  const questions = testData.questions || [];
+  const testId = testData.test_id || testData.testId;
+  const durationMinutes = testData.duration_minutes || 30;
+
+  const [answers, setAnswers] = useState({});
+  const [currentQ, setCurrentQ] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(durationMinutes * 60);
+  const [submitting, setSubmitting] = useState(false);
+  const [result, setResult] = useState(null);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const startTime = useState(Date.now())[0];
+
+  // ── Countdown timer ──────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (result) return;
+    if (timeLeft <= 0) {
+      handleSubmit(true); // auto-submit on timeout
+      return;
+    }
+    const t = setInterval(() => setTimeLeft((s) => s - 1), 1000);
+    return () => clearInterval(t);
+  }, [timeLeft, result]);
+
+  const formatTime = (secs) => {
+    const m = Math.floor(secs / 60)
+      .toString()
+      .padStart(2, "0");
+    const s = (secs % 60).toString().padStart(2, "0");
+    return `${m}:${s}`;
+  };
+
+  const timerColor =
+    timeLeft < 60
+      ? COLORS.danger
+      : timeLeft < 300
+        ? COLORS.warning
+        : COLORS.success;
+
+  // ── Answer selection ─────────────────────────────────────────────────────────
+  const selectAnswer = (qIdx, value, isMulti = false) => {
+    setAnswers((prev) => {
+      if (isMulti) {
+        const current = prev[qIdx] || [];
+        return {
+          ...prev,
+          [qIdx]: current.includes(value)
+            ? current.filter((v) => v !== value)
+            : [...current, value],
+        };
+      }
+      return { ...prev, [qIdx]: value };
+    });
+  };
+
+  // ── Submit ───────────────────────────────────────────────────────────────────
+  const handleSubmit = async (autoSubmit = false) => {
+    if (submitting) return;
+    setSubmitting(true);
+    setShowConfirm(false);
+
+    const timeTaken = Math.floor((Date.now() - startTime) / 1000);
+    try {
+      const res = await onSubmit(testId, questions, answers, timeTaken);
+      setResult(res);
+    } catch (err) {
+      setResult({ error: true, message: err.message });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const answeredCount = Object.keys(answers).length;
+  const q = questions[currentQ];
+
+  // ── Result Screen ────────────────────────────────────────────────────────────
+  if (result) {
+    const score = result.score ?? result.percentage ?? null;
+    const passed = score !== null ? score >= 50 : null;
+
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          background: COLORS.bgLight,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 20,
+        }}
+      >
+        <div
+          style={{
+            background: COLORS.bgWhite,
+            borderRadius: 16,
+            padding: 48,
+            maxWidth: 520,
+            width: "100%",
+            textAlign: "center",
+            boxShadow: "0 4px 24px rgba(0,0,0,0.1)",
+          }}
+        >
+          <div style={{ fontSize: 64, marginBottom: 16 }}>
+            {result.error
+              ? "❌"
+              : passed === null
+                ? "✅"
+                : passed
+                  ? "🎉"
+                  : "📚"}
+          </div>
+          <h2
+            style={{
+              fontSize: 28,
+              fontWeight: 800,
+              color: COLORS.darkBlue,
+              margin: "0 0 8px",
+            }}
+          >
+            {result.error
+              ? "Submission Error"
+              : passed === null
+                ? "Test Submitted!"
+                : passed
+                  ? "Well Done!"
+                  : "Keep Practicing!"}
+          </h2>
+
+          {result.error ? (
+            <p style={{ color: COLORS.danger, marginBottom: 24 }}>
+              {result.message}
+            </p>
+          ) : (
+            <>
+              {score !== null && (
+                <div
+                  style={{
+                    fontSize: 56,
+                    fontWeight: 800,
+                    color: passed ? COLORS.success : COLORS.warning,
+                    margin: "16px 0",
+                  }}
+                >
+                  {Math.round(score)}%
+                </div>
+              )}
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: 12,
+                  margin: "24px 0",
+                  textAlign: "left",
+                }}
+              >
+                {[
+                  ["✅ Correct", result.correct ?? result.correct_count ?? "—"],
+                  ["❌ Wrong", result.wrong ?? result.wrong_count ?? "—"],
+                  ["📝 Total", questions.length],
+                  [
+                    "⏱️ Time",
+                    `${Math.floor((Date.now() - startTime) / 60000)}m`,
+                  ],
+                ].map(([label, val]) => (
+                  <div
+                    key={label}
+                    style={{
+                      background: COLORS.bgLight,
+                      borderRadius: 8,
+                      padding: "12px 16px",
+                    }}
+                  >
+                    <div style={{ fontSize: 11, color: COLORS.textMuted }}>
+                      {label}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 20,
+                        fontWeight: 700,
+                        color: COLORS.darkBlue,
+                        marginTop: 4,
+                      }}
+                    >
+                      {val}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+          <button
+            onClick={onForceExit}
+            style={{
+              width: "100%",
+              padding: "14px",
+              borderRadius: 8,
+              border: "none",
+              background: COLORS.orange,
+              color: "#fff",
+              fontSize: 15,
+              fontWeight: 700,
+              cursor: "pointer",
+              marginTop: 8,
+            }}
+          >
+            ⚡ Take Another Test
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Submitting Screen ────────────────────────────────────────────────────────
+  if (submitting) {
+    return <LoadingSpinner message="Submitting Your Test" />;
+  }
+
+  if (!q) {
+    return (
+      <div style={{ padding: 40, textAlign: "center" }}>
+        <p style={{ color: COLORS.danger }}>No questions found in this test.</p>
+        <button
+          onClick={onForceExit}
+          style={{
+            padding: "10px 24px",
+            borderRadius: 8,
+            border: "none",
+            background: COLORS.orange,
+            color: "#fff",
+            fontWeight: 700,
+            cursor: "pointer",
+            marginTop: 16,
+          }}
+        >
+          Back to Setup
+        </button>
+      </div>
+    );
+  }
+
+  const isMultiSelect = q.type === "msq" || q.question_type === "msq";
+  const currentAnswer = answers[currentQ];
+  const isAnswered = isMultiSelect
+    ? Array.isArray(currentAnswer) && currentAnswer.length > 0
+    : currentAnswer !== undefined;
+
+  // ── Question Screen ──────────────────────────────────────────────────────────
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        background: COLORS.bgLight,
+        padding: "24px 16px",
+      }}
+    >
+      <div style={{ maxWidth: 800, margin: "0 auto" }}>
+        {/* Top Bar */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            background: COLORS.bgWhite,
+            borderRadius: 10,
+            padding: "12px 20px",
+            marginBottom: 20,
+            boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+          }}
+        >
+          <div
+            style={{ fontWeight: 700, color: COLORS.darkBlue, fontSize: 14 }}
+          >
+            ⚡ TestGen
+          </div>
+
+          {/* Timer */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              background: `${timerColor}15`,
+              border: `2px solid ${timerColor}`,
+              borderRadius: 8,
+              padding: "6px 14px",
+              fontWeight: 800,
+              fontSize: 18,
+              color: timerColor,
+              fontFamily: "monospace",
+            }}
+          >
+            ⏱️ {formatTime(timeLeft)}
+          </div>
+
+          <div
+            style={{ fontSize: 13, color: COLORS.textGray, fontWeight: 600 }}
+          >
+            {answeredCount}/{questions.length} answered
+          </div>
+        </div>
+
+        {/* Progress Bar */}
+        <div
+          style={{
+            height: 6,
+            background: COLORS.border,
+            borderRadius: 4,
+            overflow: "hidden",
+            marginBottom: 20,
+          }}
+        >
+          <div
+            style={{
+              height: "100%",
+              width: `${((currentQ + 1) / questions.length) * 100}%`,
+              background: `linear-gradient(90deg, ${COLORS.orange}, ${COLORS.orangeLight})`,
+              transition: "width 0.3s ease",
+            }}
+          />
+        </div>
+
+        {/* Question Card */}
+        <div
+          style={{
+            background: COLORS.bgWhite,
+            borderRadius: 12,
+            padding: 32,
+            boxShadow: "0 2px 12px rgba(0,0,0,0.08)",
+            marginBottom: 20,
+          }}
+        >
+          {/* Question Header */}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "flex-start",
+              marginBottom: 20,
+            }}
+          >
+            <span
+              style={{
+                background: COLORS.orange,
+                color: "#fff",
+                borderRadius: 6,
+                padding: "4px 12px",
+                fontSize: 12,
+                fontWeight: 700,
+              }}
+            >
+              Q{currentQ + 1} / {questions.length}
+            </span>
+            <span
+              style={{
+                background: COLORS.bgLight,
+                color: COLORS.textGray,
+                borderRadius: 6,
+                padding: "4px 12px",
+                fontSize: 11,
+                fontWeight: 600,
+                textTransform: "uppercase",
+              }}
+            >
+              {isMultiSelect
+                ? "Multi-Select"
+                : q.type === "true_false"
+                  ? "True / False"
+                  : "MCQ"}
+            </span>
+          </div>
+
+          {/* Question Text */}
+          <p
+            style={{
+              fontSize: 17,
+              fontWeight: 600,
+              color: COLORS.textDark,
+              lineHeight: 1.7,
+              marginBottom: 28,
+            }}
+          >
+            {q.question || q.question_text}
+          </p>
+
+          {isMultiSelect && (
+            <p style={{ fontSize: 12, color: COLORS.info, marginBottom: 12 }}>
+              ℹ️ Select all that apply
+            </p>
+          )}
+
+          {/* Options */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {(q.options || q.choices || []).map((opt, oIdx) => {
+              const optValue =
+                typeof opt === "object"
+                  ? opt.value || opt.text || opt.label || String(oIdx)
+                  : opt;
+              const optLabel =
+                typeof opt === "object"
+                  ? opt.text || opt.label || opt.value || opt
+                  : opt;
+
+              const isSelected = isMultiSelect
+                ? Array.isArray(currentAnswer) &&
+                  currentAnswer.includes(optValue)
+                : currentAnswer === optValue;
+
+              return (
+                <button
+                  key={oIdx}
+                  onClick={() =>
+                    selectAnswer(currentQ, optValue, isMultiSelect)
+                  }
+                  style={{
+                    padding: "14px 18px",
+                    borderRadius: 8,
+                    border: `2px solid ${isSelected ? COLORS.orange : COLORS.border}`,
+                    background: isSelected
+                      ? "rgba(255,140,0,0.08)"
+                      : COLORS.bgWhite,
+                    color: COLORS.textDark,
+                    fontSize: 14,
+                    fontWeight: isSelected ? 600 : 400,
+                    cursor: "pointer",
+                    textAlign: "left",
+                    transition: "all 0.15s",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    boxShadow: isSelected
+                      ? "0 0 0 3px rgba(255,140,0,0.15)"
+                      : "none",
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 24,
+                      height: 24,
+                      borderRadius: isMultiSelect ? 4 : "50%",
+                      border: `2px solid ${isSelected ? COLORS.orange : COLORS.border}`,
+                      background: isSelected ? COLORS.orange : "transparent",
+                      flexShrink: 0,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 12,
+                      color: "#fff",
+                    }}
+                  >
+                    {isSelected ? "✓" : ""}
+                  </span>
+                  {String.fromCharCode(65 + oIdx)}. {optLabel}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Navigation */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 12,
+          }}
+        >
+          <button
+            onClick={() => setCurrentQ((q) => Math.max(0, q - 1))}
+            disabled={currentQ === 0}
+            style={{
+              padding: "12px 24px",
+              borderRadius: 8,
+              border: `2px solid ${COLORS.border}`,
+              background: COLORS.bgWhite,
+              color: currentQ === 0 ? COLORS.textMuted : COLORS.textDark,
+              fontWeight: 700,
+              cursor: currentQ === 0 ? "not-allowed" : "pointer",
+              fontSize: 14,
+            }}
+          >
+            ← Previous
+          </button>
+
+          {/* Question dots */}
+          <div
+            style={{
+              display: "flex",
+              gap: 6,
+              flexWrap: "wrap",
+              justifyContent: "center",
+              flex: 1,
+            }}
+          >
+            {questions.map((_, idx) => {
+              const isAnsweredDot =
+                answers[idx] !== undefined &&
+                (Array.isArray(answers[idx]) ? answers[idx].length > 0 : true);
+              return (
+                <button
+                  key={idx}
+                  onClick={() => setCurrentQ(idx)}
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: "50%",
+                    border: `2px solid ${idx === currentQ ? COLORS.orange : isAnsweredDot ? COLORS.success : COLORS.border}`,
+                    background:
+                      idx === currentQ
+                        ? COLORS.orange
+                        : isAnsweredDot
+                          ? `${COLORS.success}20`
+                          : COLORS.bgWhite,
+                    color:
+                      idx === currentQ
+                        ? "#fff"
+                        : isAnsweredDot
+                          ? COLORS.success
+                          : COLORS.textMuted,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  {idx + 1}
+                </button>
+              );
+            })}
+          </div>
+
+          {currentQ < questions.length - 1 ? (
+            <button
+              onClick={() =>
+                setCurrentQ((q) => Math.min(questions.length - 1, q + 1))
+              }
+              style={{
+                padding: "12px 24px",
+                borderRadius: 8,
+                border: "none",
+                background: isAnswered ? COLORS.orange : COLORS.textMuted,
+                color: "#fff",
+                fontWeight: 700,
+                cursor: "pointer",
+                fontSize: 14,
+              }}
+            >
+              Next →
+            </button>
+          ) : (
+            <button
+              onClick={() => setShowConfirm(true)}
+              style={{
+                padding: "12px 24px",
+                borderRadius: 8,
+                border: "none",
+                background: COLORS.success,
+                color: "#fff",
+                fontWeight: 700,
+                cursor: "pointer",
+                fontSize: 14,
+              }}
+            >
+              Submit Test ✓
+            </button>
+          )}
+        </div>
+
+        {/* Unanswered warning */}
+        {answeredCount < questions.length && (
+          <div
+            style={{
+              marginTop: 16,
+              padding: "10px 16px",
+              background: "rgba(255,152,0,0.1)",
+              border: "1px solid rgba(255,152,0,0.3)",
+              borderRadius: 8,
+              fontSize: 13,
+              color: COLORS.warning,
+              textAlign: "center",
+            }}
+          >
+            ⚠️ {questions.length - answeredCount} question(s) unanswered
+          </div>
+        )}
+      </div>
+
+      {/* Confirm Submit Modal */}
+      {showConfirm && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+          }}
+        >
+          <div
+            style={{
+              background: COLORS.bgWhite,
+              borderRadius: 16,
+              padding: 40,
+              maxWidth: 420,
+              width: "90%",
+              textAlign: "center",
+              boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+            }}
+          >
+            <div style={{ fontSize: 48, marginBottom: 16 }}>📋</div>
+            <h3
+              style={{
+                fontSize: 20,
+                fontWeight: 700,
+                color: COLORS.darkBlue,
+                marginBottom: 12,
+              }}
+            >
+              Submit Test?
+            </h3>
+            <p
+              style={{
+                color: COLORS.textGray,
+                marginBottom: 8,
+                lineHeight: 1.6,
+              }}
+            >
+              You have answered <strong>{answeredCount}</strong> of{" "}
+              <strong>{questions.length}</strong> questions.
+            </p>
+            {answeredCount < questions.length && (
+              <p
+                style={{
+                  color: COLORS.warning,
+                  fontSize: 13,
+                  marginBottom: 16,
+                }}
+              >
+                ⚠️ {questions.length - answeredCount} question(s) will be marked
+                unanswered.
+              </p>
+            )}
+            <div style={{ display: "flex", gap: 12, marginTop: 24 }}>
+              <button
+                onClick={() => setShowConfirm(false)}
+                style={{
+                  flex: 1,
+                  padding: "12px",
+                  borderRadius: 8,
+                  border: `2px solid ${COLORS.border}`,
+                  background: COLORS.bgWhite,
+                  color: COLORS.textDark,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  fontSize: 14,
+                }}
+              >
+                Keep Going
+              </button>
+              <button
+                onClick={() => handleSubmit(false)}
+                style={{
+                  flex: 1,
+                  padding: "12px",
+                  borderRadius: 8,
+                  border: "none",
+                  background: COLORS.success,
+                  color: "#fff",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  fontSize: 14,
+                }}
+              >
+                Submit ✓
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
 // MAIN COMPONENT
 // ============================================================================
 
@@ -1121,33 +1811,14 @@ export default function TestGen() {
     );
   }
 
-  // ── Test Generated — show test (or your own TestTaking component) ────────────
+  // ── Test Taking Screen ───────────────────────────────────────────────────────
   if (testData) {
-    // If you have a separate TestTaking component, render it here.
-    // For now we show a placeholder. Replace with your actual component:
-    // return <TestTaking testData={testData} onSubmit={onSubmit} />;
     return (
-      <div style={{ padding: 40, textAlign: "center" }}>
-        <h2 style={{ color: COLORS.darkBlue }}>Test Ready! ✅</h2>
-        <p style={{ color: COLORS.textGray }}>
-          Test ID: {testData.test_id || testData.testId}
-        </p>
-        <button
-          onClick={() => setTestData(null)}
-          style={{
-            padding: "10px 24px",
-            borderRadius: 8,
-            border: "none",
-            background: COLORS.orange,
-            color: "#fff",
-            fontWeight: 700,
-            cursor: "pointer",
-            marginTop: 16,
-          }}
-        >
-          Back to Setup
-        </button>
-      </div>
+      <TestTakingScreen
+        testData={testData}
+        onSubmit={onSubmit}
+        onForceExit={() => setTestData(null)}
+      />
     );
   }
 
