@@ -20,7 +20,7 @@ import sys
 AGENT_URL = "https://upskill25-myagent.hf.space"
 
 # Your course IDs — add all your course IDs here
-COURSE_IDS = [1, 6]  # ← UPDATE these with your actual course IDs
+COURSE_IDS = [1, 2, 3, 4, 5]  # ← UPDATE these with your actual course IDs
 
 
 def check_agent():

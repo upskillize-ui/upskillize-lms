@@ -264,13 +264,41 @@ router.post("/submit", authMiddleware, rbac(["student"]), async (req, res) => {
     });
 
   try {
+    // ✅ FIX: Transform answers from frontend format to agent format
+    // Frontend sends: { 0: "B", 1: ["A","C"], 2: "A" }  (index-based, strings or arrays)
+    // Agent expects:  { "q1": ["B"], "q2": ["A","C"], "q3": ["A"] }  (id-based, always arrays)
+    const transformedAnswers = {};
+    for (const [key, value] of Object.entries(answers)) {
+      // Determine the question ID
+      const qIndex = parseInt(key);
+      const questionId =
+        !isNaN(qIndex) && questions[qIndex]
+          ? questions[qIndex].id || `q${qIndex + 1}`
+          : key; // If key is already a question ID like "q1", use as-is
+
+      // Ensure value is always an array
+      if (Array.isArray(value)) {
+        transformedAnswers[questionId] = value;
+      } else if (value !== null && value !== undefined && value !== "") {
+        transformedAnswers[questionId] = [String(value)];
+      } else {
+        transformedAnswers[questionId] = [];
+      }
+    }
+
+    console.log(
+      `[TestGen] Submit: student=${sid}, answers transformed:`,
+      Object.keys(transformedAnswers).length,
+      "questions answered",
+    );
+
     const { data } = await axios.post(
       `${AGENT}/api/submit-answers`,
       {
         test_id: testId,
         student_id: sid,
         questions,
-        answers,
+        answers: transformedAnswers,
         time_taken_seconds: timeTakenSeconds || 0,
       },
       { timeout: TIMEOUT_SUBMIT },
@@ -279,8 +307,16 @@ router.post("/submit", authMiddleware, rbac(["student"]), async (req, res) => {
     return res.json({ success: true, ...data });
   } catch (err) {
     await testSessionManager.releaseSlot(sid);
-    console.error(`[TestGen] submit FAILED for student=${sid}:`, err.message);
-    return res.status(500).json({ success: false, message: err.message });
+    console.error(
+      `[TestGen] submit FAILED for student=${sid}:`,
+      err.response?.data || err.message,
+    );
+    return res
+      .status(500)
+      .json({
+        success: false,
+        message: err.response?.data?.detail || err.message,
+      });
   }
 });
 
