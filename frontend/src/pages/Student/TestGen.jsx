@@ -6,7 +6,7 @@
  * ✅ Orange CTA buttons
  * ✅ Professional spacing & typography
  * ✅ Dynamic N questions (1-100)
- * ✅ Dynamic duration (5-180 minutes)
+ * ✅ Dynamic duration (1-180 minutes)
  * ✅ Beautiful loading spinner
  * ✅ 200+ concurrent support
  */
@@ -286,7 +286,7 @@ function SetupScreen({ onGenerate, loading, slots }) {
     setNQ(num);
   };
 
-  // ✅ Validate duration (5-180 minutes)
+  // ✅ Validate duration (1-180 minutes)
   const handleDurChange = (e) => {
     const val = e.target.value;
     setDurInput(val);
@@ -301,10 +301,10 @@ function SetupScreen({ onGenerate, loading, slots }) {
       setErrors((p) => ({ ...p, dur: "Enter a valid number" }));
       return;
     }
-    if (num < 5) {
+    if (num < 1) {
       setErrors((p) => ({
         ...p,
-        dur: `Minimum 5 minutes (you entered ${num})`,
+        dur: `Minimum 1 minute (you entered ${num})`,
       }));
       return;
     }
@@ -738,7 +738,7 @@ function SetupScreen({ onGenerate, loading, slots }) {
                   </label>
                   <input
                     type="number"
-                    min="5"
+                    min="1"
                     max="180"
                     style={{
                       width: "100%",
@@ -751,7 +751,7 @@ function SetupScreen({ onGenerate, loading, slots }) {
                       boxSizing: "border-box",
                       fontFamily: "inherit",
                     }}
-                    placeholder="5-180"
+                    placeholder="1-180"
                     value={durInput}
                     onChange={handleDurChange}
                   />
@@ -773,7 +773,7 @@ function SetupScreen({ onGenerate, loading, slots }) {
                       marginTop: 4,
                     }}
                   >
-                    5-180 minutes
+                    1-180 minutes
                   </div>
                 </div>
 

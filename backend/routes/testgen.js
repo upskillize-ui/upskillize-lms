@@ -181,7 +181,7 @@ router.post(
       lecture_id: lectureId || null,
       course_id: courseId || null,
       num_questions: Math.min(Math.max(numQuestions || 10, 1), 50),
-      duration_minutes: Math.min(Math.max(durationMinutes || 30, 5), 180),
+      duration_minutes: Math.min(Math.max(durationMinutes || 30, 1), 180),
       difficulty: ["easy", "medium", "hard", "complex"].includes(difficulty)
         ? difficulty
         : "medium",
