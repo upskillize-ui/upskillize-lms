@@ -1,78 +1,254 @@
 /**
- * BrainDrillMonitor.jsx
- * Admin panel — real-time visibility into AI mock test activity.
+ * BrainDrillMonitor.jsx — ANIMATED EDITION
  *
- * Shows:
- *  • Live slot occupancy (how many students are actively taking a test)
- *  • Per-student test history with scores and feedback
- *  • Ingest controls (trigger re-ingestion of a course/lecture)
- *  • Agent health status
- *
- * Add to your Admin Dashboard routes:
- *   import BrainDrillMonitor from "./BrainDrillMonitor";
- *   <Route path="/admin/braindrill" element={<BrainDrillMonitor />} />
- *
- * And add to admin sidebar:
- *   { path: "/admin/braindrill", label: "BrainDrill Monitor", icon: Zap }
+ * ✅ Smooth number counting animations (0 → actual value)
+ * ✅ Cards slide in on page load (staggered)
+ * ✅ Hover effects on cards and buttons (lift + shadow)
+ * ✅ Live pulse/glow on active indicators
+ * ✅ Progress bars animate on load
+ * ✅ Reset All Sessions button
+ * ✅ Auto-refresh (15s)
+ * ✅ Matches Upskillize website colors
  */
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import api from "../../services/api";
 
-// ── Design tokens (neutral, works in both light/dark admin themes) ─────────────
+// ── Design tokens ─────────────────────────────────────────────────────────────
 const T = {
+  primary: "#1e3a5f",
+  blue: "#2563eb",
   green: "#16a34a",
   amber: "#d97706",
   red: "#dc2626",
-  blue: "#2563eb",
   purple: "#7c3aed",
+  teal: "#0d9488",
+  orange: "#FF8C00",
   text: "#111827",
   muted: "#6b7280",
   border: "#e5e7eb",
-  bg: "#f9fafb",
+  bg: "#f0f4f8",
   card: "#ffffff",
 };
 
-function StatCard({ label, value, sub, color = T.blue, icon }) {
+// ── CSS Animations (injected once) ────────────────────────────────────────────
+const AnimationStyles = () => (
+  <style>{`
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes slideRight {
+      from { opacity: 0; transform: translateX(-20px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.7; transform: scale(1.05); }
+    }
+    @keyframes glow {
+      0%, 100% { box-shadow: 0 0 5px rgba(22,163,74,0.3); }
+      50% { box-shadow: 0 0 20px rgba(22,163,74,0.6); }
+    }
+    @keyframes glowRed {
+      0%, 100% { box-shadow: 0 0 5px rgba(220,38,38,0.3); }
+      50% { box-shadow: 0 0 20px rgba(220,38,38,0.6); }
+    }
+    @keyframes shimmer {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+    @keyframes progressFill {
+      from { width: 0%; }
+    }
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-4px); }
+    }
+    .monitor-card {
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .monitor-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.12);
+    }
+    .monitor-btn {
+      transition: all 0.2s ease;
+    }
+    .monitor-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    .monitor-btn:active {
+      transform: translateY(0);
+    }
+    .tab-btn {
+      transition: all 0.2s ease;
+      position: relative;
+    }
+    .tab-btn:hover {
+      background: #f0f4ff;
+    }
+    .tab-btn::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: 50%;
+      width: 0;
+      height: 2px;
+      background: ${T.blue};
+      transition: all 0.3s ease;
+      transform: translateX(-50%);
+    }
+    .tab-btn:hover::after {
+      width: 100%;
+    }
+    .table-row {
+      transition: all 0.2s ease;
+    }
+    .table-row:hover {
+      background: #f0f7ff !important;
+      transform: scale(1.005);
+    }
+    .ingest-input:focus {
+      border-color: ${T.blue} !important;
+      box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
+    }
+  `}</style>
+);
+
+// ── Animated Counter Hook ─────────────────────────────────────────────────────
+function useAnimatedNumber(target, duration = 1200) {
+  const [value, setValue] = useState(0);
+  const prevTarget = useRef(0);
+
+  useEffect(() => {
+    if (typeof target !== "number" || isNaN(target)) {
+      setValue(0);
+      return;
+    }
+    const start = prevTarget.current;
+    const diff = target - start;
+    const startTime = Date.now();
+
+    const animate = () => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+      setValue(Math.round(start + diff * eased));
+      if (progress < 1) requestAnimationFrame(animate);
+    };
+
+    requestAnimationFrame(animate);
+    prevTarget.current = target;
+  }, [target, duration]);
+
+  return value;
+}
+
+// ── Animated Stat Card ────────────────────────────────────────────────────────
+function StatCard({
+  label,
+  value,
+  sub,
+  color = T.blue,
+  icon,
+  index = 0,
+  isLive = false,
+}) {
+  const numericValue = typeof value === "number" ? value : null;
+  const animatedNum = useAnimatedNumber(numericValue || 0);
+  const displayValue = numericValue !== null ? animatedNum : value;
+
   return (
     <div
+      className="monitor-card"
       style={{
         background: T.card,
-        borderRadius: 12,
-        padding: "20px 24px",
+        borderRadius: 16,
+        padding: "22px 24px",
         border: `1px solid ${T.border}`,
-        boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+        boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
         display: "flex",
         alignItems: "center",
         gap: 16,
+        animation: `slideUp 0.6s ease ${index * 0.1}s both`,
+        position: "relative",
+        overflow: "hidden",
       }}
     >
+      {/* Decorative gradient stripe at top */}
       <div
         style={{
-          width: 48,
-          height: 48,
-          borderRadius: 12,
-          background: `${color}15`,
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          height: 3,
+          background: `linear-gradient(90deg, ${color}, ${color}80)`,
+        }}
+      />
+
+      <div
+        style={{
+          width: 52,
+          height: 52,
+          borderRadius: 14,
+          background: `linear-gradient(135deg, ${color}15, ${color}25)`,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          fontSize: 22,
+          fontSize: 24,
           flexShrink: 0,
+          animation: isLive ? "pulse 2s infinite" : "none",
         }}
       >
         {icon}
       </div>
       <div>
-        <div style={{ fontSize: 26, fontWeight: 800, color, lineHeight: 1 }}>
-          {value}
+        <div
+          style={{
+            fontSize: 28,
+            fontWeight: 800,
+            color,
+            lineHeight: 1,
+            letterSpacing: "-0.5px",
+          }}
+        >
+          {displayValue}
         </div>
         <div
-          style={{ fontSize: 13, fontWeight: 600, color: T.text, marginTop: 3 }}
+          style={{ fontSize: 13, fontWeight: 600, color: T.text, marginTop: 4 }}
         >
           {label}
         </div>
         {sub && (
-          <div style={{ fontSize: 11, color: T.muted, marginTop: 2 }}>
+          <div
+            style={{
+              fontSize: 11,
+              color: T.muted,
+              marginTop: 2,
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+            }}
+          >
+            {isLive && (
+              <span
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: "50%",
+                  background: color,
+                  display: "inline-block",
+                  animation: "pulse 1.5s infinite",
+                }}
+              />
+            )}
             {sub}
           </div>
         )}
@@ -81,23 +257,79 @@ function StatCard({ label, value, sub, color = T.blue, icon }) {
   );
 }
 
+// ── Animated Progress Bar ─────────────────────────────────────────────────────
+function AnimatedBar({
+  value = 0,
+  max = 100,
+  color = T.green,
+  height = 10,
+  delay = 0,
+}) {
+  const pct = Math.min((value / max) * 100, 100);
+  return (
+    <div
+      style={{
+        height,
+        borderRadius: height,
+        background: `${T.border}80`,
+        overflow: "hidden",
+        boxShadow: "inset 0 1px 3px rgba(0,0,0,0.06)",
+      }}
+    >
+      <div
+        style={{
+          height: "100%",
+          borderRadius: height,
+          background: `linear-gradient(90deg, ${color}, ${color}cc)`,
+          width: `${pct}%`,
+          animation: `progressFill 1.2s ease ${delay}s both`,
+          boxShadow: pct > 0 ? `0 0 8px ${color}40` : "none",
+        }}
+      />
+    </div>
+  );
+}
+
+// ── Badge ─────────────────────────────────────────────────────────────────────
 function Badge({ children, color = T.blue }) {
   return (
     <span
       style={{
         fontSize: 11,
-        fontWeight: 600,
-        padding: "2px 10px",
+        fontWeight: 700,
+        padding: "3px 12px",
         borderRadius: 20,
-        background: `${color}15`,
+        background: `${color}12`,
         color,
-        border: `1px solid ${color}30`,
+        border: `1px solid ${color}25`,
+        letterSpacing: "0.02em",
       }}
     >
       {children}
     </span>
   );
 }
+
+// ── Live Indicator Dot ────────────────────────────────────────────────────────
+function LiveDot({ color = T.green, size = 8 }) {
+  return (
+    <span
+      style={{
+        width: size,
+        height: size,
+        borderRadius: "50%",
+        background: color,
+        display: "inline-block",
+        animation: "glow 2s infinite",
+        boxShadow: `0 0 8px ${color}60`,
+      }}
+    />
+  );
+}
+
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
 
 export default function BrainDrillMonitor() {
   const [status, setStatus] = useState(null);
@@ -112,6 +344,7 @@ export default function BrainDrillMonitor() {
   const [activeTab, setActiveTab] = useState("overview");
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [resetting, setResetting] = useState(false);
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -119,12 +352,9 @@ export default function BrainDrillMonitor() {
         api.get("/testgen/status"),
         api.get("/testgen/health"),
       ]);
-      if (statusRes.status === "fulfilled") {
-        setStatus(statusRes.value.data);
-      }
-      if (healthRes.status === "fulfilled") {
+      if (statusRes.status === "fulfilled") setStatus(statusRes.value.data);
+      if (healthRes.status === "fulfilled")
         setAgentHealth(healthRes.value.data);
-      }
       setLastUpdated(new Date());
     } catch (err) {
       console.error("Monitor fetch error:", err);
@@ -135,13 +365,9 @@ export default function BrainDrillMonitor() {
 
   const fetchHistory = useCallback(async () => {
     try {
-      // Fetch test attempt history — uses your existing quiz attempts endpoint
-      // which stores similar data. If you have a dedicated test_results table,
-      // change this endpoint.
       const res = await api.get("/admin/test-history");
       setTestHistory(res.data.history || res.data.results || []);
     } catch {
-      // Endpoint may not exist yet — show empty state gracefully
       setTestHistory([]);
     } finally {
       setLoadingHistory(false);
@@ -159,26 +385,45 @@ export default function BrainDrillMonitor() {
     return () => clearInterval(iv);
   }, [autoRefresh, fetchStatus]);
 
+  const handleResetAll = async () => {
+    if (
+      !window.confirm(
+        "⚠️ This will clear ALL active test sessions.\n\nStudents currently taking tests will lose their session.\n\nContinue?",
+      )
+    )
+      return;
+    setResetting(true);
+    try {
+      await api.post("/testgen/admin/reset-all");
+      alert("✅ All sessions reset!");
+      fetchStatus();
+    } catch (err) {
+      alert("❌ Failed: " + (err.response?.data?.message || err.message));
+    } finally {
+      setResetting(false);
+    }
+  };
+
   const handleIngest = async (type) => {
     const id = type === "course" ? ingestCourseId : ingestLectureId;
     if (!id || isNaN(Number(id))) {
-      setIngestMsg({ ok: false, text: `Please enter a valid ${type} ID.` });
+      setIngestMsg({ ok: false, text: `Enter a valid ${type} ID.` });
       return;
     }
     setIngesting(true);
     setIngestMsg(null);
     try {
-      const payload =
+      await api.post(
+        `/testgen/ingest/${type}`,
         type === "course"
           ? { courseId: Number(id) }
-          : { lectureId: Number(id) };
-      await api.post(`/testgen/ingest/${type}`, payload);
+          : { lectureId: Number(id) },
+      );
       setIngestMsg({
         ok: true,
-        text: `✅ ${type === "course" ? "Course" : "Lecture"} ${id} ingestion started. Content will be ready in ~30s.`,
+        text: `✅ ${type === "course" ? "Course" : "Lecture"} ${id} ingestion started!`,
       });
-      if (type === "course") setIngestCourseId("");
-      else setIngestLectureId("");
+      type === "course" ? setIngestCourseId("") : setIngestLectureId("");
     } catch (err) {
       setIngestMsg({
         ok: false,
@@ -189,22 +434,19 @@ export default function BrainDrillMonitor() {
     }
   };
 
-  const occupancy = status
-    ? Math.round(
-        ((status.activeCount || status.activeTestTakers || 0) /
-          (status.maxAllowed || status.maxConcurrent || 50)) *
-          100,
-      )
-    : 0;
-
+  const activeTests = status?.activeCount ?? status?.activeTestTakers ?? 0;
+  const maxSlots = status?.maxAllowed ?? status?.maxConcurrent ?? 200;
+  const availSlots = status?.availableSlots ?? maxSlots;
+  const occupancy =
+    maxSlots > 0 ? Math.round((activeTests / maxSlots) * 100) : 0;
   const occupancyColor =
     occupancy >= 90 ? T.red : occupancy >= 60 ? T.amber : T.green;
   const agentOk = agentHealth?.agent?.status === "ok" || agentHealth?.success;
 
   const tabs = [
-    { id: "overview", label: "Live Overview" },
-    { id: "history", label: "Test History" },
-    { id: "ingest", label: "Content Ingest" },
+    { id: "overview", label: "⚡ Live Overview", icon: "⚡" },
+    { id: "history", label: "📋 Test History", icon: "📋" },
+    { id: "ingest", label: "📥 Content Ingest", icon: "📥" },
   ];
 
   return (
@@ -216,29 +458,69 @@ export default function BrainDrillMonitor() {
         fontFamily: "inherit",
       }}
     >
-      {/* Header */}
+      <AnimationStyles />
+
+      {/* ── Header ── */}
       <div
         style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          marginBottom: 24,
+          marginBottom: 28,
           flexWrap: "wrap",
           gap: 12,
+          animation: "fadeIn 0.5s ease",
         }}
       >
         <div>
           <h2
-            style={{ fontSize: 22, fontWeight: 800, color: T.text, margin: 0 }}
+            style={{
+              fontSize: 24,
+              fontWeight: 800,
+              color: T.primary,
+              margin: 0,
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+            }}
           >
-            ⚡ TestGen Monitor
+            <span style={{ fontSize: 28 }}>⚡</span> TestGen Monitor
+            {agentOk && <LiveDot color={T.green} size={10} />}
           </h2>
-          <p style={{ color: T.muted, fontSize: 13, margin: "4px 0 0" }}>
+          <p
+            style={{
+              color: T.muted,
+              fontSize: 13,
+              margin: "6px 0 0",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+            }}
+          >
             Real-time AI mock test management
-            {lastUpdated && ` · Updated ${lastUpdated.toLocaleTimeString()}`}
+            {lastUpdated && (
+              <span
+                style={{
+                  background: `${T.green}10`,
+                  padding: "2px 8px",
+                  borderRadius: 10,
+                  fontSize: 11,
+                  color: T.green,
+                }}
+              >
+                Updated {lastUpdated.toLocaleTimeString()}
+              </span>
+            )}
           </p>
         </div>
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            alignItems: "center",
+            flexWrap: "wrap",
+          }}
+        >
           <label
             style={{
               display: "flex",
@@ -247,16 +529,23 @@ export default function BrainDrillMonitor() {
               fontSize: 13,
               color: T.muted,
               cursor: "pointer",
+              padding: "6px 12px",
+              borderRadius: 8,
+              background: autoRefresh ? `${T.green}08` : "transparent",
+              border: `1px solid ${autoRefresh ? T.green + "30" : "transparent"}`,
+              transition: "all 0.2s",
             }}
           >
             <input
               type="checkbox"
               checked={autoRefresh}
               onChange={(e) => setAutoRefresh(e.target.checked)}
+              style={{ accentColor: T.green }}
             />
-            Auto-refresh (15s)
+            Auto-refresh
           </label>
           <button
+            className="monitor-btn"
             onClick={fetchStatus}
             style={{
               padding: "8px 16px",
@@ -266,44 +555,63 @@ export default function BrainDrillMonitor() {
               fontSize: 13,
               cursor: "pointer",
               color: T.text,
+              fontWeight: 600,
             }}
           >
             🔄 Refresh
           </button>
+          <button
+            className="monitor-btn"
+            onClick={handleResetAll}
+            disabled={resetting}
+            style={{
+              padding: "8px 16px",
+              borderRadius: 8,
+              border: `1px solid ${T.red}40`,
+              background: resetting ? "#fef2f2" : "#fff",
+              color: T.red,
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: resetting ? "not-allowed" : "pointer",
+              opacity: resetting ? 0.6 : 1,
+            }}
+          >
+            {resetting ? "⏳ Resetting..." : "🗑️ Reset Sessions"}
+          </button>
         </div>
       </div>
 
-      {/* Stat cards */}
+      {/* ── Stat Cards (animated) ── */}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
           gap: 16,
           marginBottom: 28,
         }}
       >
         <StatCard
+          index={0}
           icon="🎯"
           label="Active Tests"
-          value={
-            loadingStatus
-              ? "…"
-              : (status?.activeCount ?? status?.activeTestTakers ?? 0)
-          }
-          sub="Students currently testing"
+          value={loadingStatus ? "..." : activeTests}
+          isLive={activeTests > 0}
+          sub={activeTests > 0 ? "Students testing now" : "No active tests"}
           color={T.purple}
         />
         <StatCard
+          index={1}
           icon="🪑"
           label="Available Slots"
-          value={loadingStatus ? "…" : (status?.availableSlots ?? "—")}
-          sub={`Max: ${status?.maxAllowed ?? status?.maxConcurrent ?? 50}`}
+          value={loadingStatus ? "..." : availSlots}
+          sub={`Max: ${maxSlots}`}
           color={occupancyColor}
         />
         <StatCard
+          index={2}
           icon="📊"
           label="Occupancy"
-          value={loadingStatus ? "…" : `${occupancy}%`}
+          value={loadingStatus ? "..." : occupancy}
           sub={
             occupancy >= 90
               ? "⚠ Near capacity"
@@ -314,27 +622,31 @@ export default function BrainDrillMonitor() {
           color={occupancyColor}
         />
         <StatCard
+          index={3}
           icon={agentOk ? "✅" : "❌"}
           label="Agent Status"
-          value={loadingStatus ? "…" : agentOk ? "Online" : "Offline"}
+          value={loadingStatus ? "..." : agentOk ? "Online" : "Offline"}
+          isLive={agentOk}
           sub={
             agentHealth?.agent?.version
               ? `v${agentHealth.agent.version}`
-              : "HuggingFace Spaces"
+              : "HuggingFace"
           }
           color={agentOk ? T.green : T.red}
         />
       </div>
 
-      {/* Occupancy bar */}
+      {/* ── Occupancy Bar (animated) ── */}
       {!loadingStatus && (
         <div
+          className="monitor-card"
           style={{
             background: T.card,
-            borderRadius: 12,
-            padding: "16px 20px",
+            borderRadius: 16,
+            padding: "20px 24px",
             border: `1px solid ${T.border}`,
-            marginBottom: 24,
+            marginBottom: 28,
+            animation: "slideUp 0.6s ease 0.5s both",
           }}
         >
           <div
@@ -342,71 +654,70 @@ export default function BrainDrillMonitor() {
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
-              marginBottom: 8,
+              marginBottom: 10,
             }}
           >
-            <span style={{ fontSize: 13, fontWeight: 600, color: T.text }}>
-              Slot occupancy
+            <span
+              style={{
+                fontSize: 14,
+                fontWeight: 700,
+                color: T.text,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              Slot Occupancy
+              {activeTests > 0 && <LiveDot color={occupancyColor} />}
             </span>
             <span
-              style={{ fontSize: 13, color: occupancyColor, fontWeight: 700 }}
+              style={{ fontSize: 14, color: occupancyColor, fontWeight: 800 }}
             >
-              {status?.activeCount ?? 0} / {status?.maxAllowed ?? 200} slots
-              used
+              {activeTests} / {maxSlots} used
             </span>
           </div>
-          <div
-            style={{
-              height: 8,
-              borderRadius: 4,
-              background: T.border,
-              overflow: "hidden",
-            }}
-          >
-            <div
-              style={{
-                height: "100%",
-                width: `${occupancy}%`,
-                background: occupancyColor,
-                borderRadius: 4,
-                transition: "width 0.6s ease",
-              }}
-            />
-          </div>
-          <p style={{ fontSize: 11, color: T.muted, marginTop: 6 }}>
-            {status?.availableSlots ?? 50} slots available · Rate limit:{" "}
-            {process.env.TESTGEN_RATE_LIMIT || 3} tests/hour per student
+          <AnimatedBar
+            value={activeTests}
+            max={maxSlots}
+            color={occupancyColor}
+            height={12}
+            delay={0.6}
+          />
+          <p style={{ fontSize: 12, color: T.muted, marginTop: 8 }}>
+            {availSlots} slots available · Rate limit: 3 tests/hour per student
           </p>
         </div>
       )}
 
-      {/* Tabs */}
+      {/* ── Tabs ── */}
       <div
         style={{
           display: "flex",
           gap: 4,
-          marginBottom: 20,
-          borderBottom: `1px solid ${T.border}`,
-          paddingBottom: 0,
+          marginBottom: 24,
+          borderBottom: `2px solid ${T.border}`,
+          animation: "slideRight 0.5s ease 0.3s both",
         }}
       >
         {tabs.map((t) => (
           <button
             key={t.id}
+            className="tab-btn"
             onClick={() => setActiveTab(t.id)}
             style={{
-              padding: "10px 18px",
-              fontSize: 13,
+              padding: "12px 22px",
+              fontSize: 14,
               fontWeight: 600,
               cursor: "pointer",
-              background: "none",
+              background: activeTab === t.id ? `${T.blue}08` : "none",
               border: "none",
+              borderRadius: "10px 10px 0 0",
               borderBottom:
                 activeTab === t.id
-                  ? `2px solid ${T.blue}`
-                  : "2px solid transparent",
+                  ? `3px solid ${T.blue}`
+                  : "3px solid transparent",
               color: activeTab === t.id ? T.blue : T.muted,
-              marginBottom: -1,
+              marginBottom: -2,
             }}
           >
             {t.label}
@@ -416,25 +727,33 @@ export default function BrainDrillMonitor() {
 
       {/* ── Tab: Overview ── */}
       {activeTab === "overview" && (
-        <div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          {/* Agent Details */}
           <div
+            className="monitor-card"
             style={{
               background: T.card,
-              borderRadius: 12,
-              padding: 20,
+              borderRadius: 16,
+              padding: 24,
               border: `1px solid ${T.border}`,
+              animation: "slideUp 0.5s ease 0.1s both",
             }}
           >
             <h3
               style={{
-                fontSize: 15,
+                fontSize: 16,
                 fontWeight: 700,
                 color: T.text,
                 marginTop: 0,
                 marginBottom: 16,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
               }}
             >
-              Agent details
+              🤖 Agent Details
+              {agentOk && <Badge color={T.green}>Connected</Badge>}
+              {!agentOk && <Badge color={T.red}>Offline</Badge>}
             </h3>
             {agentHealth ? (
               <div
@@ -448,34 +767,39 @@ export default function BrainDrillMonitor() {
                   [
                     "Status",
                     agentHealth.agent?.status || (agentOk ? "ok" : "offline"),
+                    agentOk ? T.green : T.red,
                   ],
-                  ["Version", agentHealth.agent?.version || "—"],
+                  ["Version", agentHealth.agent?.version || "—", T.blue],
                   [
-                    "Embed model",
+                    "Embed Model",
                     agentHealth.agent?.embed_model || "all-MiniLM-L6-v2",
+                    T.purple,
                   ],
-                  [
-                    "Agent URL",
-                    process.env.REACT_APP_AGENT_URL ||
-                      "upskill25-myagent.hf.space",
-                  ],
-                ].map(([k, v]) => (
+                  ["Agent URL", "upskill25-myagent.hf.space", T.teal],
+                ].map(([k, v, c], i) => (
                   <div
                     key={k}
+                    className="monitor-card"
                     style={{
-                      padding: "10px 14px",
-                      background: T.bg,
-                      borderRadius: 8,
+                      padding: "14px 18px",
+                      background: `${c}06`,
+                      borderRadius: 12,
+                      border: `1px solid ${c}15`,
+                      animation: `slideUp 0.4s ease ${0.2 + i * 0.1}s both`,
                     }}
                   >
                     <div
-                      style={{ fontSize: 11, color: T.muted, marginBottom: 3 }}
+                      style={{
+                        fontSize: 11,
+                        color: T.muted,
+                        marginBottom: 4,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.05em",
+                      }}
                     >
                       {k}
                     </div>
-                    <div
-                      style={{ fontSize: 14, fontWeight: 600, color: T.text }}
-                    >
+                    <div style={{ fontSize: 15, fontWeight: 700, color: c }}>
                       {String(v)}
                     </div>
                   </div>
@@ -488,72 +812,163 @@ export default function BrainDrillMonitor() {
             )}
           </div>
 
+          {/* Rate Limiting */}
           <div
+            className="monitor-card"
             style={{
               background: T.card,
-              borderRadius: 12,
-              padding: 20,
+              borderRadius: 16,
+              padding: 24,
               border: `1px solid ${T.border}`,
-              marginTop: 16,
+              animation: "slideUp 0.5s ease 0.3s both",
             }}
           >
             <h3
               style={{
-                fontSize: 15,
+                fontSize: 16,
                 fontWeight: 700,
                 color: T.text,
                 marginTop: 0,
                 marginBottom: 4,
               }}
             >
-              Rate limiting rules
+              ⚙️ Rate Limiting Rules
             </h3>
             <p
               style={{
                 color: T.muted,
                 fontSize: 13,
                 marginTop: 0,
-                marginBottom: 12,
+                marginBottom: 16,
               }}
             >
-              Configured via environment variables on Railway/Render.
+              Configured via environment variables on Render
             </p>
             <div
               style={{
                 display: "grid",
                 gridTemplateColumns: "1fr 1fr 1fr",
-                gap: 12,
+                gap: 14,
               }}
             >
               {[
-                ["Max concurrent tests", "MAX_CONCURRENT_TESTS", "50"],
-                ["Tests per student/hour", "TESTGEN_RATE_LIMIT", "3"],
-                ["Session TTL", "Hardcoded", "90 min"],
-              ].map(([label, envKey, defaultVal]) => (
+                ["Max Concurrent", "50", T.blue, "MAX_CONCURRENT_TESTS"],
+                ["Per Student/Hour", "3", T.amber, "TESTGEN_RATE_LIMIT"],
+                ["Session TTL", "90 min", T.purple, "Hardcoded"],
+              ].map(([label, val, color, env], i) => (
                 <div
                   key={label}
+                  className="monitor-card"
                   style={{
-                    padding: "12px 14px",
-                    background: T.bg,
-                    borderRadius: 8,
+                    padding: "18px 16px",
+                    background: `linear-gradient(135deg, ${color}08, ${color}03)`,
+                    borderRadius: 14,
+                    border: `1px solid ${color}15`,
+                    textAlign: "center",
+                    animation: `slideUp 0.4s ease ${0.4 + i * 0.1}s both`,
                   }}
                 >
-                  <div style={{ fontSize: 11, color: T.muted }}>{label}</div>
+                  <div
+                    style={{ fontSize: 11, color: T.muted, marginBottom: 6 }}
+                  >
+                    {label}
+                  </div>
                   <div
                     style={{
-                      fontSize: 16,
+                      fontSize: 28,
                       fontWeight: 800,
-                      color: T.blue,
-                      marginTop: 4,
+                      color,
+                      lineHeight: 1,
                     }}
                   >
-                    {defaultVal}
+                    {val}
                   </div>
-                  <div style={{ fontSize: 10, color: T.muted, marginTop: 2 }}>
-                    env: {envKey}
+                  <div
+                    style={{
+                      fontSize: 10,
+                      color: T.muted,
+                      marginTop: 6,
+                      fontFamily: "monospace",
+                    }}
+                  >
+                    env: {env}
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+
+          {/* Quick Actions */}
+          <div
+            className="monitor-card"
+            style={{
+              background: `linear-gradient(135deg, ${T.primary}08, ${T.blue}05)`,
+              borderRadius: 16,
+              padding: 24,
+              border: `1px solid ${T.primary}15`,
+              animation: "slideUp 0.5s ease 0.5s both",
+            }}
+          >
+            <h3
+              style={{
+                fontSize: 16,
+                fontWeight: 700,
+                color: T.primary,
+                marginTop: 0,
+                marginBottom: 12,
+              }}
+            >
+              🚀 Quick Actions
+            </h3>
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+              <button
+                className="monitor-btn"
+                onClick={handleResetAll}
+                style={{
+                  padding: "10px 20px",
+                  borderRadius: 10,
+                  border: `1px solid ${T.red}30`,
+                  background: "#fff",
+                  color: T.red,
+                  fontWeight: 600,
+                  fontSize: 13,
+                  cursor: "pointer",
+                }}
+              >
+                🗑️ Clear Stuck Sessions
+              </button>
+              <button
+                className="monitor-btn"
+                onClick={() => setActiveTab("ingest")}
+                style={{
+                  padding: "10px 20px",
+                  borderRadius: 10,
+                  border: `1px solid ${T.blue}30`,
+                  background: "#fff",
+                  color: T.blue,
+                  fontWeight: 600,
+                  fontSize: 13,
+                  cursor: "pointer",
+                }}
+              >
+                📥 Ingest Content
+              </button>
+              <button
+                className="monitor-btn"
+                onClick={fetchStatus}
+                style={{
+                  padding: "10px 20px",
+                  borderRadius: 10,
+                  border: `1px solid ${T.green}30`,
+                  background: "#fff",
+                  color: T.green,
+                  fontWeight: 600,
+                  fontSize: 13,
+                  cursor: "pointer",
+                }}
+              >
+                🔄 Force Refresh
+              </button>
             </div>
           </div>
         </div>
@@ -562,69 +977,113 @@ export default function BrainDrillMonitor() {
       {/* ── Tab: Test History ── */}
       {activeTab === "history" && (
         <div
+          className="monitor-card"
           style={{
             background: T.card,
-            borderRadius: 12,
+            borderRadius: 16,
             border: `1px solid ${T.border}`,
             overflow: "hidden",
+            animation: "slideUp 0.5s ease both",
           }}
         >
           <div
             style={{
-              padding: "16px 20px",
+              padding: "18px 24px",
               borderBottom: `1px solid ${T.border}`,
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
+              background: `linear-gradient(135deg, ${T.bg}, ${T.card})`,
             }}
           >
             <h3
               style={{
-                fontSize: 15,
+                fontSize: 16,
                 fontWeight: 700,
                 color: T.text,
                 margin: 0,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
               }}
             >
-              Student test history
+              📋 Student Test History
+              {testHistory.length > 0 && (
+                <Badge color={T.blue}>{testHistory.length} results</Badge>
+              )}
             </h3>
             <button
+              className="monitor-btn"
               onClick={fetchHistory}
               style={{
                 fontSize: 12,
                 color: T.blue,
-                background: "none",
-                border: "none",
+                background: `${T.blue}08`,
+                border: `1px solid ${T.blue}20`,
+                padding: "6px 14px",
+                borderRadius: 8,
                 cursor: "pointer",
+                fontWeight: 600,
               }}
             >
-              Refresh
+              ↻ Refresh
             </button>
           </div>
 
           {loadingHistory ? (
-            <div style={{ padding: 40, textAlign: "center", color: T.muted }}>
-              Loading history…
+            <div style={{ padding: 60, textAlign: "center", color: T.muted }}>
+              <div
+                style={{
+                  fontSize: 36,
+                  marginBottom: 12,
+                  animation: "bounce 1s infinite",
+                }}
+              >
+                📊
+              </div>
+              Loading history...
             </div>
           ) : testHistory.length === 0 ? (
-            <div style={{ padding: 40, textAlign: "center" }}>
-              <div style={{ fontSize: 40, marginBottom: 12 }}>📋</div>
-              <p style={{ color: T.muted, fontSize: 14 }}>
-                No test history available yet.
+            <div
+              style={{
+                padding: 60,
+                textAlign: "center",
+                animation: "fadeIn 0.5s ease",
+              }}
+            >
+              <div style={{ fontSize: 48, marginBottom: 16 }}>📋</div>
+              <p
+                style={{
+                  color: T.text,
+                  fontSize: 16,
+                  fontWeight: 600,
+                  marginBottom: 4,
+                }}
+              >
+                No Test History Yet
               </p>
-              <p style={{ color: T.muted, fontSize: 12, marginTop: 4 }}>
-                Results will appear here once students complete tests and you
-                add a<br />
+              <p
+                style={{
+                  color: T.muted,
+                  fontSize: 13,
+                  maxWidth: 400,
+                  margin: "0 auto",
+                  lineHeight: 1.6,
+                }}
+              >
+                Results will appear here once students complete tests. You need
+                a
                 <code
                   style={{
                     background: T.bg,
                     padding: "2px 6px",
                     borderRadius: 4,
+                    margin: "0 4px",
                   }}
                 >
                   GET /api/admin/test-history
-                </code>{" "}
-                endpoint.
+                </code>
+                backend endpoint.
               </p>
             </div>
           ) : (
@@ -640,7 +1099,7 @@ export default function BrainDrillMonitor() {
                   <tr style={{ background: T.bg }}>
                     {[
                       "Student",
-                      "Course / Topic",
+                      "Topic",
                       "Score",
                       "Band",
                       "Time",
@@ -650,16 +1109,17 @@ export default function BrainDrillMonitor() {
                       <th
                         key={h}
                         style={{
-                          padding: "10px 16px",
+                          padding: "12px 16px",
                           textAlign: "left",
-                          fontWeight: 600,
+                          fontWeight: 700,
                           color: T.muted,
                           fontSize: 11,
-                          letterSpacing: "0.05em",
-                          borderBottom: `1px solid ${T.border}`,
+                          letterSpacing: "0.06em",
+                          borderBottom: `2px solid ${T.border}`,
+                          textTransform: "uppercase",
                         }}
                       >
-                        {h.toUpperCase()}
+                        {h}
                       </th>
                     ))}
                   </tr>
@@ -667,7 +1127,8 @@ export default function BrainDrillMonitor() {
                 <tbody>
                   {testHistory.map((r, i) => {
                     const pct =
-                      r.percentage ?? Math.round((r.score / r.total) * 100);
+                      r.percentage ??
+                      (r.total > 0 ? Math.round((r.score / r.total) * 100) : 0);
                     const band =
                       r.performance_band ||
                       (pct >= 85
@@ -687,43 +1148,49 @@ export default function BrainDrillMonitor() {
                     return (
                       <tr
                         key={i}
-                        style={{ borderBottom: `1px solid ${T.border}` }}
+                        className="table-row"
+                        style={{
+                          borderBottom: `1px solid ${T.border}`,
+                          animation: `slideRight 0.4s ease ${i * 0.05}s both`,
+                        }}
                       >
                         <td
                           style={{
-                            padding: "12px 16px",
+                            padding: "14px 16px",
                             fontWeight: 600,
                             color: T.text,
                           }}
                         >
                           {r.student_name || r.student_id || "—"}
                         </td>
-                        <td style={{ padding: "12px 16px", color: T.muted }}>
+                        <td style={{ padding: "14px 16px", color: T.muted }}>
                           {r.topic || r.course_name || "—"}
                         </td>
-                        <td
-                          style={{
-                            padding: "12px 16px",
-                            fontWeight: 700,
-                            color: T.text,
-                          }}
-                        >
-                          {r.score}/{r.total}{" "}
-                          <span style={{ color: T.muted, fontWeight: 400 }}>
+                        <td style={{ padding: "14px 16px" }}>
+                          <span style={{ fontWeight: 700, color: T.text }}>
+                            {r.score}/{r.total}
+                          </span>
+                          <span
+                            style={{
+                              color: T.muted,
+                              fontWeight: 400,
+                              marginLeft: 4,
+                            }}
+                          >
                             ({pct}%)
                           </span>
                         </td>
-                        <td style={{ padding: "12px 16px" }}>
+                        <td style={{ padding: "14px 16px" }}>
                           <Badge color={bandColor}>{band}</Badge>
                         </td>
-                        <td style={{ padding: "12px 16px", color: T.muted }}>
+                        <td style={{ padding: "14px 16px", color: T.muted }}>
                           {r.time_taken_seconds
                             ? `${Math.floor(r.time_taken_seconds / 60)}m ${r.time_taken_seconds % 60}s`
                             : "—"}
                         </td>
                         <td
                           style={{
-                            padding: "12px 16px",
+                            padding: "14px 16px",
                             color: T.muted,
                             maxWidth: 200,
                             overflow: "hidden",
@@ -735,7 +1202,7 @@ export default function BrainDrillMonitor() {
                         </td>
                         <td
                           style={{
-                            padding: "12px 16px",
+                            padding: "14px 16px",
                             color: T.muted,
                             whiteSpace: "nowrap",
                           }}
@@ -763,40 +1230,55 @@ export default function BrainDrillMonitor() {
 
       {/* ── Tab: Content Ingest ── */}
       {activeTab === "ingest" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 20,
+            animation: "slideUp 0.5s ease both",
+          }}
+        >
           {ingestMsg && (
             <div
               style={{
-                padding: "12px 16px",
-                borderRadius: 8,
-                fontSize: 13,
+                padding: "14px 18px",
+                borderRadius: 12,
+                fontSize: 14,
+                fontWeight: 500,
                 background: ingestMsg.ok ? "#f0fdf4" : "#fef2f2",
                 color: ingestMsg.ok ? T.green : T.red,
                 border: `1px solid ${ingestMsg.ok ? "#bbf7d0" : "#fecaca"}`,
+                animation: "slideUp 0.3s ease",
               }}
             >
               {ingestMsg.text}
             </div>
           )}
 
+          {/* Course Ingest */}
           <div
+            className="monitor-card"
             style={{
               background: T.card,
-              borderRadius: 12,
+              borderRadius: 16,
               padding: 24,
               border: `1px solid ${T.border}`,
+              animation: "slideUp 0.4s ease 0.1s both",
             }}
           >
             <h3
               style={{
-                fontSize: 15,
+                fontSize: 16,
                 fontWeight: 700,
                 color: T.text,
                 marginTop: 0,
                 marginBottom: 6,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
               }}
             >
-              Ingest course content
+              📚 Ingest Course Content
             </h3>
             <p
               style={{
@@ -806,62 +1288,68 @@ export default function BrainDrillMonitor() {
                 marginBottom: 16,
               }}
             >
-              Re-embed an entire course so students get questions based on
-              latest content. Run this whenever faculty uploads new material.
+              Re-embed an entire course so students get questions from latest
+              content.
             </p>
             <div style={{ display: "flex", gap: 10 }}>
               <input
                 type="number"
-                placeholder="Course ID (e.g. 37)"
+                className="ingest-input"
+                placeholder="Course ID (e.g. 1)"
                 value={ingestCourseId}
                 onChange={(e) => setIngestCourseId(e.target.value)}
                 style={{
                   flex: 1,
-                  padding: "10px 14px",
-                  borderRadius: 8,
-                  border: `1.5px solid ${T.border}`,
+                  padding: "12px 16px",
+                  borderRadius: 10,
+                  border: `2px solid ${T.border}`,
                   fontSize: 14,
                   outline: "none",
+                  transition: "all 0.2s",
                 }}
               />
               <button
+                className="monitor-btn"
                 onClick={() => handleIngest("course")}
                 disabled={ingesting}
                 style={{
-                  padding: "10px 20px",
-                  borderRadius: 8,
+                  padding: "12px 24px",
+                  borderRadius: 10,
                   border: "none",
                   cursor: ingesting ? "not-allowed" : "pointer",
-                  background: T.blue,
+                  background: `linear-gradient(135deg, ${T.blue}, ${T.blue}dd)`,
                   color: "#fff",
-                  fontWeight: 600,
+                  fontWeight: 700,
                   fontSize: 14,
                   opacity: ingesting ? 0.6 : 1,
                 }}
               >
-                {ingesting ? "Starting…" : "Ingest Course"}
+                {ingesting ? "⏳ Starting..." : "🚀 Ingest Course"}
               </button>
             </div>
           </div>
 
+          {/* Lecture Ingest */}
           <div
+            className="monitor-card"
             style={{
               background: T.card,
-              borderRadius: 12,
+              borderRadius: 16,
               padding: 24,
               border: `1px solid ${T.border}`,
+              animation: "slideUp 0.4s ease 0.2s both",
             }}
           >
             <h3
               style={{
-                fontSize: 15,
+                fontSize: 16,
                 fontWeight: 700,
                 color: T.text,
                 marginTop: 0,
                 marginBottom: 6,
               }}
             >
-              Ingest single lecture
+              📖 Ingest Single Lecture
             </h3>
             <p
               style={{
@@ -871,60 +1359,78 @@ export default function BrainDrillMonitor() {
                 marginBottom: 16,
               }}
             >
-              Re-embed a specific lecture. Faster than full course — use after
-              updating one lesson.
+              Faster than full course — use after updating one lesson.
             </p>
             <div style={{ display: "flex", gap: 10 }}>
               <input
                 type="number"
+                className="ingest-input"
                 placeholder="Lecture ID (e.g. 12)"
                 value={ingestLectureId}
                 onChange={(e) => setIngestLectureId(e.target.value)}
                 style={{
                   flex: 1,
-                  padding: "10px 14px",
-                  borderRadius: 8,
-                  border: `1.5px solid ${T.border}`,
+                  padding: "12px 16px",
+                  borderRadius: 10,
+                  border: `2px solid ${T.border}`,
                   fontSize: 14,
                   outline: "none",
+                  transition: "all 0.2s",
                 }}
               />
               <button
+                className="monitor-btn"
                 onClick={() => handleIngest("lecture")}
                 disabled={ingesting}
                 style={{
-                  padding: "10px 20px",
-                  borderRadius: 8,
+                  padding: "12px 24px",
+                  borderRadius: 10,
                   border: "none",
                   cursor: ingesting ? "not-allowed" : "pointer",
-                  background: T.purple,
+                  background: `linear-gradient(135deg, ${T.purple}, ${T.purple}dd)`,
                   color: "#fff",
-                  fontWeight: 600,
+                  fontWeight: 700,
                   fontSize: 14,
                   opacity: ingesting ? 0.6 : 1,
                 }}
               >
-                {ingesting ? "Starting…" : "Ingest Lecture"}
+                {ingesting ? "⏳ Starting..." : "🚀 Ingest Lecture"}
               </button>
             </div>
           </div>
 
+          {/* Info Box */}
           <div
             style={{
-              background: "#fffbeb",
-              borderRadius: 12,
-              padding: 16,
+              background: "linear-gradient(135deg, #fffbeb, #fef3c7)",
+              borderRadius: 14,
+              padding: 20,
               border: "1px solid #fcd34d",
+              animation: "slideUp 0.4s ease 0.3s both",
             }}
           >
-            <p style={{ margin: 0, fontSize: 13, color: "#92400e" }}>
-              <strong>💡 How ingestion works:</strong> When you click Ingest,
-              the agent downloads all lesson text, PDFs, and notes for that
-              course/lecture, splits them into chunks, converts each chunk into
-              a 384-dimension vector, and stores them in the{" "}
-              <code>rag_embeddings</code> MySQL table. Future tests will be
-              grounded in this content. Ingestion runs in the background — it
-              takes ~10–30 seconds per lecture.
+            <p
+              style={{
+                margin: 0,
+                fontSize: 13,
+                color: "#92400e",
+                lineHeight: 1.7,
+              }}
+            >
+              <strong>💡 How ingestion works:</strong> The agent downloads all
+              lesson text, PDFs, and notes, splits them into chunks, converts
+              each into a 384-dimension vector, and stores them in the
+              <code
+                style={{
+                  background: "#fef9c3",
+                  padding: "1px 6px",
+                  borderRadius: 4,
+                  margin: "0 3px",
+                }}
+              >
+                rag_embeddings
+              </code>
+              MySQL table. Takes ~10–30 seconds per lecture.
             </p>
           </div>
         </div>

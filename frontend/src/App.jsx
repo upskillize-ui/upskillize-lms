@@ -4,6 +4,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import StudentDashboard from "./pages/Student/Dashboard";
 import TestGen from "./pages/Student/TestGen";
+import CaseStudyReview from "./pages/Student/CaseStudyReview";
 import FacultyDashboard from "./pages/Faculty/Dashboard";
 import AdminDashboard from "./pages/Admin/Dashboard";
 
@@ -42,7 +43,6 @@ function AppRoutes() {
 
   return (
     <Routes>
-      {/* ✅ ROOT ROUTE - Redirect to login if not authenticated */}
       <Route
         path="/"
         element={
@@ -85,6 +85,15 @@ function AppRoutes() {
       />
 
       <Route
+        path="/student/case-study"
+        element={
+          <PrivateRoute allowedRoles={["student"]}>
+            <CaseStudyReview />
+          </PrivateRoute>
+        }
+      />
+
+      <Route
         path="/student/*"
         element={
           <PrivateRoute allowedRoles={["student"]}>
@@ -113,7 +122,6 @@ function AppRoutes() {
         }
       />
 
-      {/* ✅ CATCH-ALL - Redirect unknown routes to login */}
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );
