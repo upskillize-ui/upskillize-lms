@@ -1051,134 +1051,258 @@ function TestTakingScreen({ testData, onSubmit, onForceExit }) {
 
   // ── Result Screen ────────────────────────────────────────────────────────────
   if (result) {
-    const score = result.score ?? result.percentage ?? null;
-    const passed = score !== null ? score >= 50 : null;
+    // Map the API response fields correctly
+    const totalQ = result.total ?? questions.length;
+    const correctCount = result.score ?? 0;
+    const wrongCount = totalQ - correctCount;
+    const pct = result.percentage ?? (totalQ > 0 ? Math.round((correctCount / totalQ) * 100 * 10) / 10 : 0);
+    const band = result.performance_band || (pct >= 85 ? "Excellent" : pct >= 70 ? "Good" : pct >= 50 ? "Average" : "Needs Improvement");
+    const passed = pct >= 50;
+    const timeTaken = result.time_taken_seconds || Math.floor((Date.now() - startTime) / 1000);
+    const feedback = result.overall_feedback || "";
+    const recommendations = result.study_recommendations || [];
+    const questionResults = result.results || [];
 
     return (
       <div
         style={{
           minHeight: "100vh",
           background: COLORS.bgLight,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: 20,
+          padding: "30px 20px",
         }}
       >
-        <div
-          style={{
-            background: COLORS.bgWhite,
-            borderRadius: 16,
-            padding: 48,
-            maxWidth: 520,
-            width: "100%",
-            textAlign: "center",
-            boxShadow: "0 4px 24px rgba(0,0,0,0.1)",
-          }}
-        >
-          <div style={{ fontSize: 64, marginBottom: 16 }}>
-            {result.error
-              ? "❌"
-              : passed === null
-                ? "✅"
-                : passed
-                  ? "🎉"
-                  : "📚"}
-          </div>
-          <h2
+        <div style={{ maxWidth: 800, margin: "0 auto" }}>
+
+          {/* Score Card */}
+          <div
             style={{
-              fontSize: 28,
-              fontWeight: 800,
-              color: COLORS.darkBlue,
-              margin: "0 0 8px",
+              background: COLORS.bgWhite,
+              borderRadius: 16,
+              padding: "40px 32px",
+              textAlign: "center",
+              boxShadow: "0 4px 24px rgba(0,0,0,0.08)",
+              marginBottom: 20,
             }}
           >
-            {result.error
-              ? "Submission Error"
-              : passed === null
-                ? "Test Submitted!"
-                : passed
-                  ? "Well Done!"
-                  : "Keep Practicing!"}
-          </h2>
+            <div style={{ fontSize: 56, marginBottom: 12 }}>
+              {result.error ? "❌" : passed ? "🎉" : "📚"}
+            </div>
+            <h2
+              style={{
+                fontSize: 26,
+                fontWeight: 800,
+                color: COLORS.darkBlue,
+                margin: "0 0 8px",
+              }}
+            >
+              {result.error
+                ? "Submission Error"
+                : passed ? "Well Done!" : "Keep Practicing!"}
+            </h2>
 
-          {result.error ? (
-            <p style={{ color: COLORS.danger, marginBottom: 24 }}>
-              {result.message}
-            </p>
-          ) : (
-            <>
-              {score !== null && (
+            {result.error ? (
+              <p style={{ color: COLORS.danger, marginBottom: 24 }}>
+                {result.message}
+              </p>
+            ) : (
+              <>
+                {/* Performance Band */}
+                <div style={{
+                  display: "inline-block",
+                  padding: "6px 20px",
+                  borderRadius: 20,
+                  background: passed ? "#e8f5e9" : "#fff3e0",
+                  color: passed ? COLORS.success : COLORS.warning,
+                  fontWeight: 700,
+                  fontSize: 14,
+                  marginBottom: 16,
+                }}>
+                  {band}
+                </div>
+
+                {/* Big Percentage */}
                 <div
                   style={{
-                    fontSize: 56,
+                    fontSize: 64,
                     fontWeight: 800,
                     color: passed ? COLORS.success : COLORS.warning,
-                    margin: "16px 0",
+                    margin: "12px 0",
+                    lineHeight: 1,
                   }}
                 >
-                  {Math.round(score)}%
+                  {Math.round(pct)}%
                 </div>
-              )}
 
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: 12,
-                  margin: "24px 0",
-                  textAlign: "left",
-                }}
-              >
-                {[
-                  ["✅ Correct", result.correct ?? result.correct_count ?? "—"],
-                  ["❌ Wrong", result.wrong ?? result.wrong_count ?? "—"],
-                  ["📝 Total", questions.length],
-                  [
-                    "⏱️ Time",
-                    `${Math.floor((Date.now() - startTime) / 60000)}m`,
-                  ],
-                ].map(([label, val]) => (
-                  <div
-                    key={label}
-                    style={{
-                      background: COLORS.bgLight,
-                      borderRadius: 8,
-                      padding: "12px 16px",
-                    }}
-                  >
-                    <div style={{ fontSize: 11, color: COLORS.textMuted }}>
-                      {label}
-                    </div>
+                {/* Stats Grid */}
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr 1fr 1fr",
+                    gap: 10,
+                    margin: "24px 0",
+                    textAlign: "center",
+                  }}
+                >
+                  {[
+                    ["✅ Correct", correctCount, COLORS.success],
+                    ["❌ Wrong", wrongCount, COLORS.danger],
+                    ["📝 Total", totalQ, COLORS.darkBlue],
+                    ["⏱ Time", `${Math.floor(timeTaken / 60)}m ${timeTaken % 60}s`, COLORS.mediumBlue],
+                  ].map(([label, val, color]) => (
                     <div
+                      key={label}
                       style={{
-                        fontSize: 20,
-                        fontWeight: 700,
-                        color: COLORS.darkBlue,
-                        marginTop: 4,
+                        background: COLORS.bgLight,
+                        borderRadius: 10,
+                        padding: "14px 8px",
                       }}
                     >
-                      {val}
+                      <div style={{ fontSize: 11, color: COLORS.textMuted }}>
+                        {label}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 22,
+                          fontWeight: 800,
+                          color: color,
+                          marginTop: 4,
+                        }}
+                      >
+                        {val}
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            </>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Overall Feedback */}
+          {feedback && !result.error && (
+            <div
+              style={{
+                background: COLORS.bgWhite,
+                borderRadius: 14,
+                padding: "24px 28px",
+                boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
+                marginBottom: 20,
+                borderLeft: `4px solid ${COLORS.mediumBlue}`,
+              }}
+            >
+              <h3 style={{ fontSize: 16, fontWeight: 700, color: COLORS.darkBlue, marginBottom: 10, marginTop: 0 }}>
+                💡 AI Feedback
+              </h3>
+              <p style={{ fontSize: 14, lineHeight: 1.8, color: COLORS.textDark, margin: 0 }}>
+                {feedback}
+              </p>
+            </div>
           )}
 
+          {/* Study Recommendations */}
+          {recommendations.length > 0 && !result.error && (
+            <div
+              style={{
+                background: COLORS.bgWhite,
+                borderRadius: 14,
+                padding: "24px 28px",
+                boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
+                marginBottom: 20,
+                borderLeft: `4px solid ${COLORS.orange}`,
+              }}
+            >
+              <h3 style={{ fontSize: 16, fontWeight: 700, color: COLORS.darkBlue, marginBottom: 12, marginTop: 0 }}>
+                📖 Study Recommendations
+              </h3>
+              {recommendations.map((rec, i) => (
+                <div key={i} style={{
+                  fontSize: 14,
+                  color: COLORS.textDark,
+                  padding: "8px 0 8px 16px",
+                  borderLeft: `2px solid ${COLORS.orange}40`,
+                  marginBottom: 8,
+                  lineHeight: 1.6,
+                }}>
+                  {rec}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Question-by-Question Review */}
+          {questionResults.length > 0 && !result.error && (
+            <div
+              style={{
+                background: COLORS.bgWhite,
+                borderRadius: 14,
+                padding: "24px 28px",
+                boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
+                marginBottom: 20,
+              }}
+            >
+              <h3 style={{ fontSize: 16, fontWeight: 700, color: COLORS.darkBlue, marginBottom: 16, marginTop: 0 }}>
+                📋 Question Review
+              </h3>
+              {questionResults.map((qr, i) => (
+                <div
+                  key={i}
+                  style={{
+                    padding: "16px",
+                    borderRadius: 10,
+                    marginBottom: 12,
+                    background: qr.is_correct ? "#f0fdf4" : "#fef2f2",
+                    border: `1px solid ${qr.is_correct ? "#bbf7d0" : "#fecaca"}`,
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                    <span style={{ fontWeight: 700, fontSize: 14, color: COLORS.darkBlue }}>
+                      Q{i + 1}
+                    </span>
+                    <span style={{
+                      fontSize: 12,
+                      fontWeight: 700,
+                      padding: "3px 12px",
+                      borderRadius: 20,
+                      background: qr.is_correct ? "#dcfce7" : "#fee2e2",
+                      color: qr.is_correct ? "#16a34a" : "#dc2626",
+                    }}>
+                      {qr.is_correct ? "✓ Correct" : "✗ Wrong"}
+                    </span>
+                  </div>
+
+                  <div style={{ fontSize: 13, color: COLORS.textDark, marginBottom: 6 }}>
+                    <strong>Your answer:</strong> {Array.isArray(qr.student_answer) ? qr.student_answer.join(", ") : qr.student_answer || "—"}
+                  </div>
+
+                  {!qr.is_correct && (
+                    <div style={{ fontSize: 13, color: COLORS.success, marginBottom: 6 }}>
+                      <strong>Correct answer:</strong> {Array.isArray(qr.correct_answer) ? qr.correct_answer.join(", ") : qr.correct_answer || "—"}
+                    </div>
+                  )}
+
+                  {qr.feedback && (
+                    <div style={{ fontSize: 13, color: COLORS.textGray, lineHeight: 1.6, marginTop: 6, paddingTop: 6, borderTop: `1px solid ${qr.is_correct ? "#bbf7d0" : "#fecaca"}` }}>
+                      💡 {qr.feedback}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Take Another Test Button */}
           <button
             onClick={onForceExit}
             style={{
               width: "100%",
-              padding: "14px",
-              borderRadius: 8,
+              padding: "16px",
+              borderRadius: 10,
               border: "none",
               background: COLORS.orange,
               color: "#fff",
-              fontSize: 15,
+              fontSize: 16,
               fontWeight: 700,
               cursor: "pointer",
-              marginTop: 8,
+              boxShadow: "0 4px 12px rgba(255,140,0,0.3)",
             }}
           >
             ⚡ Take Another Test
