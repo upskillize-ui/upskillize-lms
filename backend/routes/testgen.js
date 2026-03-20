@@ -62,26 +62,32 @@ function getCollegeId(req) {
 
 // ✅ FIX 2: Sequelize-compatible enrollment check
 async function isEnrolled(userId, lectureId, courseId) {
-  if (!sequelize) return true; // fail open if no DB
+  if (!sequelize) return true;
   try {
-    const query = courseId
-      ? `SELECT COUNT(*) as cnt FROM enrollments WHERE student_id = :userId AND course_id = :courseId`
-      : `SELECT COUNT(*) as cnt FROM enrollments e
-         JOIN courses c ON e.course_id = c.id
-         JOIN course_modules cm ON cm.course_id = c.id
-         JOIN lessons l ON l.course_module_id = cm.id
-         WHERE e.student_id = :userId AND l.id = :lectureId`;
+    // Step 1: Get the student.id from users.id (they are different!)
+    const [studentRows] = await sequelize.query(
+      `SELECT id FROM students WHERE user_id = :userId LIMIT 1`,
+      { replacements: { userId }, type: 'SELECT' }
+    );
+    
+    const studentId = studentRows?.id ?? studentRows?.[0]?.id;
+    if (!studentId) {
+      console.log(`[TestGen] No student record found for user_id=${userId}`);
+      return true; // fail open if no student record
+    }
 
-    const [results] = await sequelize.query(query, {
-      replacements: courseId ? { userId, courseId } : { userId, lectureId },
-      type: sequelize.QueryTypes?.SELECT || "SELECT",
-    });
+    // Step 2: Check enrollment using the correct student_id
+    const [results] = await sequelize.query(
+      `SELECT COUNT(*) as cnt FROM enrollments WHERE student_id = :studentId AND course_id = :courseId`,
+      { replacements: { studentId, courseId: courseId || 0 }, type: 'SELECT' }
+    );
 
     const count = results?.cnt ?? results?.[0]?.cnt ?? 0;
+    console.log(`[TestGen] Enrollment: user=${userId} → student=${studentId}, course=${courseId}, enrolled=${count > 0}`);
     return parseInt(count) > 0;
   } catch (err) {
     console.error("[TestGen] Enrollment check failed:", err.message);
-    return true; // fail open — never block students on DB error
+    return true; // fail open
   }
 }
 
