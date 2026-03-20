@@ -1242,7 +1242,25 @@ function TestTakingScreen({ testData, onSubmit, onForceExit }) {
               <h3 style={{ fontSize: 16, fontWeight: 700, color: COLORS.darkBlue, marginBottom: 16, marginTop: 0 }}>
                 📋 Question Review
               </h3>
-              {questionResults.map((qr, i) => (
+              {questionResults.map((qr, i) => {
+                const matchedQ = questions.find(q => q.id === qr.id) || questions[i] || {};
+                const qOptions = matchedQ.options || {};
+                const optionEntries = Object.entries(qOptions);
+
+                // Get student answer letters and correct answer letters as arrays
+                const studentLetters = (Array.isArray(qr.student_answer) ? qr.student_answer : [qr.student_answer]).map(a => {
+                  if (!a) return "";
+                  if (/^[A-E]$/.test(String(a).trim())) return a.trim();
+                  // Reverse lookup if it's option text
+                  for (const [letter, text] of optionEntries) {
+                    if (text === a || text.trim() === String(a).trim()) return letter;
+                  }
+                  return String(a);
+                }).filter(Boolean);
+
+                const correctLetters = (Array.isArray(qr.correct_answer) ? qr.correct_answer : [qr.correct_answer]).map(a => String(a || "").trim());
+
+                return (
                 <div
                   key={i}
                   style={{
@@ -1269,14 +1287,83 @@ function TestTakingScreen({ testData, onSubmit, onForceExit }) {
                     </span>
                   </div>
 
-                  <div style={{ fontSize: 13, color: COLORS.textDark, marginBottom: 6 }}>
-                    <strong>Your answer:</strong> {Array.isArray(qr.student_answer) ? qr.student_answer.join(", ") : qr.student_answer || "—"}
-                  </div>
-
-                  {!qr.is_correct && (
-                    <div style={{ fontSize: 13, color: COLORS.success, marginBottom: 6 }}>
-                      <strong>Correct answer:</strong> {Array.isArray(qr.correct_answer) ? qr.correct_answer.join(", ") : qr.correct_answer || "—"}
+                  {/* Question text */}
+                  {(matchedQ.question || qr.question) && (
+                    <div style={{ fontSize: 13, color: COLORS.textDark, marginBottom: 12, fontWeight: 600, lineHeight: 1.5 }}>
+                      {matchedQ.question || qr.question}
                     </div>
+                  )}
+
+                  {/* All options with visual indicators */}
+                  {optionEntries.length > 0 && (
+                    <div style={{ marginBottom: 10 }}>
+                      {optionEntries.map(([letter, text]) => {
+                        const isStudentPick = studentLetters.includes(letter);
+                        const isCorrect = correctLetters.includes(letter);
+                        const isWrongPick = isStudentPick && !isCorrect;
+
+                        let bg = "transparent";
+                        let borderColor = "#e0e0e0";
+                        let icon = "";
+                        let textColor = COLORS.textGray;
+
+                        if (isCorrect && isStudentPick) {
+                          bg = "#dcfce7"; borderColor = "#16a34a"; icon = "✅"; textColor = "#16a34a";
+                        } else if (isCorrect) {
+                          bg = "#dcfce7"; borderColor = "#16a34a"; icon = "✓"; textColor = "#16a34a";
+                        } else if (isWrongPick) {
+                          bg = "#fee2e2"; borderColor = "#dc2626"; icon = "✗"; textColor = "#dc2626";
+                        } else if (isStudentPick) {
+                          bg = "#dcfce7"; borderColor = "#16a34a"; icon = "✅"; textColor = "#16a34a";
+                        }
+
+                        return (
+                          <div key={letter} style={{
+                            display: "flex",
+                            alignItems: "flex-start",
+                            gap: 8,
+                            padding: "6px 10px",
+                            marginBottom: 4,
+                            borderRadius: 6,
+                            background: bg,
+                            border: `1px solid ${borderColor}`,
+                            fontSize: 13,
+                            color: textColor,
+                            lineHeight: 1.5,
+                          }}>
+                            <span style={{ fontWeight: 700, minWidth: 20, flexShrink: 0 }}>
+                              {icon || letter})
+                            </span>
+                            <span>
+                              <strong>{letter})</strong> {text}
+                              {isStudentPick && !isCorrect && (
+                                <span style={{ fontSize: 11, marginLeft: 8, color: "#dc2626", fontWeight: 600 }}>← Your pick</span>
+                              )}
+                              {isCorrect && !isStudentPick && (
+                                <span style={{ fontSize: 11, marginLeft: 8, color: "#16a34a", fontWeight: 600 }}>← Correct answer</span>
+                              )}
+                              {isCorrect && isStudentPick && (
+                                <span style={{ fontSize: 11, marginLeft: 8, color: "#16a34a", fontWeight: 600 }}>← Your pick ✓</span>
+                              )}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Fallback: show text if no options available */}
+                  {optionEntries.length === 0 && (
+                    <>
+                      <div style={{ fontSize: 13, color: qr.is_correct ? COLORS.success : COLORS.danger, marginBottom: 6 }}>
+                        <strong>Your answer:</strong> {Array.isArray(qr.student_answer) ? qr.student_answer.join(", ") : qr.student_answer || "—"}
+                      </div>
+                      {!qr.is_correct && (
+                        <div style={{ fontSize: 13, color: COLORS.success, marginBottom: 6 }}>
+                          <strong>Correct answer:</strong> {Array.isArray(qr.correct_answer) ? qr.correct_answer.join(", ") : qr.correct_answer || "—"}
+                        </div>
+                      )}
+                    </>
                   )}
 
                   {qr.feedback && (
@@ -1285,7 +1372,8 @@ function TestTakingScreen({ testData, onSubmit, onForceExit }) {
                     </div>
                   )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
