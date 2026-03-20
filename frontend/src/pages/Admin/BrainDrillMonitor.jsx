@@ -1,14 +1,18 @@
 /**
  * BrainDrillMonitor.jsx — ANIMATED EDITION
  *
- * ✅ Smooth number counting animations (0 → actual value)
- * ✅ Cards slide in on page load (staggered)
- * ✅ Hover effects on cards and buttons (lift + shadow)
- * ✅ Live pulse/glow on active indicators
- * ✅ Progress bars animate on load
- * ✅ Reset All Sessions button
- * ✅ Auto-refresh (15s)
- * ✅ Matches Upskillize website colors
+ * Shows:
+ *  • Live slot occupancy (how many students are actively taking a test)
+ *  • Per-student test history with scores and feedback
+ *  • Ingest controls (trigger re-ingestion of a course/lecture)
+ *  • Agent health status
+ *
+ * Add to your Admin Dashboard routes:
+ *   import BrainDrillMonitor from "./BrainDrillMonitor";
+ *   <Route path="/admin/braindrill" element={<BrainDrillMonitor />} />
+ *
+ * And add to admin sidebar:
+ *   { path: "/admin/braindrill", label: "BrainDrill Monitor", icon: Zap }
  */
 
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -385,25 +389,6 @@ export default function BrainDrillMonitor() {
     return () => clearInterval(iv);
   }, [autoRefresh, fetchStatus]);
 
-  const handleResetAll = async () => {
-    if (
-      !window.confirm(
-        "⚠️ This will clear ALL active test sessions.\n\nStudents currently taking tests will lose their session.\n\nContinue?",
-      )
-    )
-      return;
-    setResetting(true);
-    try {
-      await api.post("/testgen/admin/reset-all");
-      alert("✅ All sessions reset!");
-      fetchStatus();
-    } catch (err) {
-      alert("❌ Failed: " + (err.response?.data?.message || err.message));
-    } finally {
-      setResetting(false);
-    }
-  };
-
   const handleIngest = async (type) => {
     const id = type === "course" ? ingestCourseId : ingestLectureId;
     if (!id || isNaN(Number(id))) {
@@ -560,24 +545,6 @@ export default function BrainDrillMonitor() {
           >
             🔄 Refresh
           </button>
-          <button
-            className="monitor-btn"
-            onClick={handleResetAll}
-            disabled={resetting}
-            style={{
-              padding: "8px 16px",
-              borderRadius: 8,
-              border: `1px solid ${T.red}40`,
-              background: resetting ? "#fef2f2" : "#fff",
-              color: T.red,
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: resetting ? "not-allowed" : "pointer",
-              opacity: resetting ? 0.6 : 1,
-            }}
-          >
-            {resetting ? "⏳ Resetting..." : "🗑️ Reset Sessions"}
-          </button>
         </div>
       </div>
 
@@ -673,18 +640,31 @@ export default function BrainDrillMonitor() {
             <span
               style={{ fontSize: 14, color: occupancyColor, fontWeight: 800 }}
             >
-              {activeTests} / {maxSlots} used
+              {status?.activeCount ?? 0} / {status?.maxAllowed ?? 200} slots
+              used
             </span>
           </div>
-          <AnimatedBar
-            value={activeTests}
-            max={maxSlots}
-            color={occupancyColor}
-            height={12}
-            delay={0.6}
-          />
-          <p style={{ fontSize: 12, color: T.muted, marginTop: 8 }}>
-            {availSlots} slots available · Rate limit: 3 tests/hour per student
+          <div
+            style={{
+              height: 8,
+              borderRadius: 4,
+              background: T.border,
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                height: "100%",
+                width: `${occupancy}%`,
+                background: occupancyColor,
+                borderRadius: 4,
+                transition: "width 0.6s ease",
+              }}
+            />
+          </div>
+          <p style={{ fontSize: 11, color: T.muted, marginTop: 6 }}>
+            {status?.availableSlots ?? 50} slots available · Rate limit:{" "}
+            {process.env.TESTGEN_RATE_LIMIT || 3} tests/hour per student
           </p>
         </div>
       )}
@@ -775,8 +755,12 @@ export default function BrainDrillMonitor() {
                     agentHealth.agent?.embed_model || "all-MiniLM-L6-v2",
                     T.purple,
                   ],
-                  ["Agent URL", "upskill25-myagent.hf.space", T.teal],
-                ].map(([k, v, c], i) => (
+                  [
+                    "Agent URL",
+                    process.env.REACT_APP_AGENT_URL ||
+                      "upskill25-myagent.hf.space",
+                  ],
+                ].map(([k, v]) => (
                   <div
                     key={k}
                     className="monitor-card"
