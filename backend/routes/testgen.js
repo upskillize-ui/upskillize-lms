@@ -1,4 +1,4 @@
-﻿/**
+/**
  * testgen.js — Express router
  *
  * ✅ FIX 1: BullMQ queue for AI generation (stops 429)
@@ -62,32 +62,26 @@ function getCollegeId(req) {
 
 // ✅ FIX 2: Sequelize-compatible enrollment check
 async function isEnrolled(userId, lectureId, courseId) {
-  if (!sequelize) return true;
+  if (!sequelize) return true; // fail open if no DB
   try {
-    // Step 1: Get the student.id from users.id (they are different!)
-    const [studentRows] = await sequelize.query(
-      `SELECT id FROM students WHERE user_id = :userId LIMIT 1`,
-      { replacements: { userId }, type: 'SELECT' }
-    );
-    
-    const studentId = studentRows?.id ?? studentRows?.[0]?.id;
-    if (!studentId) {
-      console.log(`[TestGen] No student record found for user_id=${userId}`);
-      return true; // fail open if no student record
-    }
+    const query = courseId
+      ? `SELECT COUNT(*) as cnt FROM enrollments WHERE student_id = :userId AND course_id = :courseId`
+      : `SELECT COUNT(*) as cnt FROM enrollments e
+         JOIN courses c ON e.course_id = c.id
+         JOIN course_modules cm ON cm.course_id = c.id
+         JOIN lessons l ON l.course_module_id = cm.id
+         WHERE e.student_id = :userId AND l.id = :lectureId`;
 
-    // Step 2: Check enrollment using the correct student_id
-    const [results] = await sequelize.query(
-      `SELECT COUNT(*) as cnt FROM enrollments WHERE student_id = :studentId AND course_id = :courseId`,
-      { replacements: { studentId, courseId: courseId || 0 }, type: 'SELECT' }
-    );
+    const [results] = await sequelize.query(query, {
+      replacements: courseId ? { userId, courseId } : { userId, lectureId },
+      type: sequelize.QueryTypes?.SELECT || "SELECT",
+    });
 
     const count = results?.cnt ?? results?.[0]?.cnt ?? 0;
-    console.log(`[TestGen] Enrollment: user=${userId} → student=${studentId}, course=${courseId}, enrolled=${count > 0}`);
     return parseInt(count) > 0;
   } catch (err) {
     console.error("[TestGen] Enrollment check failed:", err.message);
-    return true; // fail open
+    return true; // fail open — never block students on DB error
   }
 }
 
@@ -271,32 +265,49 @@ router.post("/submit", authMiddleware, rbac(["student"]), async (req, res) => {
 
   try {
     // ✅ FIX: Transform answers from frontend format to agent format
-    // Frontend sends: { 0: "B", 1: ["A","C"], 2: "A" }  (index-based, strings or arrays)
-    // Agent expects:  { "q1": ["B"], "q2": ["A","C"], "q3": ["A"] }  (id-based, always arrays)
+    // Frontend sends: { 0: "Option text here", 1: ["Text A","Text C"] }  (index-based, option TEXT)
+    // Agent expects:  { "q1": ["B"], "q2": ["A","C"] }  (id-based, option LETTERS)
+    // We need to reverse-lookup: find which letter key matches the selected text
     const transformedAnswers = {};
     for (const [key, value] of Object.entries(answers)) {
-      // Determine the question ID
       const qIndex = parseInt(key);
-      const questionId =
-        !isNaN(qIndex) && questions[qIndex]
-          ? questions[qIndex].id || `q${qIndex + 1}`
-          : key; // If key is already a question ID like "q1", use as-is
+      const question = !isNaN(qIndex) ? questions[qIndex] : null;
+      const questionId = question ? (question.id || `q${qIndex + 1}`) : key;
 
-      // Ensure value is always an array
+      // Get the options map for this question (e.g., {A: "text1", B: "text2", ...})
+      const options = question?.options || {};
+
+      // Helper: convert option text to its letter key
+      const textToLetter = (text) => {
+        if (!text || typeof text !== 'string') return text;
+        // If it's already a single letter (A, B, C, D, E), keep it
+        if (/^[A-E]$/.test(text.trim())) return text.trim();
+        // If it's "True"/"False" for true_false questions, map to letter
+        if (text.trim() === 'True') return 'A';
+        if (text.trim() === 'False') return 'B';
+        // Reverse lookup: find which letter has this text as its value
+        for (const [letter, optionText] of Object.entries(options)) {
+          if (optionText === text || optionText.trim() === text.trim()) {
+            return letter;
+          }
+        }
+        // No match found — return original (agent will handle mismatch)
+        return text;
+      };
+
+      // Convert value(s) to letter(s)
       if (Array.isArray(value)) {
-        transformedAnswers[questionId] = value;
+        transformedAnswers[questionId] = value.map(textToLetter);
       } else if (value !== null && value !== undefined && value !== "") {
-        transformedAnswers[questionId] = [String(value)];
+        transformedAnswers[questionId] = [textToLetter(String(value))];
       } else {
         transformedAnswers[questionId] = [];
       }
     }
 
-    console.log(
-      `[TestGen] Submit: student=${sid}, answers transformed:`,
-      Object.keys(transformedAnswers).length,
-      "questions answered",
-    );
+    console.log(`[TestGen] Submit: student=${sid}, answers transformed:`, 
+      Object.keys(transformedAnswers).length, "questions answered",
+      JSON.stringify(transformedAnswers));
 
     const { data } = await axios.post(
       `${AGENT}/api/submit-answers`,
@@ -313,16 +324,8 @@ router.post("/submit", authMiddleware, rbac(["student"]), async (req, res) => {
     return res.json({ success: true, ...data });
   } catch (err) {
     await testSessionManager.releaseSlot(sid);
-    console.error(
-      `[TestGen] submit FAILED for student=${sid}:`,
-      err.response?.data || err.message,
-    );
-    return res
-      .status(500)
-      .json({
-        success: false,
-        message: err.response?.data?.detail || err.message,
-      });
+    console.error(`[TestGen] submit FAILED for student=${sid}:`, err.response?.data || err.message);
+    return res.status(500).json({ success: false, message: err.response?.data?.detail || err.message });
   }
 });
 
