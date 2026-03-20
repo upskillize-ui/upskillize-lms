@@ -7,6 +7,7 @@
  *  • Per-student test history with scores and feedback
  *  • Ingest controls (trigger re-ingestion of a course/lecture)
  *  • Agent health status
+ *  • Reset All Sessions button (clears stuck sessions)
  *
  * Add to your Admin Dashboard routes:
  *   import BrainDrillMonitor from "./BrainDrillMonitor";
@@ -112,6 +113,7 @@ export default function BrainDrillMonitor() {
   const [activeTab, setActiveTab] = useState("overview");
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [resetting, setResetting] = useState(false);
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -135,13 +137,9 @@ export default function BrainDrillMonitor() {
 
   const fetchHistory = useCallback(async () => {
     try {
-      // Fetch test attempt history — uses your existing quiz attempts endpoint
-      // which stores similar data. If you have a dedicated test_results table,
-      // change this endpoint.
       const res = await api.get("/admin/test-history");
       setTestHistory(res.data.history || res.data.results || []);
     } catch {
-      // Endpoint may not exist yet — show empty state gracefully
       setTestHistory([]);
     } finally {
       setLoadingHistory(false);
@@ -158,6 +156,21 @@ export default function BrainDrillMonitor() {
     const iv = setInterval(fetchStatus, 15_000);
     return () => clearInterval(iv);
   }, [autoRefresh, fetchStatus]);
+
+  // ✅ Reset All Sessions handler
+  const handleResetAll = async () => {
+    if (!window.confirm("⚠️ This will clear ALL active test sessions.\n\nStudents currently taking tests will lose their session.\n\nAre you sure?")) return;
+    setResetting(true);
+    try {
+      await api.post("/testgen/admin/reset-all");
+      alert("✅ All sessions reset! Slots are now 200/200.");
+      fetchStatus();
+    } catch (err) {
+      alert("❌ Reset failed: " + (err.response?.data?.message || err.message));
+    } finally {
+      setResetting(false);
+    }
+  };
 
   const handleIngest = async (type) => {
     const id = type === "course" ? ingestCourseId : ingestLectureId;
@@ -270,6 +283,23 @@ export default function BrainDrillMonitor() {
           >
             🔄 Refresh
           </button>
+          <button
+            onClick={handleResetAll}
+            disabled={resetting}
+            style={{
+              padding: "8px 16px",
+              borderRadius: 8,
+              border: `1px solid ${T.red}`,
+              background: resetting ? "#fef2f2" : "#fff",
+              color: T.red,
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: resetting ? "not-allowed" : "pointer",
+              opacity: resetting ? 0.6 : 1,
+            }}
+          >
+            {resetting ? "Resetting..." : "🗑️ Reset All Sessions"}
+          </button>
         </div>
       </div>
 
@@ -351,7 +381,7 @@ export default function BrainDrillMonitor() {
             <span
               style={{ fontSize: 13, color: occupancyColor, fontWeight: 700 }}
             >
-              {status?.activeCount ?? 0} / {status?.maxAllowed ?? 200} slots
+              {status?.activeCount ?? status?.activeTestTakers ?? 0} / {status?.maxAllowed ?? status?.maxConcurrent ?? 200} slots
               used
             </span>
           </div>
@@ -374,8 +404,7 @@ export default function BrainDrillMonitor() {
             />
           </div>
           <p style={{ fontSize: 11, color: T.muted, marginTop: 6 }}>
-            {status?.availableSlots ?? 50} slots available · Rate limit:{" "}
-            {process.env.TESTGEN_RATE_LIMIT || 3} tests/hour per student
+            {status?.availableSlots ?? 200} slots available · Rate limit: 3 tests/hour per student
           </p>
         </div>
       )}
@@ -456,8 +485,7 @@ export default function BrainDrillMonitor() {
                   ],
                   [
                     "Agent URL",
-                    process.env.REACT_APP_AGENT_URL ||
-                      "upskill25-myagent.hf.space",
+                    "upskill25-myagent.hf.space",
                   ],
                 ].map(([k, v]) => (
                   <div
