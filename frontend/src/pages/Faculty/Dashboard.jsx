@@ -277,35 +277,6 @@ const MBAStyles = () => (
 const Spinner = () => <div className="fmba-spin"><div className="fmba-spinner" /></div>;
 const FLabel = ({ children }) => <label className="fmba-label">{children}</label>;
 
-function GenderAvatar({ gender, size = 34 }) {
-  const isFemale = (gender || "").toLowerCase() === "female";
-  const isMale   = (gender || "").toLowerCase() === "male";
-  return (
-    <svg width={size} height={size} viewBox="0 0 34 34" fill="none"
-      xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
-      <circle cx="17" cy="17" r="17" fill="#1a2744" />
-      {isFemale ? (<>
-        <circle cx="17" cy="12" r="6" fill="#fff" fillOpacity="0.92" />
-        <path d="M11 11 Q11 5 17 5 Q23 5 23 11"
-          stroke="#fff" strokeOpacity="0.75" strokeWidth="2"
-          fill="none" strokeLinecap="round"/>
-        <path d="M7 32 C7 24 11 20 17 20 C23 20 27 24 27 32"
-          fill="#fff" fillOpacity="0.92" />
-      </>) : isMale ? (<>
-        <circle cx="17" cy="12" r="6" fill="#fff" fillOpacity="0.92" />
-        <path d="M11 10 Q11 5 17 5 Q23 5 23 10"
-          fill="#fff" fillOpacity="0.45" />
-        <path d="M5 32 L5 25 Q5 20 17 20 Q29 20 29 25 L29 32"
-          fill="#fff" fillOpacity="0.92" />
-      </>) : (<>
-        <circle cx="17" cy="12.5" r="6" fill="#fff" fillOpacity="0.92" />
-        <path d="M5 31 C5 23 10 20 17 20 C24 20 29 23 29 31"
-          fill="#fff" fillOpacity="0.92" />
-      </>)}
-    </svg>
-  );
-}
-
 // Shared toast hook — replaces alert() throughout
 function useToast() {
   const [toast, setToast] = useState({ type: '', text: '' });
@@ -342,6 +313,7 @@ function ConfirmDialog({ message, onConfirm, onCancel }) {
     </div>
   );
 }
+
 
 // ─── OVERVIEW ────────────────────────────────────────────────────────────────
 function Overview() {
@@ -559,9 +531,9 @@ function MyCourses() {
   const [showEdit, setShowEdit] = useState(false);
   const [editing, setEditing] = useState(null);
   const [editForm, setEditForm] = useState({ course_name: '', code: '', description: '', status: 'active', duration_hours: '', schedule: '' });
+  const { showToast, ToastEl } = useToast();
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
-  const { showToast, ToastEl } = useToast();
 
   useEffect(() => {
     api.get('/faculty/courses').then(r => { if (r.data.success) setCourses(r.data.courses || []); }).catch(() => {}).finally(() => setLoading(false));
@@ -577,7 +549,7 @@ function MyCourses() {
     if (!editForm.course_name.trim()) { showToast('error', 'Course name is required'); return; }
     try {
       const r = await api.put(`/faculty/courses/${editing.id}`, editForm);
-      if (r.data.success) { setCourses(courses.map(c => c.id === editing.id ? { ...c, ...editForm } : c)); setShowEdit(false); showToast('success', 'Course updated!'); }
+      if (r.data.success) { setCourses(courses.map(c => c.id === editing.id ? { ...c, ...editForm } : c)); setShowEdit(false); }
     } catch (e) { showToast('error', e.response?.data?.message || 'Failed to update'); }
   };
 
@@ -701,7 +673,7 @@ function ContentUpload() {
   const [editForm, setEditForm] = useState({});
   const [editSaving, setEditSaving] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
-  const [confirmDelete, setConfirmDelete] = useState(null); // item to confirm delete
+  const [confirmDelete, setConfirmDelete] = useState(null);
 
   const typeCfg = {
     video: { label: 'Video', color: T.red,   accept: 'video/*',      fileLabel: 'MP4, AVI, MOV' },
@@ -744,15 +716,9 @@ function ContentUpload() {
   };
 
   const handleDelete = async (item) => {
-    setConfirmDelete(item);
-  };
-
-  const doDelete = async () => {
-    const item = confirmDelete;
-    setConfirmDelete(null);
     setDeletingId(item.id);
     try { await api.delete(`/faculty/content/${item.id}`); setUploadedContent(p => p.filter(c => c.id !== item.id)); }
-    catch { setErrorMsg('Delete failed. Please try again.'); } finally { setDeletingId(null); }
+    catch { setErrorMsg('Delete failed'); } finally { setDeletingId(null); }
   };
 
   const filtered = uploadedContent.filter(c => (filterType === 'all' || c.type === filterType) && (c.title || '').toLowerCase().includes(searchContent.toLowerCase()));
@@ -1097,7 +1063,6 @@ function AssignmentManagement() {
   const resetForm = () => setForm({ title: '', course: '', dueDate: '', totalMarks: '', description: '', rubricCategories: [{ name: '', points: '' }] });
 
   const handleDelete = async (id) => {
-    
     try { await api.delete(`/faculty/assignments/${id}`); setAssignments(assignments.filter(a => a.id !== id)); }
     catch { showToast('error', 'Failed to delete assignment'); }
   };
@@ -1109,7 +1074,7 @@ function AssignmentManagement() {
       const updated = submissions.map(s => s.id === submission.id ? { ...s, grade: totalGrade, feedback, status: 'graded' } : s);
       setSubmissions(updated);
       setAssignments(p => p.map(a => a.id === selected.id ? { ...a, graded: updated.filter(s => s.grade != null).length } : a));
-    } catch (e) { setMsg({ type: 'error', text: e.response?.data?.message || 'Failed to grade submission' }); setTimeout(() => setMsg({ type: '', text: '' }), 3500); }
+    } catch (e) { showToast('error', e.response?.data?.message || 'Failed to grade submission'); }
   };
 
   if (loading) return <Spinner />;
@@ -1345,7 +1310,6 @@ function QuizExamManagement() {
   };
 
   const handleDelete = async (id) => {
-    
     try { await api.delete(`/quizzes/${id}`); setQuizzes(quizzes.filter(q => q.id !== id)); }
     catch { showToast('error', 'Error deleting quiz'); }
   };
@@ -1689,7 +1653,6 @@ function AnnouncementManagement() {
   };
 
   const handleDelete = async (id) => {
-    
     try { await api.delete(`/faculty/announcements/${id}`); setAnnouncements(p => p.filter(a => a.id !== id)); } catch {}
   };
 
@@ -1789,7 +1752,6 @@ function BatchManagement() {
   };
 
   const handleDelete = async (id) => {
-    
     try { await api.delete(`/faculty/batches/${id}`); setBatches(p => p.filter(b => b.id !== id)); } catch { showToast('error', 'Delete failed'); }
   };
 
@@ -2294,7 +2256,7 @@ function DiscussionForum() {
   const [replyContent, setReplyContent] = useState('');
   const [submittingReply, setSubmittingReply] = useState(false);
   const [filterCourse, setFilterCourse] = useState('');
-  const [filterType, setFilterType] = useState('all');  // all | discussion | doubt
+  const [filterType, setFilterType] = useState('all');
   const [courses, setCourses] = useState([]);
   const [newThread, setNewThread] = useState({ title: '', content: '', course: 'General' });
   const [posting, setPosting] = useState(false);
@@ -2302,10 +2264,7 @@ function DiscussionForum() {
 
   const loadThreads = async (silent = false) => {
     if (!silent) setLoading(true); else setRefreshing(true);
-    try {
-      const r = await api.get('/forum/threads');
-      if (r.data.success) setThreads(r.data.threads || []);
-    } catch {}
+    try { const r = await api.get('/forum/threads'); if (r.data.success) setThreads(r.data.threads || []); } catch {}
     finally { setLoading(false); setRefreshing(false); }
   };
 
@@ -2322,19 +2281,12 @@ function DiscussionForum() {
     e.preventDefault(); setPosting(true);
     try {
       const r = await api.post('/forum/threads', newThread);
-      if (r.data.success) {
-        setThreads([r.data.thread, ...threads]);
-        setShowNew(false);
-        setNewThread({ title: '', content: '', course: 'General' });
-      }
+      if (r.data.success) { setThreads([r.data.thread, ...threads]); setShowNew(false); setNewThread({ title: '', content: '', course: 'General' }); }
     } catch { showToast('error', 'Error creating thread'); } finally { setPosting(false); }
   };
 
   const openThread = async (t) => {
-    try {
-      const r = await api.get(`/forum/threads/${t.id}`);
-      setSelThread(r.data.thread || r.data);
-    } catch { setSelThread(t); }
+    try { const r = await api.get(`/forum/threads/${t.id}`); setSelThread(r.data.thread || r.data); } catch { setSelThread(t); }
   };
 
   const handleReply = async () => {
@@ -2343,14 +2295,9 @@ function DiscussionForum() {
     try {
       await api.post(`/forum/threads/${selThread.id}/replies`, { content: replyContent });
       setReplyContent('');
-      // reload thread to show new reply
       const r = await api.get(`/forum/threads/${selThread.id}`);
       setSelThread(r.data.thread || r.data);
-      // also update reply count in list
-      setThreads(prev => prev.map(t => t.id === selThread.id
-        ? { ...t, replyCount: (t.replyCount || 0) + 1, replies: (t.replies || 0) + 1 }
-        : t
-      ));
+      setThreads(prev => prev.map(t => t.id === selThread.id ? { ...t, replyCount: (t.replyCount || 0) + 1 } : t));
     } catch { showToast('error', 'Error posting reply'); } finally { setSubmittingReply(false); }
   };
 
@@ -2359,54 +2306,36 @@ function DiscussionForum() {
       await api.patch(`/forum/replies/${replyId}/mark-answer`);
       const r = await api.get(`/forum/threads/${selThread.id}`);
       setSelThread(r.data.thread || r.data);
-      // mark thread as answered in list
       setThreads(prev => prev.map(t => t.id === selThread.id ? { ...t, hasAnswer: true, has_answer: true } : t));
     } catch { showToast('error', 'Error marking answer'); }
   };
 
-  // ── Thread Detail View ──────────────────────────────────────────────────
+  if (loading) return <Spinner />;
+
   if (selThread) {
     const replies = selThread.replies || [];
     const isAnswered = selThread.has_answer || selThread.hasAnswer;
     const postedDate = selThread.created_at || selThread.created;
-
     return (
       <div style={{ maxWidth: 760 }}>
-        {/* Back + actions */}
+        {ToastEl}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <button className="fmba-btn-ghost" onClick={() => setSelThread(null)}>
             <ChevronRight size={13} style={{ transform: 'rotate(180deg)' }} /> Back to Forum
           </button>
-          <button className="fmba-btn-ghost" onClick={async () => {
-            const r = await api.get(`/forum/threads/${selThread.id}`);
-            setSelThread(r.data.thread || r.data);
-          }} style={{ fontSize: 12 }}>
+          <button className="fmba-btn-ghost" onClick={async () => { const r = await api.get(`/forum/threads/${selThread.id}`); setSelThread(r.data.thread || r.data); }} style={{ fontSize: 12 }}>
             <RefreshCw size={12} /> Refresh
           </button>
         </div>
-
-        {/* Thread card */}
         <div className="fmba-card" style={{ marginBottom: 14, padding: 22 }}>
-          {/* Type + course + status badges */}
           <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
             <span style={{ fontSize: 18 }}>{selThread.type === 'doubt' ? '❓' : '💬'}</span>
             {selThread.course && <span className="fmba-pill fmba-pill-navy">{selThread.course}</span>}
             {selThread.topic && <span className="fmba-pill fmba-pill-gold" style={{ fontSize: 11 }}>{selThread.topic}</span>}
-            <span className="fmba-pill" style={{ fontSize: 11, background: selThread.type === 'doubt' ? '#fdf1f0' : T.blueSoft, color: selThread.type === 'doubt' ? T.red : T.navy }}>
-              {selThread.type === 'doubt' ? 'Doubt / Question' : 'Discussion'}
-            </span>
-            {isAnswered && (
-              <span className="fmba-pill fmba-pill-pass" style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-                <CheckCircle size={10} /> Answered
-              </span>
-            )}
+            <span className="fmba-pill" style={{ fontSize: 11, background: selThread.type === 'doubt' ? '#fdf1f0' : T.blueSoft, color: selThread.type === 'doubt' ? T.red : T.navy }}>{selThread.type === 'doubt' ? 'Doubt / Question' : 'Discussion'}</span>
+            {isAnswered && <span className="fmba-pill fmba-pill-pass" style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><CheckCircle size={10} /> Answered</span>}
           </div>
-
-          <h2 style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 20, fontWeight: 800, color: T.navy, marginBottom: 10 }}>
-            {selThread.title}
-          </h2>
-
-          {/* Student author info */}
+          <h2 style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 20, fontWeight: 800, color: T.navy, marginBottom: 10 }}>{selThread.title}</h2>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, padding: '10px 14px', background: T.bg, borderRadius: 8 }}>
             <div style={{ width: 34, height: 34, borderRadius: '50%', background: T.navy, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: 13, flexShrink: 0 }}>
               {(selThread.author_name || selThread.author || 'S').charAt(0).toUpperCase()}
@@ -2416,52 +2345,24 @@ function DiscussionForum() {
                 <span style={{ fontSize: 14, fontWeight: 700, color: T.navy }}>{selThread.author_name || selThread.author}</span>
                 <span className="fmba-pill" style={{ fontSize: 10, background: T.blueSoft, color: T.navy }}>STUDENT</span>
               </div>
-              <span style={{ fontSize: 11, color: T.subtle }}>
-                {postedDate ? new Date(postedDate).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}
-              </span>
+              <span style={{ fontSize: 11, color: T.subtle }}>{postedDate ? new Date(postedDate).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}</span>
             </div>
           </div>
-
-          {/* Thread content */}
-          <div style={{ background: '#fff', border: `1px solid ${T.border}`, borderRadius: 8, padding: '14px 16px', fontSize: 14, color: T.text, lineHeight: 1.75 }}>
-            {selThread.content}
-          </div>
+          <div style={{ background: '#fff', border: `1px solid ${T.border}`, borderRadius: 8, padding: '14px 16px', fontSize: 14, color: T.text, lineHeight: 1.75 }}>{selThread.content}</div>
         </div>
-
-        {/* Replies header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-          <h3 style={{ fontSize: 14, fontWeight: 700, color: T.navy }}>
-            {replies.length} {replies.length === 1 ? 'Reply' : 'Replies'}
-          </h3>
-          {!isAnswered && selThread.type === 'doubt' && (
-            <span style={{ fontSize: 12, color: T.gold, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
-              <AlertCircle size={12} /> Waiting for answer
-            </span>
-          )}
+          <h3 style={{ fontSize: 14, fontWeight: 700, color: T.navy }}>{replies.length} {replies.length === 1 ? 'Reply' : 'Replies'}</h3>
+          {!isAnswered && selThread.type === 'doubt' && <span style={{ fontSize: 12, color: T.gold, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}><AlertCircle size={12} /> Waiting for answer</span>}
         </div>
-
-        {/* Reply list */}
-        {replies.length === 0 ? (
-          <div className="fmba-card" style={{ padding: 20, textAlign: 'center', marginBottom: 14 }}>
-            <MessageSquare size={28} style={{ color: T.border, display: 'block', margin: '0 auto 8px' }} />
-            <p style={{ fontSize: 13, color: T.subtle }}>No replies yet — be the first to respond!</p>
-          </div>
-        ) : (
-          replies.map((r, i) => {
+        {replies.length === 0
+          ? <div className="fmba-card" style={{ padding: 20, textAlign: 'center', marginBottom: 14 }}><MessageSquare size={28} style={{ color: T.border, display: 'block', margin: '0 auto 8px' }} /><p style={{ fontSize: 13, color: T.subtle }}>No replies yet</p></div>
+          : replies.map((r, i) => {
             const isFaculty = r.role === 'faculty' || r.author_role === 'faculty' || r.is_faculty;
             const isAnswer = r.is_answer;
             const replyDate = r.created_at || r.created;
             return (
-              <div key={r.id || i} style={{
-                border: `1px solid ${isAnswer ? T.green : isFaculty ? T.gold : T.border}`,
-                borderLeft: `3px solid ${isAnswer ? T.green : isFaculty ? T.gold : T.border}`,
-                borderRadius: 10,
-                padding: 18,
-                marginBottom: 10,
-                background: isAnswer ? T.greenSoft : isFaculty ? '#fffdf4' : '#fff',
-              }}>
+              <div key={r.id || i} style={{ border: `1px solid ${isAnswer ? T.green : isFaculty ? T.gold : T.border}`, borderLeft: `3px solid ${isAnswer ? T.green : isFaculty ? T.gold : T.border}`, borderRadius: 10, padding: 18, marginBottom: 10, background: isAnswer ? T.greenSoft : isFaculty ? '#fffdf4' : '#fff' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
-                  {/* Author row */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <div style={{ width: 34, height: 34, borderRadius: '50%', background: isFaculty ? T.gold : T.navy, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: 13, flexShrink: 0 }}>
                       {(r.author_name || r.author || '?').charAt(0).toUpperCase()}
@@ -2469,107 +2370,55 @@ function DiscussionForum() {
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <span style={{ fontSize: 14, fontWeight: 700, color: T.navy }}>{r.author_name || r.author}</span>
-                        <span className="fmba-pill" style={{ fontSize: 10, background: isFaculty ? T.gold : T.blueSoft, color: isFaculty ? '#fff' : T.navy }}>
-                          {isFaculty ? 'FACULTY' : 'STUDENT'}
-                        </span>
-                        {isAnswer && (
-                          <span className="fmba-pill fmba-pill-pass" style={{ fontSize: 10, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-                            <CheckCircle size={9} /> Best Answer
-                          </span>
-                        )}
+                        <span className="fmba-pill" style={{ fontSize: 10, background: isFaculty ? T.gold : T.blueSoft, color: isFaculty ? '#fff' : T.navy }}>{isFaculty ? 'FACULTY' : 'STUDENT'}</span>
+                        {isAnswer && <span className="fmba-pill fmba-pill-pass" style={{ fontSize: 10, display: 'inline-flex', alignItems: 'center', gap: 3 }}><CheckCircle size={9} /> Best Answer</span>}
                       </div>
-                      <span style={{ fontSize: 11, color: T.subtle }}>
-                        {replyDate ? new Date(replyDate).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}
-                      </span>
+                      <span style={{ fontSize: 11, color: T.subtle }}>{replyDate ? new Date(replyDate).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}</span>
                     </div>
                   </div>
-                  {/* Mark answer button */}
-                  {!isAnswer && (
-                    <button className="fmba-btn-ghost" style={{ fontSize: 11, padding: '5px 10px' }} onClick={() => handleMark(r.id)}>
-                      <CheckCircle size={11} /> Mark Best Answer
-                    </button>
-                  )}
+                  {!isAnswer && <button className="fmba-btn-ghost" style={{ fontSize: 11, padding: '5px 10px' }} onClick={() => handleMark(r.id)}><CheckCircle size={11} /> Mark Best Answer</button>}
                 </div>
                 <p style={{ fontSize: 13, color: T.text, lineHeight: 1.65 }}>{r.content}</p>
               </div>
             );
-          })
-        )}
-
-        {/* Faculty reply box */}
+          })}
         <div className="fmba-card" style={{ marginTop: 14, padding: 20, borderLeft: `3px solid ${T.gold}` }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-            <div style={{ width: 28, height: 28, borderRadius: '50%', background: T.gold, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 11, fontWeight: 800 }}>
-              {(user?.full_name || 'F').charAt(0)}
-            </div>
-            <p style={{ fontSize: 13, fontWeight: 700, color: T.navy }}>
-              Reply as Faculty
-              <span className="fmba-pill" style={{ fontSize: 10, background: T.gold, color: '#fff', marginLeft: 6 }}>FACULTY</span>
-            </p>
+            <div style={{ width: 28, height: 28, borderRadius: '50%', background: T.gold, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 11, fontWeight: 800 }}>{(user?.full_name || 'F').charAt(0)}</div>
+            <p style={{ fontSize: 13, fontWeight: 700, color: T.navy }}>Reply as Faculty <span className="fmba-pill" style={{ fontSize: 10, background: T.gold, color: '#fff', marginLeft: 6 }}>FACULTY</span></p>
           </div>
-          <textarea
-            className="fmba-textarea"
-            rows={4}
-            value={replyContent}
-            onChange={e => setReplyContent(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); handleReply(); } }}
-            placeholder="Write your reply or explanation… (Ctrl+Enter to submit)"
-            style={{ marginBottom: 10 }}
-          />
+          <textarea className="fmba-textarea" rows={4} value={replyContent} onChange={e => setReplyContent(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); handleReply(); } }} placeholder="Write your reply… (Ctrl+Enter to submit)" style={{ marginBottom: 10 }} />
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 11, color: T.subtle }}>{replyContent.length} characters · Ctrl+Enter to post</span>
-            <button className="fmba-btn-primary" onClick={handleReply} disabled={submittingReply || !replyContent.trim()}>
-              <Send size={13} /> {submittingReply ? 'Posting…' : 'Post Reply'}
-            </button>
+            <span style={{ fontSize: 11, color: T.subtle }}>{replyContent.length} characters</span>
+            <button className="fmba-btn-primary" onClick={handleReply} disabled={submittingReply || !replyContent.trim()}><Send size={13} /> {submittingReply ? 'Posting…' : 'Post Reply'}</button>
           </div>
         </div>
       </div>
     );
   }
 
-  // ── Thread List View ────────────────────────────────────────────────────
   const pendingDoubts = threads.filter(t => t.type === 'doubt' && !t.hasAnswer && !t.has_answer).length;
-
-  const filtered = threads.filter(t => {
-    const matchType   = filterType === 'all' || t.type === filterType;
-    const matchCourse = !filterCourse || t.course === filterCourse;
-    return matchType && matchCourse;
-  });
-
-  if (loading) return <Spinner />;
+  const filtered = threads.filter(t => (filterType === 'all' || t.type === filterType) && (!filterCourse || t.course === filterCourse));
 
   return (
     <div>
       {ToastEl}
-      {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <div>
-          <h2 className="fmba-section-title">Discussion Forum</h2>
-          <p className="fmba-section-sub">{threads.length} posts total</p>
-        </div>
+        <div><h2 className="fmba-section-title">Discussion Forum</h2><p className="fmba-section-sub">{threads.length} posts total</p></div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="fmba-btn-ghost" onClick={() => loadThreads(true)} disabled={refreshing} style={{ fontSize: 12 }}>
-            <RefreshCw size={12} style={{ animation: refreshing ? 'fmba-spin .7s linear infinite' : 'none' }} />
-            {refreshing ? 'Refreshing…' : 'Refresh'}
+            <RefreshCw size={12} style={{ animation: refreshing ? 'fmba-spin .7s linear infinite' : 'none' }} /> {refreshing ? 'Refreshing…' : 'Refresh'}
           </button>
           <button className="fmba-btn-primary" onClick={() => setShowNew(true)}><Plus size={13} /> New Post</button>
         </div>
       </div>
-
-      {/* Pending doubts alert */}
       {pendingDoubts > 0 && (
         <div style={{ background: '#fdf8ed', border: '1px solid #e8d89a', borderLeft: `3px solid ${T.gold}`, borderRadius: 10, padding: '11px 16px', display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
           <AlertCircle size={15} style={{ color: T.gold, flexShrink: 0 }} />
-          <p style={{ fontSize: 13, color: '#5a4500' }}>
-            <strong>{pendingDoubts} student doubt{pendingDoubts > 1 ? 's' : ''}</strong> waiting for your reply
-          </p>
-          <button onClick={() => setFilterType('doubt')} style={{ marginLeft: 'auto', background: T.gold, color: '#fff', border: 'none', borderRadius: 6, padding: '5px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-            View Doubts
-          </button>
+          <p style={{ fontSize: 13, color: '#5a4500' }}><strong>{pendingDoubts} student doubt{pendingDoubts > 1 ? 's' : ''}</strong> waiting for your reply</p>
+          <button onClick={() => setFilterType('doubt')} style={{ marginLeft: 'auto', background: T.gold, color: '#fff', border: 'none', borderRadius: 6, padding: '5px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>View Doubts</button>
         </div>
       )}
-
-      {/* Filters */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
         <div className="fmba-tabs">
           {[['all', 'All Posts'], ['discussion', '💬 Discussions'], ['doubt', '❓ Doubts']].map(([v, l]) => (
@@ -2581,63 +2430,35 @@ function DiscussionForum() {
           {courses.map(c => <option key={c.id} value={c.course_name}>{c.course_name}</option>)}
         </select>
       </div>
-
-      {/* Thread list */}
-      {filtered.length === 0 ? (
-        <div className="fmba-card fmba-empty"><MessageSquare size={36} style={{ color: T.border, margin: '0 auto 10px' }} /><p>No {filterType !== 'all' ? filterType + 's' : 'posts'} yet</p></div>
-      ) : (
-        filtered.map(t => {
+      {filtered.length === 0
+        ? <div className="fmba-card fmba-empty"><MessageSquare size={36} style={{ color: T.border, margin: '0 auto 10px' }} /><p>No {filterType !== 'all' ? filterType + 's' : 'posts'} yet</p></div>
+        : filtered.map(t => {
           const isUnansweredDoubt = t.type === 'doubt' && !t.hasAnswer && !t.has_answer;
           const replyCount = t.replyCount || t.replies || 0;
           const postedDate = t.created_at || t.created;
           return (
-            <div key={t.id} className="fmba-thread-row" onClick={() => openThread(t)}
-              style={{ borderLeft: isUnansweredDoubt ? `3px solid ${T.gold}` : undefined }}>
+            <div key={t.id} className="fmba-thread-row" onClick={() => openThread(t)} style={{ borderLeft: isUnansweredDoubt ? `3px solid ${T.gold}` : undefined }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  {/* Badges row */}
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 6, alignItems: 'center' }}>
                     <span style={{ fontSize: 15 }}>{t.type === 'doubt' ? '❓' : '💬'}</span>
                     {t.course && <span className="fmba-pill fmba-pill-navy" style={{ fontSize: 11 }}>{t.course}</span>}
-                    {t.topic && <span className="fmba-pill fmba-pill-gold" style={{ fontSize: 10 }}>{t.topic}</span>}
-                    {(t.hasAnswer || t.has_answer) && (
-                      <span className="fmba-pill fmba-pill-pass" style={{ fontSize: 10, display: 'inline-flex', alignItems: 'center', gap: 2 }}>
-                        <CheckCircle size={9} /> Answered
-                      </span>
-                    )}
-                    {isUnansweredDoubt && (
-                      <span className="fmba-pill" style={{ fontSize: 10, background: '#fdf8ed', color: T.gold }}>⏳ Awaiting Reply</span>
-                    )}
+                    {(t.hasAnswer || t.has_answer) && <span className="fmba-pill fmba-pill-pass" style={{ fontSize: 10, display: 'inline-flex', alignItems: 'center', gap: 2 }}><CheckCircle size={9} /> Answered</span>}
+                    {isUnansweredDoubt && <span className="fmba-pill" style={{ fontSize: 10, background: '#fdf8ed', color: T.gold }}>⏳ Awaiting Reply</span>}
                   </div>
-                  {/* Title */}
                   <h3 style={{ fontSize: 14, fontWeight: 700, color: T.navy, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 3 }}>{t.title}</h3>
-                  {/* Preview */}
                   <p style={{ fontSize: 12, color: T.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 6 }}>{t.content}</p>
-                  {/* Meta */}
                   <div style={{ display: 'flex', gap: 12, fontSize: 12, color: T.subtle }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                      <User size={11} />
-                      <strong style={{ color: T.navy }}>{t.author_name || t.author}</strong>
-                      <span className="fmba-pill" style={{ fontSize: 9, background: T.blueSoft, color: T.navy, padding: '1px 5px' }}>STUDENT</span>
-                    </span>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                      <MessageCircle size={11} /> {replyCount} repl{replyCount === 1 ? 'y' : 'ies'}
-                    </span>
-                    {postedDate && (
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                        <Clock size={11} /> {new Date(postedDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
-                      </span>
-                    )}
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><User size={11} /><strong style={{ color: T.navy }}>{t.author_name || t.author}</strong><span className="fmba-pill" style={{ fontSize: 9, background: T.blueSoft, color: T.navy, padding: '1px 5px' }}>STUDENT</span></span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><MessageCircle size={11} /> {replyCount} repl{replyCount === 1 ? 'y' : 'ies'}</span>
+                    {postedDate && <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><Clock size={11} /> {new Date(postedDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</span>}
                   </div>
                 </div>
                 <ChevronRight size={14} style={{ color: T.subtle, flexShrink: 0, marginLeft: 10, marginTop: 4 }} />
               </div>
             </div>
           );
-        })
-      )}
-
-      {/* New Post Modal */}
+        })}
       {showNew && (
         <div className="fmba-modal-bg">
           <div className="fmba-modal">
@@ -2654,9 +2475,7 @@ function DiscussionForum() {
               <div><FLabel>Title *</FLabel><input className="fmba-input" value={newThread.title} onChange={e => setNewThread(f => ({ ...f, title: e.target.value }))} placeholder="Topic or announcement…" required /></div>
               <div><FLabel>Content *</FLabel><textarea className="fmba-textarea" rows={5} value={newThread.content} onChange={e => setNewThread(f => ({ ...f, content: e.target.value }))} placeholder="Write your post here…" required /></div>
               <div style={{ display: 'flex', gap: 8 }}>
-                <button type="submit" className="fmba-btn-primary" disabled={posting || !newThread.title || !newThread.content} style={{ flex: 1, justifyContent: 'center' }}>
-                  {posting ? 'Posting…' : <><Send size={13} /> Post</>}
-                </button>
+                <button type="submit" className="fmba-btn-primary" disabled={posting || !newThread.title || !newThread.content} style={{ flex: 1, justifyContent: 'center' }}>{posting ? 'Posting…' : <><Send size={13} /> Post</>}</button>
                 <button type="button" className="fmba-btn-ghost" onClick={() => setShowNew(false)}>Cancel</button>
               </div>
             </form>
@@ -2866,6 +2685,8 @@ function FacultyProfile() {
   const [msg, setMsg] = useState({ type: '', text: '' });
   const [photoUploading, setPhotoUploading] = useState(false);
   const [photoPreview, setPhotoPreview] = useState(user?.profile_photo || null);
+  // Keep preview in sync if profile_photo changes in context (e.g. from another tab)
+  useEffect(() => { if (user?.profile_photo) setPhotoPreview(user.profile_photo); }, [user?.profile_photo]);
 
   const [personal, setPersonal] = useState({
     full_name: user?.full_name || '', email: user?.email || '', phone: user?.phone || '',
@@ -2907,10 +2728,12 @@ function FacultyProfile() {
       const fd = new FormData(); fd.append('photo', file);
       const r = await api.post('/faculty/profile/photo', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
       if (r.data.success) {
-        updateUser({ profile_photo: r.data.imageUrl });    // ✅ matches line 100
-      } 
-      if (updateUser) updateUser({ profile_photo: r.data.photo_url }); }
-    catch { showMsg('error', 'Photo upload failed'); } finally { setPhotoUploading(false); }
+        showMsg('success', 'Photo updated!');
+        if (updateUser) updateUser({ profile_photo: r.data.photo_url });
+        // Broadcast to the whole dashboard (sidebar + topbar update instantly)
+        window.dispatchEvent(new CustomEvent('facultyPhotoUpdated', { detail: { url: r.data.photo_url } }));
+      }
+    } catch { showMsg('error', 'Photo upload failed'); } finally { setPhotoUploading(false); }
   };
 
   const savePersonal = async () => {
@@ -2961,10 +2784,10 @@ function FacultyProfile() {
       <div className="fmba-card" style={{ marginBottom: 16, padding: 24 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 22 }}>
           <div style={{ position: 'relative', flexShrink: 0 }}>
-            <div style={{ width:80,height:80,borderRadius:'50%',border:`3px solid ${T.border}`,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center',background:T.navy }}>
+            <div style={{ width: 80, height: 80, borderRadius: '50%', background: T.blueSoft, border: `3px solid ${T.border}`, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {photoPreview
-              ? <img src={photoPreview} alt="Profile" style={{ width:'100%',height:'100%',objectFit:'cover' }} />
-              : <GenderAvatar gender={user?.gender} size={80} />}
+                ? <img src={photoPreview} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                : <span style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 26, fontWeight: 800, color: T.navy }}>{(user?.full_name || 'F').charAt(0)}</span>}
             </div>
             <label htmlFor="photo-upload" style={{ position: 'absolute', bottom: 0, right: 0, width: 26, height: 26, borderRadius: '50%', background: T.navy, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: `2px solid ${T.white}` }}>
               {photoUploading ? <div style={{ width: 12, height: 12, border: '2px solid rgba(255,255,255,.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'fmba-spin .7s linear infinite' }} /> : <Camera size={12} style={{ color: '#fff' }} />}
@@ -3649,6 +3472,11 @@ export default function FacultyDashboard() {
   const [showGlobalSearch,  setShowGlobalSearch]   = useState(false);
   const [messages,          setMessages]           = useState([]);
   const [notifications,     setNotifications]      = useState([]);
+  // Live profile photo — updates instantly when user uploads a new photo
+  const [livePhoto, setLivePhoto] = useState(user?.profile_photo || null);
+
+  // Keep livePhoto in sync whenever user context updates (e.g. after photo upload)
+  useEffect(() => { if (user?.profile_photo) setLivePhoto(user.profile_photo); }, [user?.profile_photo]);
 
   useEffect(() => {
     api.get('/faculty/messages').then(r => { if (r.data.success) setMessages(r.data.messages || []); }).catch(() => setMessages([]));
@@ -3660,6 +3488,13 @@ export default function FacultyDashboard() {
     const handler = (e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); setShowGlobalSearch(v => !v); } if (e.key === 'Escape') setShowGlobalSearch(false); };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
+  }, []);
+
+  // Listen for photo upload events from FacultyProfile — updates sidebar + topbar instantly
+  useEffect(() => {
+    const onPhoto = (e) => { if (e.detail?.url) setLivePhoto(e.detail.url); };
+    window.addEventListener('facultyPhotoUpdated', onPhoto);
+    return () => window.removeEventListener('facultyPhotoUpdated', onPhoto);
   }, []);
 
   const closeAll = () => { setShowMailbox(false); setShowNotifications(false); setShowHelp(false); setUserMenuOpen(false); };
@@ -3731,13 +3566,10 @@ export default function FacultyDashboard() {
         </nav>
         <div className="fmba-sidebar-footer">
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div className="fmba-avatar">
-              {user?.profile_photo
-              ? <div className="fmba-avatar">
-              <img src={user.profile_photo} alt=""
-              style={{ width:'100%', height:'100%', objectFit:'cover', borderRadius:'50%' }} />
-            </div>
-            : <GenderAvatar gender={user?.gender} size={34} />}
+            <div className="fmba-avatar" style={{ cursor: 'pointer', border: livePhoto ? '2px solid rgba(184,150,11,0.6)' : 'none' }} onClick={() => navigate('/faculty/profile')}>
+              {livePhoto
+                ? <img src={livePhoto} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                : <span style={{ fontSize: 13, fontWeight: 800, color: '#1a2744' }}>{initials}</span>}
             </div>
             <div>
               <div style={{ fontSize: 13, color: 'rgba(255,255,255,.8)', fontWeight: 600 }}>{user?.full_name?.split(' ')[0] || 'Faculty'}</div>
@@ -3862,13 +3694,10 @@ export default function FacultyDashboard() {
             {/* User menu */}
             <div style={{ position: 'relative' }}>
               <button onClick={() => { closeAll(); setUserMenuOpen(v => !v); }} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 10px 5px 5px', borderRadius: 10, border: `1.5px solid ${T.border}`, background: T.white, cursor: 'pointer', transition: 'all .18s', boxShadow: '0 1px 4px rgba(26,39,68,0.06)' }}>
-                <div className="fmba-avatar">
-                  {user?.profile_photo
-                  ? <div className="fmba-avatar">
-                      <img src={user.profile_photo} alt=""
-                      style={{ width:'100%', height:'100%', objectFit:'cover', borderRadius:'50%' }} />
-                    </div>
-                    : <GenderAvatar gender={user?.gender} size={34} />}
+                <div className="fmba-avatar" style={{ border: livePhoto ? `2px solid ${T.gold}` : `2px solid ${T.border}` }}>
+                  {livePhoto
+                    ? <img src={livePhoto} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                    : <span style={{ fontSize: 13, fontWeight: 800, color: '#1a2744' }}>{initials}</span>}
                 </div>
                 <div style={{ textAlign: 'left' }}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: T.text, lineHeight: 1.3 }}>{user?.full_name?.split(' ')[0] || 'Faculty'}</div>
