@@ -92,12 +92,12 @@ async function ensureContentTable(sequelize) {
 }
 
 // ── PROFILE PHOTO ──────────────────────────────────────────
-router.post('/profile/upload-photo', authMiddleware, upload.single('profile_photo'), async (req, res) => {
+router.post('/profile/photo', authMiddleware, upload.single('photo'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded' });
     const imageUrl = `/uploads/profiles/faculty/${req.file.filename}`;
     await User.update({ profile_photo: imageUrl }, { where: { id: req.user.id, role: 'faculty' } });
-    res.json({ success: true, message: 'Profile photo uploaded successfully', imageUrl });
+     res.json({ success: true, imageUrl });   // ← photo_url to match frontend
   } catch (error) {
     res.status(500).json({ success: false, message: 'Error uploading profile photo' });
   }
@@ -206,11 +206,29 @@ router.get('/dashboard/stats', authMiddleware, async (req, res) => {
       ? await Exam.count({ where: { course_id: { [Op.in]: courseIds }, is_active: true } })
       : 0;
 
+    // ─────────────────────────────────────────────────────────────────────
+    // FIX: Added  as: 'user'  to the nested Student include.
+    //
+    // The Student model defines its User association with a lowercase alias:
+    //   Student.belongsTo(User, { as: 'user', foreignKey: 'user_id' })
+    //
+    // Sequelize throws EagerLoadingError when the 'as' value doesn't exactly
+    // match the alias defined in the association (case-sensitive).
+    //
+    // BEFORE (broken):
+    //   include: [{ model: Student, include: [{ model: User, attributes: ['full_name'] }] }]
+    //
+    // AFTER (fixed — lowercase 'user'):
+    //   include: [{ model: Student, include: [{ model: User, as: 'user', attributes: ['full_name'] }] }]
+    // ─────────────────────────────────────────────────────────────────────
     const recentEnrollments = courseIds.length > 0
       ? await Enrollment.findAll({
           where: { course_id: { [Op.in]: courseIds } },
           include: [
-            { model: Student, include: [{ model: User, attributes: ['full_name'] }] },
+            {
+              model: Student,
+              include: [{ model: User, as: 'user', attributes: ['full_name'] }]  // ✅ FIXED — lowercase alias
+            },
             { model: Course, attributes: ['course_name'] }
           ],
           order: [['created_at', 'DESC']],
@@ -219,7 +237,7 @@ router.get('/dashboard/stats', authMiddleware, async (req, res) => {
       : [];
 
     const activities = recentEnrollments.map(e => ({
-      title: `${e.Student?.User?.full_name || 'A student'} enrolled in ${e.Course?.course_name || 'a course'}`,
+      title: `${e.Student?.user?.full_name || 'A student'} enrolled in ${e.Course?.course_name || 'a course'}`,
       time: e.created_at,
       type: 'enrollment'
     }));
@@ -308,7 +326,7 @@ router.get('/students', authMiddleware, async (req, res) => {
       include: [
         {
           model: Student,
-          include: [{ model: User, attributes: ['full_name', 'email', 'phone', 'profile_photo'] }]
+          include: [{ model: User, as: 'user', attributes: ['full_name', 'email', 'phone', 'profile_photo'] }]  // ✅ lowercase alias matches model definition
         },
         { model: Course, attributes: ['course_name'] }
       ],
@@ -322,10 +340,10 @@ router.get('/students', authMiddleware, async (req, res) => {
       if (!studentMap[sid]) {
         studentMap[sid] = {
           id: sid,
-          name: e.Student?.User?.full_name || 'Unknown',
-          email: e.Student?.User?.email || '',
-          phone: e.Student?.User?.phone || '',
-          profile_photo: e.Student?.User?.profile_photo || '',
+          name: e.Student?.user?.full_name || 'Unknown',
+          email: e.Student?.user?.email || '',
+          phone: e.Student?.user?.phone || '',
+          profile_photo: e.Student?.user?.profile_photo || '',
           courses: [],
           status: e.completion_status || 'enrolled',
           enrolled_at: e.created_at

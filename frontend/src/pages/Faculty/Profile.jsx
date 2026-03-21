@@ -157,13 +157,13 @@ function Profile() {
       const formData = new FormData();
       formData.append('profile_photo', file);
 
-      const response = await api.post('/faculty/profile/upload-photo', formData, {
+   const response = await api.post('/faculty/profile/photo', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
 
       if (response.data.success) {
         if (updateUser) {
-          updateUser({ profile_photo: response.data.imageUrl });
+         updateUser({ profile_photo: response.data.photo_url });
         }
         showMessage('success', 'Profile photo updated successfully!');
       } else {
