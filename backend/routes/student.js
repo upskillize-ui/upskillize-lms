@@ -208,7 +208,6 @@ router.get('/gamification', ...studentOnly, async (req, res) => {
         enrollments.filter(e => (e.progress_percentage || 0) >= 100).length * 200;
       level = Math.floor(xp / 500) + 1;
 
-      // Simple leaderboard from all students
       const allStudents = await Student.findAll({
         include: [{ model: User, as: 'user', attributes: ['full_name', 'profile_photo'] }],
         limit: 10
@@ -295,42 +294,30 @@ router.get('/profile/complete', ...studentOnly, async (req, res) => {
 // ============================================================
 // PROFILE — SAVE PERSONAL INFO
 // PUT /api/student/profile/personal
-// ✅ FIXED: now saves profile_photo, bio, gender, date_of_birth
 // ============================================================
 router.put('/profile/personal', ...studentOnly, async (req, res) => {
   try {
-    console.log('🔍 BODY KEYS:', Object.keys(req.body), 'USER:', req.user?.id);
-    const {
-      full_name,
-      phone,
-      date_of_birth,
-      gender,
-      bio,
-      profile_photo
-    } = req.body;
+    const { full_name, phone, date_of_birth, gender, bio, profile_photo } = req.body;
 
-    // Only include fields that exist in the users table
     const allUpdates = {
-      full_name:     full_name?.trim()    || null,
-      phone:         phone?.trim()        || null,
-      date_of_birth: date_of_birth        || null,
-      gender:        gender               || null,
-      bio:           bio?.trim()          || null,
+      full_name:     full_name?.trim()  || null,
+      phone:         phone?.trim()      || null,
+      date_of_birth: date_of_birth      || null,
+      gender:        gender             || null,
+      bio:           bio?.trim()        || null,
     };
 
     if (profile_photo) {
       allUpdates.profile_photo = profile_photo;
     }
 
-    // Get actual columns in users table to avoid saving dropped columns
     const { sequelize } = require('../config/database');
     const [cols] = await sequelize.query(
-      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS 
+      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users'`
     );
     const existingCols = cols.map(c => c.COLUMN_NAME);
 
-    // Filter updateData to only include existing columns
     const updateData = {};
     Object.keys(allUpdates).forEach(key => {
       if (existingCols.includes(key)) {
@@ -339,18 +326,7 @@ router.put('/profile/personal', ...studentOnly, async (req, res) => {
     });
 
     if (Object.keys(updateData).length > 0) {
-      const { sequelize } = require('../config/database');
-    const [cols] = await sequelize.query(
-      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS 
-       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users'`
-    );
-    const existingCols = cols.map(c => c.COLUMN_NAME);
-    const allAddr = { street, city, state, country, postal_code };
-    const updateData = {};
-    Object.keys(allAddr).forEach(k => { if (existingCols.includes(k)) updateData[k] = allAddr[k]; });
-    if (Object.keys(updateData).length > 0) {
       await User.update(updateData, { where: { id: req.user.id } });
-    }
     }
 
     return res.json({ success: true, message: 'Personal info updated' });
@@ -367,10 +343,24 @@ router.put('/profile/personal', ...studentOnly, async (req, res) => {
 router.put('/profile/address', ...studentOnly, async (req, res) => {
   try {
     const { street, city, state, country, postal_code } = req.body;
-    await User.update(
-      { street, city, state, country, postal_code },
-      { where: { id: req.user.id } }
+
+    const { sequelize } = require('../config/database');
+    const [cols] = await sequelize.query(
+      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users'`
     );
+    const existingCols = cols.map(c => c.COLUMN_NAME);
+
+    const allAddr = { street, city, state, country, postal_code };
+    const updateData = {};
+    Object.keys(allAddr).forEach(k => {
+      if (existingCols.includes(k)) updateData[k] = allAddr[k];
+    });
+
+    if (Object.keys(updateData).length > 0) {
+      await User.update(updateData, { where: { id: req.user.id } });
+    }
+
     return res.json({ success: true, message: 'Address updated' });
   } catch (error) {
     console.error('Error updating address:', error);
@@ -385,10 +375,24 @@ router.put('/profile/address', ...studentOnly, async (req, res) => {
 router.put('/profile/social', ...studentOnly, async (req, res) => {
   try {
     const { linkedin, github, twitter, portfolio } = req.body;
-    await User.update(
-      { linkedin, github, twitter, portfolio },
-      { where: { id: req.user.id } }
+
+    const { sequelize } = require('../config/database');
+    const [cols] = await sequelize.query(
+      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users'`
     );
+    const existingCols = cols.map(c => c.COLUMN_NAME);
+
+    const allSocial = { linkedin, github, twitter, portfolio };
+    const updateData = {};
+    Object.keys(allSocial).forEach(k => {
+      if (existingCols.includes(k)) updateData[k] = allSocial[k];
+    });
+
+    if (Object.keys(updateData).length > 0) {
+      await User.update(updateData, { where: { id: req.user.id } });
+    }
+
     return res.json({ success: true, message: 'Social links updated' });
   } catch (error) {
     console.error('Error updating social links:', error);
