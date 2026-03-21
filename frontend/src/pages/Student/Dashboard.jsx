@@ -2206,105 +2206,88 @@ function AIEnhancerTab() {
   const [error, setError] = useState("");
 
   const AGENT_URL = "https://upskill25-ai-enhancer.hf.space";
-
   const getToken = () => localStorage.getItem("token");
 
   const apiCall = async (method, path, body = null) => {
     const opts = {
       method,
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${getToken()}`,
-      },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${getToken()}` },
     };
     if (body) opts.body = JSON.stringify(body);
     const res = await fetch(`${AGENT_URL}${path}`, opts);
-    if (!res.ok) {
-      if (res.status === 404) return null;
-      throw new Error(`API error ${res.status}`);
-    }
+    if (!res.ok) { if (res.status === 404) return null; throw new Error(`API error ${res.status}`); }
     return res.json();
   };
 
-  useEffect(() => {
-    loadProfile();
-  }, []);
+  useEffect(() => { loadProfile(); }, []);
 
   const loadProfile = async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const data = await apiCall("GET", "/api/v1/profile/me");
-      setProfile(data);
-    } catch (err) {
-      setProfile(null);
-    }
+    setLoading(true); setError("");
+    try { const data = await apiCall("GET", "/api/v1/profile/me"); setProfile(data); }
+    catch (err) { setProfile(null); }
     setLoading(false);
   };
 
   const handleGenerate = async () => {
-    setGenerating(true);
-    setError("");
-    try {
-      await apiCall("POST", "/api/v1/profile/generate", { force_regenerate: !!profile });
-      await loadProfile();
-    } catch (err) {
-      setError("Profile generation failed. Please try again.");
-    }
+    setGenerating(true); setError("");
+    try { await apiCall("POST", "/api/v1/profile/generate", { force_regenerate: !!profile }); await loadProfile(); }
+    catch (err) { setError("Profile generation failed. Please try again."); }
     setGenerating(false);
   };
 
   const handleToggle = async () => {
     if (!profile) return;
     const newVis = profile.visibility === "public" ? "private" : "public";
-    try {
-      await apiCall("POST", "/api/v1/profile/toggle-visibility", { visibility: newVis });
-      await loadProfile();
-    } catch (err) {
-      setError("Failed to update visibility");
-    }
+    try { await apiCall("POST", "/api/v1/profile/toggle-visibility", { visibility: newVis }); await loadProfile(); }
+    catch (err) { setError("Failed to update visibility"); }
+  };
+
+  const handleViewProfile = () => {
+    if (!profile?.slug) return;
+    window.open(`${AGENT_URL}/api/v1/profile/public/${profile.slug}`, "_blank");
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-orange-500"></div>
+      <div className="flex flex-col items-center justify-center py-20 gap-4">
+        <div className="relative">
+          <div className="animate-spin rounded-full h-16 w-16 border-4 border-orange-200 border-t-orange-500"></div>
+          <Sparkles size={24} className="text-orange-500 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+        </div>
+        <p className="text-gray-500 text-sm font-medium">Loading your profile...</p>
       </div>
     );
   }
 
   if (!profile) {
     return (
-      <div className="text-center py-16">
-        <div className="w-20 h-20 bg-gradient-to-br from-orange-400 to-amber-500 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
-          <Sparkles size={36} className="text-white" />
+      <div className="text-center py-12">
+        <div className="relative mx-auto w-28 h-28 mb-8">
+          <div className="absolute inset-0 bg-gradient-to-br from-orange-400 to-amber-500 rounded-3xl rotate-6 opacity-20"></div>
+          <div className="relative w-28 h-28 bg-gradient-to-br from-orange-400 to-amber-500 rounded-3xl flex items-center justify-center shadow-2xl shadow-orange-200">
+            <Sparkles size={48} className="text-white" />
+          </div>
         </div>
-        <h3 className="text-2xl font-bold text-gray-800 mb-3">AI Profile Builder</h3>
-        <p className="text-gray-500 mb-2 max-w-lg mx-auto">
-          Generate a professional, recruiter-ready portfolio from your courses,
-          test scores, case studies, and achievements — in one click.
+        <h3 className="text-3xl font-extrabold text-gray-900 mb-3">AI Profile Builder</h3>
+        <p className="text-gray-500 mb-2 max-w-lg mx-auto text-base leading-relaxed">
+          Transform your learning journey into a stunning, recruiter-ready portfolio.
+          Our AI analyzes your courses, scores, and achievements to create a professional profile.
         </p>
-        <p className="text-gray-400 text-sm mb-8">Powered by AI • Takes ~20 seconds</p>
-        {error && (
-          <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm max-w-md mx-auto">{error}</div>
-        )}
-        <button
-          onClick={handleGenerate}
-          disabled={generating}
-          className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold py-4 px-10 rounded-xl transition-all disabled:opacity-50 shadow-lg hover:shadow-xl text-lg"
-        >
+        <div className="flex items-center justify-center gap-6 text-sm text-gray-400 mb-8">
+          <span className="flex items-center gap-1.5"><span className="w-2 h-2 bg-green-400 rounded-full"></span> AI Powered</span>
+          <span className="flex items-center gap-1.5"><span className="w-2 h-2 bg-blue-400 rounded-full"></span> ~20 seconds</span>
+          <span className="flex items-center gap-1.5"><span className="w-2 h-2 bg-purple-400 rounded-full"></span> Shareable</span>
+        </div>
+        {error && <div className="bg-red-50 text-red-600 p-4 rounded-xl mb-6 text-sm max-w-md mx-auto border border-red-100">{error}</div>}
+        <button onClick={handleGenerate} disabled={generating}
+          className="group bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold py-4 px-12 rounded-2xl transition-all disabled:opacity-50 shadow-xl shadow-orange-200 hover:shadow-2xl hover:shadow-orange-300 text-lg hover:-translate-y-0.5">
           {generating ? (
             <span className="flex items-center gap-3">
-              <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-              Generating Your Profile...
+              <svg className="animate-spin h-6 w-6" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+              Building Your Profile...
             </span>
           ) : (
-            <span className="flex items-center gap-2">
-              <Sparkles size={20} /> Generate My Profile
-            </span>
+            <span className="flex items-center gap-2"><Sparkles size={22} /> Generate My Profile</span>
           )}
         </button>
       </div>
@@ -2312,91 +2295,100 @@ function AIEnhancerTab() {
   }
 
   return (
-    <div className="space-y-6">
-      {error && (
-        <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm">{error}</div>
-      )}
+    <div className="space-y-5">
+      {error && <div className="bg-red-50 text-red-600 p-3 rounded-xl text-sm border border-red-100">{error}</div>}
 
-      {/* Controls */}
-      <div className="flex items-center justify-between flex-wrap gap-4 bg-gradient-to-r from-gray-50 to-orange-50 p-5 rounded-xl border border-orange-100">
-        <div>
-          <h3 className="text-lg font-bold text-gray-800">{profile.student_name || "My AI Profile"}</h3>
-          <p className="text-sm text-gray-500 mt-1">
-            Status: <span className="text-green-600 font-semibold">{profile.status}</span>
-            {" • "}
-            <span className={profile.visibility === "public" ? "text-blue-600 font-semibold" : "text-gray-500 font-semibold"}>
-              {profile.visibility?.toUpperCase()}
-            </span>
-            {" • "}
-            {profile.views || 0} views
-          </p>
-        </div>
-        <div className="flex gap-3">
-          <button onClick={handleToggle}
-            className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition ${
-              profile.visibility === "public"
-                ? "bg-gray-200 hover:bg-gray-300 text-gray-700"
-                : "bg-blue-600 hover:bg-blue-700 text-white"
-            }`}
-          >
-            {profile.visibility === "public" ? "Make Private" : "Make Public"}
-          </button>
-          <button onClick={handleGenerate} disabled={generating}
-            className="px-5 py-2.5 rounded-lg text-sm font-semibold bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-50"
-          >
-            {generating ? "Regenerating..." : "Regenerate"}
-          </button>
+      <div className="relative overflow-hidden bg-gradient-to-r from-[#1a1714] to-[#2c2824] rounded-2xl p-8 text-white">
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-orange-400 via-amber-400 to-orange-500"></div>
+        <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-bl from-orange-500/10 to-transparent rounded-full -translate-y-1/2 translate-x-1/2"></div>
+        <div className="relative flex items-start justify-between flex-wrap gap-6">
+          <div className="flex items-center gap-5">
+            <div className="w-16 h-16 bg-gradient-to-br from-orange-400 to-amber-500 rounded-2xl flex items-center justify-center text-2xl font-bold shadow-lg shadow-orange-500/20">
+              {(profile.student_name || "S")[0].toUpperCase()}
+            </div>
+            <div>
+              <h3 className="text-2xl font-bold">{profile.student_name || "Student"}</h3>
+              <p className="text-orange-300/80 text-sm mt-1 font-medium">Upskillize Professional Profile</p>
+              <div className="flex items-center gap-3 mt-2">
+                <span className={`text-xs font-bold px-3 py-1 rounded-full ${profile.visibility === "public" ? "bg-green-500/20 text-green-300" : "bg-gray-500/20 text-gray-400"}`}>
+                  {profile.visibility?.toUpperCase()}
+                </span>
+                <span className="text-xs text-gray-400">{profile.views || 0} views</span>
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button onClick={handleToggle} className="px-5 py-2.5 rounded-xl text-sm font-semibold transition bg-white/10 hover:bg-white/20 text-white border border-white/10">
+              {profile.visibility === "public" ? "Make Private" : "Make Public"}
+            </button>
+            <button onClick={handleViewProfile} className="px-5 py-2.5 rounded-xl text-sm font-semibold transition bg-white/10 hover:bg-white/20 text-white border border-white/10">
+              View Full Profile
+            </button>
+            <button onClick={handleGenerate} disabled={generating}
+              className="px-5 py-2.5 rounded-xl text-sm font-semibold transition bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white disabled:opacity-50 shadow-lg shadow-orange-500/20">
+              {generating ? "Regenerating..." : "Regenerate"}
+            </button>
+          </div>
         </div>
       </div>
 
       {profile.public_url && profile.visibility === "public" && (
-        <div className="flex items-center gap-3 p-4 bg-blue-50 rounded-xl border border-blue-100">
-          <span className="text-blue-600 text-sm font-semibold">Public URL:</span>
-          <a href={profile.public_url} target="_blank" rel="noopener noreferrer"
-            className="text-blue-600 underline text-sm truncate">{profile.public_url}</a>
-          <button onClick={() => { navigator.clipboard.writeText(profile.public_url); }}
-            className="ml-auto text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 px-4 py-1.5 rounded-lg font-semibold">
-            Copy
-          </button>
+        <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
+          <span className="text-lg">🔗</span>
+          <a href={profile.public_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700 underline text-sm font-medium truncate flex-1">{profile.public_url}</a>
+          <button onClick={() => { navigator.clipboard.writeText(profile.public_url); alert("Copied!"); }}
+            className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold transition">Copy Link</button>
         </div>
       )}
 
-      {/* Summary */}
       {profile.summary && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-          <h4 className="font-bold text-gray-700 mb-3 flex items-center gap-2">
-            <span className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center text-orange-600 text-sm">✦</span>
-            Professional Summary
-          </h4>
-          <p className="text-gray-600 leading-relaxed">{profile.summary}</p>
+        <div className="bg-white rounded-2xl border border-gray-100 p-7 shadow-sm hover:shadow-md transition-shadow">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 bg-gradient-to-br from-orange-100 to-amber-100 rounded-xl flex items-center justify-center"><span className="text-orange-600 text-lg font-bold">✦</span></div>
+            <h4 className="font-bold text-gray-800 text-lg">Professional Summary</h4>
+          </div>
+          <p className="text-gray-600 leading-relaxed text-[15px]">{profile.summary}</p>
         </div>
       )}
 
-      {/* Skills */}
+      {profile.performance && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {[
+            { label: "Overall Score", value: `${profile.performance.overall_score || 0}%`, icon: "🎯", gradient: "from-orange-50 to-amber-50", border: "border-orange-100", text: "text-orange-600" },
+            { label: "Tests Taken", value: profile.performance.total_tests || 0, icon: "📝", gradient: "from-blue-50 to-indigo-50", border: "border-blue-100", text: "text-blue-600" },
+            { label: "Case Studies", value: profile.performance.total_case_studies || 0, icon: "📋", gradient: "from-emerald-50 to-green-50", border: "border-emerald-100", text: "text-emerald-600" },
+            { label: "Courses", value: profile.performance.total_courses || 0, icon: "📚", gradient: "from-purple-50 to-violet-50", border: "border-purple-100", text: "text-purple-600" },
+          ].map((item, i) => (
+            <div key={i} className={`bg-gradient-to-br ${item.gradient} rounded-2xl p-5 border ${item.border} text-center hover:shadow-md transition-shadow`}>
+              <div className="text-2xl mb-2">{item.icon}</div>
+              <div className={`text-3xl font-extrabold ${item.text}`}>{item.value}</div>
+              <div className="text-xs text-gray-500 mt-1.5 font-semibold uppercase tracking-wider">{item.label}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {profile.skills && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-          <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
-            <span className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600 text-sm">⚡</span>
-            Key Skills & Competencies
-          </h4>
+        <div className="bg-white rounded-2xl border border-gray-100 p-7 shadow-sm hover:shadow-md transition-shadow">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-xl flex items-center justify-center"><span className="text-blue-600 text-lg">⚡</span></div>
+            <h4 className="font-bold text-gray-800 text-lg">Skills & Competencies</h4>
+          </div>
           {["technical_skills", "tools", "soft_skills", "domain_knowledge"].map((cat) => {
             const items = profile.skills[cat];
             if (!items || items.length === 0) return null;
             return (
-              <div key={cat} className="mb-5">
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">
-                  {cat.replace(/_/g, " ")}
-                </p>
+              <div key={cat} className="mb-6 last:mb-0">
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">{cat.replace(/_/g, " ")}</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {items.map((s, i) => (
-                    <div key={i} className="flex items-center justify-between bg-gray-50 rounded-lg px-4 py-3">
-                      <span className="text-sm font-medium text-gray-700">{s.name}</span>
-                      <div className="flex items-center gap-2">
-                        <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
-                          <div className="h-full bg-gradient-to-r from-orange-400 to-amber-500 rounded-full"
-                            style={{ width: `${s.score}%` }} />
+                    <div key={i} className="group flex items-center justify-between bg-gray-50 hover:bg-orange-50/50 rounded-xl px-4 py-3 transition-colors border border-transparent hover:border-orange-100">
+                      <span className="text-sm font-semibold text-gray-700 group-hover:text-gray-900">{s.name}</span>
+                      <div className="flex items-center gap-3">
+                        <div className="w-28 h-2.5 bg-gray-200 rounded-full overflow-hidden">
+                          <div className="h-full bg-gradient-to-r from-orange-400 to-amber-400 rounded-full" style={{ width: `${s.score}%` }} />
                         </div>
-                        <span className="text-xs font-bold text-gray-500 w-10 text-right">{s.score}%</span>
+                        <span className="text-xs font-bold text-orange-600 w-10 text-right">{s.score}%</span>
                       </div>
                     </div>
                   ))}
@@ -2407,75 +2399,43 @@ function AIEnhancerTab() {
         </div>
       )}
 
-      {/* Performance */}
-      {profile.performance && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-          <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
-            <span className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center text-green-600 text-sm">📊</span>
-            Performance Highlights
-          </h4>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            {[
-              { label: "Overall Score", value: `${profile.performance.overall_score || 0}%`, color: "from-orange-400 to-amber-500" },
-              { label: "Tests Taken", value: profile.performance.total_tests || 0, color: "from-blue-400 to-blue-600" },
-              { label: "Case Studies", value: profile.performance.total_case_studies || 0, color: "from-green-400 to-emerald-500" },
-              { label: "Courses", value: profile.performance.total_courses || 0, color: "from-purple-400 to-purple-600" },
-            ].map((item, i) => (
-              <div key={i} className="text-center p-5 bg-gray-50 rounded-xl border border-gray-100">
-                <div className={`text-3xl font-bold bg-gradient-to-r ${item.color} bg-clip-text text-transparent`}>
-                  {item.value}
-                </div>
-                <div className="text-xs text-gray-500 mt-2 font-semibold">{item.label}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Case Studies */}
-      {profile.case_studies && profile.case_studies.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-          <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
-            <span className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center text-emerald-600 text-sm">📋</span>
-            Top Case Studies
-          </h4>
-          {profile.case_studies.map((cs, i) => (
-            <div key={i} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg mb-3 border border-gray-100">
-              <div>
-                <p className="font-semibold text-gray-700 text-sm">{cs.title}</p>
-                {cs.feedback_summary && <p className="text-xs text-gray-400 mt-1 italic">{cs.feedback_summary}</p>}
-              </div>
-              <span className="text-green-600 font-bold text-sm">{cs.score}/{cs.max_score}</span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Personality */}
       {profile.personality && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-          <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
-            <span className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center text-purple-600 text-sm">🧠</span>
-            Personality & Work Style
-          </h4>
-          <div className="inline-flex items-center gap-2 px-5 py-2.5 bg-purple-50 rounded-full text-purple-700 font-bold text-sm mb-4 border border-purple-100">
+        <div className="bg-white rounded-2xl border border-gray-100 p-7 shadow-sm hover:shadow-md transition-shadow">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="w-10 h-10 bg-gradient-to-br from-purple-100 to-violet-100 rounded-xl flex items-center justify-center"><span className="text-purple-600 text-lg">🧠</span></div>
+            <h4 className="font-bold text-gray-800 text-lg">Personality & Work Style</h4>
+          </div>
+          <div className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-purple-50 to-violet-50 rounded-2xl text-purple-700 font-bold text-sm mb-5 border border-purple-100">
             🎯 {profile.personality.personality_type}
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {[
-              { label: "Traits", value: profile.personality.traits },
-              { label: "Work Style", value: profile.personality.work_style },
-              { label: "Communication", value: profile.personality.communication },
-              { label: "Leadership", value: profile.personality.leadership },
+              { label: "Key Traits", value: profile.personality.traits, icon: "💡" },
+              { label: "Work Style", value: profile.personality.work_style, icon: "⚙️" },
+              { label: "Communication", value: profile.personality.communication, icon: "💬" },
+              { label: "Leadership", value: profile.personality.leadership, icon: "👑" },
             ].map((item, i) => item.value ? (
-              <div key={i} className="p-4 bg-gray-50 rounded-lg border border-gray-100">
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">{item.label}</p>
+              <div key={i} className="p-4 bg-gray-50 rounded-xl border border-gray-100 hover:border-purple-100 transition-colors">
+                <div className="flex items-center gap-2 mb-2"><span>{item.icon}</span><p className="text-xs font-bold text-gray-400 uppercase tracking-wider">{item.label}</p></div>
                 <p className="text-sm font-medium text-gray-700">{item.value}</p>
               </div>
             ) : null)}
           </div>
         </div>
       )}
+
+      <div className="flex items-center justify-center gap-4 pt-4 pb-2">
+        <button onClick={handleViewProfile}
+          className="flex items-center gap-2 bg-gradient-to-r from-[#1a1714] to-[#2c2824] hover:from-[#2c2824] hover:to-[#3c3834] text-white font-bold py-3 px-8 rounded-xl transition-all shadow-lg hover:shadow-xl text-sm">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          View & Download Profile
+        </button>
+        <button onClick={() => { if(profile.public_url) { navigator.clipboard.writeText(profile.public_url); alert("Profile link copied!"); } }}
+          className="flex items-center gap-2 bg-white hover:bg-gray-50 text-gray-700 font-bold py-3 px-8 rounded-xl transition-all border-2 border-gray-200 hover:border-gray-300 text-sm">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+          Share Profile
+        </button>
+      </div>
     </div>
   );
 }
