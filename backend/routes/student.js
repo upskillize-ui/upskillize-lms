@@ -305,10 +305,11 @@ router.put('/profile/personal', ...studentOnly, async (req, res) => {
       date_of_birth,
       gender,
       bio,
-      profile_photo   // ✅ now extracted and saved
+      profile_photo
     } = req.body;
 
-    const updateData = {
+    // Only include fields that exist in the users table
+    const allUpdates = {
       full_name:     full_name?.trim()    || null,
       phone:         phone?.trim()        || null,
       date_of_birth: date_of_birth        || null,
@@ -316,12 +317,40 @@ router.put('/profile/personal', ...studentOnly, async (req, res) => {
       bio:           bio?.trim()          || null,
     };
 
-    // Only update photo if one was actually sent (base64 or URL)
     if (profile_photo) {
-      updateData.profile_photo = profile_photo;
+      allUpdates.profile_photo = profile_photo;
     }
 
-    await User.update(updateData, { where: { id: req.user.id } });
+    // Get actual columns in users table to avoid saving dropped columns
+    const { sequelize } = require('../config/database');
+    const [cols] = await sequelize.query(
+      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS 
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users'`
+    );
+    const existingCols = cols.map(c => c.COLUMN_NAME);
+
+    // Filter updateData to only include existing columns
+    const updateData = {};
+    Object.keys(allUpdates).forEach(key => {
+      if (existingCols.includes(key)) {
+        updateData[key] = allUpdates[key];
+      }
+    });
+
+    if (Object.keys(updateData).length > 0) {
+      const { sequelize } = require('../config/database');
+    const [cols] = await sequelize.query(
+      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS 
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users'`
+    );
+    const existingCols = cols.map(c => c.COLUMN_NAME);
+    const allAddr = { street, city, state, country, postal_code };
+    const updateData = {};
+    Object.keys(allAddr).forEach(k => { if (existingCols.includes(k)) updateData[k] = allAddr[k]; });
+    if (Object.keys(updateData).length > 0) {
+      await User.update(updateData, { where: { id: req.user.id } });
+    }
+    }
 
     return res.json({ success: true, message: 'Personal info updated' });
   } catch (error) {

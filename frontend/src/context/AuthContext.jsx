@@ -180,6 +180,7 @@ export const AuthProvider = ({ children }) => {
       setToken(null);
       localStorage.removeItem('token');
       localStorage.removeItem('user');
+      localStorage.removeItem('upskillize_profile_cache');
       delete api.defaults.headers.common['Authorization'];
 
       console.log('✅ Logged out successfully');

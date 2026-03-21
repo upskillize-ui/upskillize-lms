@@ -1240,7 +1240,16 @@ function ProfileManagement() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState({ type:"",text:"" });
   const [profileCompletion, setProfileCompletion] = useState(0);
-  const [personalInfo, setPersonalInfo] = useState({ full_name:user?.full_name||"",email:user?.email||"",phone:"",date_of_birth:"",gender:"",profile_photo:null,bio:"" });
+  const cached = JSON.parse(localStorage.getItem('upskillize_profile_cache') || '{}');
+  const [personalInfo, setPersonalInfo] = useState({ 
+    full_name: cached.full_name || user?.full_name || "",
+    email: cached.email || user?.email || "",
+    phone: cached.phone || "",
+    date_of_birth: cached.date_of_birth || "",
+    gender: cached.gender || "",
+    profile_photo: cached.profile_photo || null,
+    bio: cached.bio || ""
+  });
   const [address, setAddress] = useState({ street:"",city:"",state:"",country:"",postal_code:"" });
   const [security, setSecurity] = useState({ current_password:"",new_password:"",confirm_password:"" });
   const [showPwd, setShowPwd] = useState({ current:false,new_:false });
@@ -1252,15 +1261,21 @@ function ProfileManagement() {
   const [psychoDone, setPsychoDone] = useState(false);
   const [psychoResult, setPsychoResult] = useState(null);
 
-  useEffect(() => {
+   useEffect(() => {
+    const cached = JSON.parse(localStorage.getItem('upskillize_profile_cache') || '{}');
+    const hasCached = Object.keys(cached).length > 0;
+    
     api.get("/student/profile/complete").then(r => {
       if (r.data.success) {
         const d = r.data.profile;
-        if (d.personal) setPersonalInfo(p => ({ ...p,...d.personal }));
+        // Only update personalInfo from API if no local cache exists
+        if (d.personal && !hasCached) {
+          setPersonalInfo(p => ({ ...p, ...d.personal }));
+        }
         if (d.address)  setAddress(d.address);
         if (d.social)   setSocialLinks(d.social);
         if (d.corporate_visible !== undefined) setCorporateVisible(d.corporate_visible);
-        if (d.resume_url) setResume(r => ({ ...r,uploadedUrl:d.resume_url,uploadedName:d.resume_name }));
+        if (d.resume_url) setResume(r => ({ ...r, uploadedUrl: d.resume_url, uploadedName: d.resume_name }));
         if (d.psycho_result) { setPsychoResult(d.psycho_result); setPsychoDone(true); }
       }
     }).catch(()=>{});
@@ -1390,7 +1405,12 @@ function ProfileManagement() {
                 </div>
               </div>
               <div style={{ display:"flex",gap:8 }}>
-                <button className="mba-btn-primary" onClick={save(async () => { const r = await api.put("/student/profile/personal",personalInfo); if (r.data.success) { showMsg("success","Personal information saved!"); if (updateUser) updateUser({ full_name:personalInfo.full_name }); } })} disabled={saving}><Save size={13} /> {saving?"Saving...":"Save Personal Info"}</button>
+                <button className="mba-btn-primary" onClick={save(async () => { const r = await api.put("/student/profile/personal", personalInfo); 
+                  if (r.data.success) { 
+                    showMsg("success", "Personal information saved!"); 
+                    localStorage.setItem('upskillize_profile_cache', JSON.stringify(personalInfo));
+                    if (updateUser) updateUser({ full_name: personalInfo.full_name, phone: personalInfo.phone, gender: personalInfo.gender, bio: personalInfo.bio }); 
+                      }})} disabled={saving}><Save size={13} /> {saving?"Saving...":"Save Personal Info"}</button>
               </div>
             </div>
           )}
