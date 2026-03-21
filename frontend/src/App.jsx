@@ -1,11 +1,14 @@
+import AIProfile from "./pages/Student/AIProfile";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import StudentDashboard from "./pages/Student/Dashboard";
 import TestGen from "./pages/Student/TestGen";
+import CaseStudyReview from "./pages/Student/CaseStudyReview";
 import FacultyDashboard from "./pages/Faculty/Dashboard";
 import AdminDashboard from "./pages/Admin/Dashboard";
+
 
 import BrowseCourses from "./pages/BrowseCourses";
 import CourseView from "./pages/CourseView";
@@ -80,6 +83,24 @@ function AppRoutes() {
         element={
           <PrivateRoute allowedRoles={["student"]}>
             <TestGen />
+          </PrivateRoute>
+        }
+      />
+      
+        <Route
+        path="/student/ai-profile"
+        element={
+          <PrivateRoute allowedRoles={["student"]}>
+            <AIProfile />
+          </PrivateRoute>
+        }
+      />        
+
+      <Route
+        path="/student/case-study"
+        element={
+          <PrivateRoute allowedRoles={["student"]}>
+            <CaseStudyReview />
           </PrivateRoute>
         }
       />
