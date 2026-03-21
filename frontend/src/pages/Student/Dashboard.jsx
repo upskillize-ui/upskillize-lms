@@ -84,7 +84,7 @@ import {
   Archive,
   FilePlus,
   ChevronLeft,
-} from "lucide-react";
+ Sparkles} from "lucide-react";
 
 // ==================== CIRCULAR PROGRESS ====================
 function CircularProgress({ percentage, size = 120, strokeWidth = 8 }) {
@@ -1663,6 +1663,7 @@ function ProfileManagement() {
     { id: "security", label: "Security", icon: Shield },
     { id: "preferences", label: "Preferences", icon: Globe },
     { id: "social", label: "Social Links", icon: LinkIcon },
+    { id: "ai_enhancer", label: "AI Enhancer", icon: Sparkles },
   ];
 
   return (
@@ -2185,8 +2186,296 @@ function ProfileManagement() {
               </button>
             </div>
           )}
+
+          {activeTab === "ai_enhancer" && (
+            <div className="space-y-6">
+              <AIEnhancerTab />
+            </div>
+          )}
         </div>
       </div>
+    </div>
+  );
+}
+
+// ==================== AI ENHANCER TAB ====================
+function AIEnhancerTab() {
+  const [profile, setProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState("");
+
+  const AGENT_URL = "https://upskill25-ai-enhancer.hf.space";
+
+  const getToken = () => localStorage.getItem("token");
+
+  const apiCall = async (method, path, body = null) => {
+    const opts = {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${getToken()}`,
+      },
+    };
+    if (body) opts.body = JSON.stringify(body);
+    const res = await fetch(`${AGENT_URL}${path}`, opts);
+    if (!res.ok) {
+      if (res.status === 404) return null;
+      throw new Error(`API error ${res.status}`);
+    }
+    return res.json();
+  };
+
+  useEffect(() => {
+    loadProfile();
+  }, []);
+
+  const loadProfile = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const data = await apiCall("GET", "/api/v1/profile/me");
+      setProfile(data);
+    } catch (err) {
+      setProfile(null);
+    }
+    setLoading(false);
+  };
+
+  const handleGenerate = async () => {
+    setGenerating(true);
+    setError("");
+    try {
+      await apiCall("POST", "/api/v1/profile/generate", { force_regenerate: !!profile });
+      await loadProfile();
+    } catch (err) {
+      setError("Profile generation failed. Please try again.");
+    }
+    setGenerating(false);
+  };
+
+  const handleToggle = async () => {
+    if (!profile) return;
+    const newVis = profile.visibility === "public" ? "private" : "public";
+    try {
+      await apiCall("POST", "/api/v1/profile/toggle-visibility", { visibility: newVis });
+      await loadProfile();
+    } catch (err) {
+      setError("Failed to update visibility");
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-orange-500"></div>
+      </div>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <div className="text-center py-16">
+        <div className="w-20 h-20 bg-gradient-to-br from-orange-400 to-amber-500 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
+          <Sparkles size={36} className="text-white" />
+        </div>
+        <h3 className="text-2xl font-bold text-gray-800 mb-3">AI Profile Builder</h3>
+        <p className="text-gray-500 mb-2 max-w-lg mx-auto">
+          Generate a professional, recruiter-ready portfolio from your courses,
+          test scores, case studies, and achievements — in one click.
+        </p>
+        <p className="text-gray-400 text-sm mb-8">Powered by AI • Takes ~20 seconds</p>
+        {error && (
+          <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm max-w-md mx-auto">{error}</div>
+        )}
+        <button
+          onClick={handleGenerate}
+          disabled={generating}
+          className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold py-4 px-10 rounded-xl transition-all disabled:opacity-50 shadow-lg hover:shadow-xl text-lg"
+        >
+          {generating ? (
+            <span className="flex items-center gap-3">
+              <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              Generating Your Profile...
+            </span>
+          ) : (
+            <span className="flex items-center gap-2">
+              <Sparkles size={20} /> Generate My Profile
+            </span>
+          )}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {error && (
+        <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm">{error}</div>
+      )}
+
+      {/* Controls */}
+      <div className="flex items-center justify-between flex-wrap gap-4 bg-gradient-to-r from-gray-50 to-orange-50 p-5 rounded-xl border border-orange-100">
+        <div>
+          <h3 className="text-lg font-bold text-gray-800">{profile.student_name || "My AI Profile"}</h3>
+          <p className="text-sm text-gray-500 mt-1">
+            Status: <span className="text-green-600 font-semibold">{profile.status}</span>
+            {" • "}
+            <span className={profile.visibility === "public" ? "text-blue-600 font-semibold" : "text-gray-500 font-semibold"}>
+              {profile.visibility?.toUpperCase()}
+            </span>
+            {" • "}
+            {profile.views || 0} views
+          </p>
+        </div>
+        <div className="flex gap-3">
+          <button onClick={handleToggle}
+            className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition ${
+              profile.visibility === "public"
+                ? "bg-gray-200 hover:bg-gray-300 text-gray-700"
+                : "bg-blue-600 hover:bg-blue-700 text-white"
+            }`}
+          >
+            {profile.visibility === "public" ? "Make Private" : "Make Public"}
+          </button>
+          <button onClick={handleGenerate} disabled={generating}
+            className="px-5 py-2.5 rounded-lg text-sm font-semibold bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-50"
+          >
+            {generating ? "Regenerating..." : "Regenerate"}
+          </button>
+        </div>
+      </div>
+
+      {profile.public_url && profile.visibility === "public" && (
+        <div className="flex items-center gap-3 p-4 bg-blue-50 rounded-xl border border-blue-100">
+          <span className="text-blue-600 text-sm font-semibold">Public URL:</span>
+          <a href={profile.public_url} target="_blank" rel="noopener noreferrer"
+            className="text-blue-600 underline text-sm truncate">{profile.public_url}</a>
+          <button onClick={() => { navigator.clipboard.writeText(profile.public_url); }}
+            className="ml-auto text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 px-4 py-1.5 rounded-lg font-semibold">
+            Copy
+          </button>
+        </div>
+      )}
+
+      {/* Summary */}
+      {profile.summary && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+          <h4 className="font-bold text-gray-700 mb-3 flex items-center gap-2">
+            <span className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center text-orange-600 text-sm">✦</span>
+            Professional Summary
+          </h4>
+          <p className="text-gray-600 leading-relaxed">{profile.summary}</p>
+        </div>
+      )}
+
+      {/* Skills */}
+      {profile.skills && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+          <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
+            <span className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600 text-sm">⚡</span>
+            Key Skills & Competencies
+          </h4>
+          {["technical_skills", "tools", "soft_skills", "domain_knowledge"].map((cat) => {
+            const items = profile.skills[cat];
+            if (!items || items.length === 0) return null;
+            return (
+              <div key={cat} className="mb-5">
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">
+                  {cat.replace(/_/g, " ")}
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {items.map((s, i) => (
+                    <div key={i} className="flex items-center justify-between bg-gray-50 rounded-lg px-4 py-3">
+                      <span className="text-sm font-medium text-gray-700">{s.name}</span>
+                      <div className="flex items-center gap-2">
+                        <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
+                          <div className="h-full bg-gradient-to-r from-orange-400 to-amber-500 rounded-full"
+                            style={{ width: `${s.score}%` }} />
+                        </div>
+                        <span className="text-xs font-bold text-gray-500 w-10 text-right">{s.score}%</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Performance */}
+      {profile.performance && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+          <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
+            <span className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center text-green-600 text-sm">📊</span>
+            Performance Highlights
+          </h4>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {[
+              { label: "Overall Score", value: `${profile.performance.overall_score || 0}%`, color: "from-orange-400 to-amber-500" },
+              { label: "Tests Taken", value: profile.performance.total_tests || 0, color: "from-blue-400 to-blue-600" },
+              { label: "Case Studies", value: profile.performance.total_case_studies || 0, color: "from-green-400 to-emerald-500" },
+              { label: "Courses", value: profile.performance.total_courses || 0, color: "from-purple-400 to-purple-600" },
+            ].map((item, i) => (
+              <div key={i} className="text-center p-5 bg-gray-50 rounded-xl border border-gray-100">
+                <div className={`text-3xl font-bold bg-gradient-to-r ${item.color} bg-clip-text text-transparent`}>
+                  {item.value}
+                </div>
+                <div className="text-xs text-gray-500 mt-2 font-semibold">{item.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Case Studies */}
+      {profile.case_studies && profile.case_studies.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+          <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
+            <span className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center text-emerald-600 text-sm">📋</span>
+            Top Case Studies
+          </h4>
+          {profile.case_studies.map((cs, i) => (
+            <div key={i} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg mb-3 border border-gray-100">
+              <div>
+                <p className="font-semibold text-gray-700 text-sm">{cs.title}</p>
+                {cs.feedback_summary && <p className="text-xs text-gray-400 mt-1 italic">{cs.feedback_summary}</p>}
+              </div>
+              <span className="text-green-600 font-bold text-sm">{cs.score}/{cs.max_score}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Personality */}
+      {profile.personality && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+          <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
+            <span className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center text-purple-600 text-sm">🧠</span>
+            Personality & Work Style
+          </h4>
+          <div className="inline-flex items-center gap-2 px-5 py-2.5 bg-purple-50 rounded-full text-purple-700 font-bold text-sm mb-4 border border-purple-100">
+            🎯 {profile.personality.personality_type}
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {[
+              { label: "Traits", value: profile.personality.traits },
+              { label: "Work Style", value: profile.personality.work_style },
+              { label: "Communication", value: profile.personality.communication },
+              { label: "Leadership", value: profile.personality.leadership },
+            ].map((item, i) => item.value ? (
+              <div key={i} className="p-4 bg-gray-50 rounded-lg border border-gray-100">
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">{item.label}</p>
+                <p className="text-sm font-medium text-gray-700">{item.value}</p>
+              </div>
+            ) : null)}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
