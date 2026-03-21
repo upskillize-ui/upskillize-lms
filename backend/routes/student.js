@@ -346,7 +346,11 @@ router.put('/profile/address', ...studentOnly, async (req, res) => {
 
     const { sequelize } = require('../config/database');
     const [cols] = await sequelize.query(
+<<<<<<< Updated upstream
       `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+=======
+      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS 
+>>>>>>> Stashed changes
        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users'`
     );
     const existingCols = cols.map(c => c.COLUMN_NAME);

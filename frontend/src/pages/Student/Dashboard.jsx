@@ -1409,7 +1409,13 @@ function ProfileManagement() {
                   if (r.data.success) { 
                     showMsg("success", "Personal information saved!"); 
                     localStorage.setItem('upskillize_profile_cache', JSON.stringify(personalInfo));
-                    if (updateUser) updateUser({ full_name: personalInfo.full_name, phone: personalInfo.phone, gender: personalInfo.gender, bio: personalInfo.bio }); 
+                    if (updateUser) updateUser({ 
+                      full_name: personalInfo.full_name, 
+                      phone: personalInfo.phone, 
+                      gender: personalInfo.gender,
+                      bio: personalInfo.bio,
+                      profile_photo: personalInfo.profile_photo || null
+                    }); 
                       }})} disabled={saving}><Save size={13} /> {saving?"Saving...":"Save Personal Info"}</button>
               </div>
             </div>
