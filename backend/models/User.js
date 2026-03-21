@@ -32,7 +32,7 @@ const User = sequelize.define('User', {
     type: DataTypes.STRING(20),
   },
   profile_photo: {
-    type: DataTypes.STRING(255),
+    type: DataTypes.TEXT('long'),
   },
   is_active: {
     type:         DataTypes.BOOLEAN,

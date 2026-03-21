@@ -299,6 +299,7 @@ router.get('/profile/complete', ...studentOnly, async (req, res) => {
 // ============================================================
 router.put('/profile/personal', ...studentOnly, async (req, res) => {
   try {
+    console.log('🔍 BODY KEYS:', Object.keys(req.body), 'USER:', req.user?.id);
     const {
       full_name,
       phone,
