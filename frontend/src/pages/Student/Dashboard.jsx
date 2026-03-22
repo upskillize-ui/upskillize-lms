@@ -7,7 +7,7 @@ import { useAuth } from "../../context/AuthContext";
 import api from "../../services/api";
 import CoursePlayer from "./CoursePlayer";
 import BrowseCourses from "../../pages/BrowseCourses";
-import StudentAssignments from "../../pages/Student/StudentAssignments";
+import StudentAssignments from "./StudentAssignments";
 import {
   BookOpen, TrendingUp, Award, PlayCircle, Clock, Bell,
   MessageSquare, HelpCircle, CreditCard, BarChart3, Download,
@@ -3070,6 +3070,204 @@ function SystemSettings() {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── STUDENT ASSESSMENTS (Quiz/MCQ) — stays inside Dashboard ─────────────
+function StudentAssessments() {
+  const [quizzes, setQuizzes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [activeQuiz, setActiveQuiz] = useState(null);
+  const [answers, setAnswers] = useState({});
+  const [submitted, setSubmitted] = useState(false);
+  const [result, setResult] = useState(null);
+  const [attempts, setAttempts] = useState([]);
+  const [tab, setTab] = useState("available");
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [ar, qr] = await Promise.allSettled([
+          api.get("/quizzes/available"),
+          api.get("/quizzes/my-attempts"),
+        ]);
+        if (ar.status==="fulfilled" && ar.value.data.success)
+          setQuizzes(ar.value.data.quizzes || []);
+        if (qr.status==="fulfilled" && qr.value.data.success)
+          setAttempts(qr.value.data.attempts || []);
+      } catch {}
+      setLoading(false);
+    };
+    load();
+  }, []);
+
+  const startQuiz = (quiz) => {
+    setActiveQuiz(quiz);
+    setAnswers({});
+    setSubmitted(false);
+    setResult(null);
+  };
+
+  const submitQuiz = async () => {
+    if (!activeQuiz) return;
+    try {
+      const r = await api.post(`/quizzes/${activeQuiz.id}/submit`, { answers });
+      if (r.data.success) { setResult(r.data); setSubmitted(true); }
+    } catch {
+      const questions = activeQuiz.questions || [];
+      let correct = 0;
+      questions.forEach((q, i) => {
+        if (answers[i] === q.correct_answer || answers[i] === q.correctAnswer) correct++;
+      });
+      const score = questions.length > 0 ? Math.round((correct / questions.length) * 100) : 0;
+      setResult({ score, correct, total: questions.length });
+      setSubmitted(true);
+    }
+  };
+
+  if (loading) return <Spinner />;
+
+  // ── Quiz attempt in progress ──
+  if (activeQuiz && !submitted) {
+    const questions = activeQuiz.questions || [];
+    const answered = Object.keys(answers).length;
+    return (
+      <div style={{ maxWidth:720 }}>
+        <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16 }}>
+          <div>
+            <h2 className="mba-section-title">{activeQuiz.title}</h2>
+            <p className="mba-section-sub">{answered}/{questions.length} answered</p>
+          </div>
+          <button className="mba-btn-ghost" onClick={() => setActiveQuiz(null)}>✕ Exit</button>
+        </div>
+        <div className="mba-bar-track" style={{ marginBottom:20 }}>
+          <div className="mba-bar-fill" style={{ width:`${questions.length>0?(answered/questions.length)*100:0}%`,background:T.navy }} />
+        </div>
+        {questions.map((q, qi) => (
+          <div key={qi} className="mba-card" style={{ marginBottom:12,padding:20 }}>
+            <p style={{ fontSize:14,fontWeight:700,color:T.navy,marginBottom:12 }}>
+              Q{qi+1}. {q.question || q.text}
+            </p>
+            <div style={{ display:"flex",flexDirection:"column",gap:8 }}>
+              {(q.options || q.choices || []).map((opt, oi) => (
+                <button key={oi}
+                  className={`mba-quiz-option ${answers[qi]===oi?"selected":""}`}
+                  onClick={() => setAnswers(a => ({...a,[qi]:oi}))}>
+                  <span style={{ width:22,height:22,borderRadius:"50%",border:`2px solid ${answers[qi]===oi?T.navy:T.border}`,background:answers[qi]===oi?T.navy:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0 }}>
+                    {answers[qi]===oi && <div style={{ width:8,height:8,borderRadius:"50%",background:"#fff" }}/>}
+                  </span>
+                  <span style={{ fontSize:13 }}>{typeof opt==="object"?opt.text:opt}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+        <div style={{ display:"flex",gap:8,marginTop:8 }}>
+          <button className="mba-btn-ghost" onClick={() => setActiveQuiz(null)}>Cancel</button>
+          <button className="mba-btn-primary" style={{ flex:1,justifyContent:"center" }}
+            disabled={answered < questions.length} onClick={submitQuiz}>
+            <CheckCircle size={13}/> Submit Assessment
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Result view ──
+  if (submitted && result) {
+    const score = result.score ?? 0;
+    return (
+      <div style={{ maxWidth:520 }}>
+        <h2 className="mba-section-title" style={{ marginBottom:20 }}>Assessment Complete!</h2>
+        <div className="mba-card" style={{ padding:32,textAlign:"center",marginBottom:16 }}>
+          <div style={{ width:90,height:90,borderRadius:"50%",background:score>=75?T.greenSoft:score>=50?T.goldSoft:T.redSoft,border:`3px solid ${score>=75?T.green:score>=50?T.gold:T.red}`,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px" }}>
+            <span style={{ fontSize:26,fontWeight:800,color:score>=75?T.green:score>=50?T.gold:T.red }}>{score}%</span>
+          </div>
+          <h3 style={{ fontSize:18,fontWeight:800,color:T.navy,marginBottom:6 }}>
+            {score>=75?"Excellent! 🎉":score>=50?"Good effort! 👍":"Keep practising! 💪"}
+          </h3>
+          {result.correct!=null && (
+            <p style={{ fontSize:13,color:T.muted }}>{result.correct} of {result.total} correct</p>
+          )}
+        </div>
+        <div style={{ display:"flex",gap:8 }}>
+          <button className="mba-btn-ghost" onClick={() => { setActiveQuiz(null); setSubmitted(false); }}>
+            ← Back to Assessments
+          </button>
+          <button className="mba-btn-primary" style={{ flex:1,justifyContent:"center" }}
+            onClick={() => startQuiz(activeQuiz)}>
+            <RefreshCw size={13}/> Retake
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Main list view ──
+  return (
+    <div>
+      <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20 }}>
+        <div>
+          <h2 className="mba-section-title">Assessments</h2>
+          <p className="mba-section-sub">Online quizzes and MCQ tests</p>
+        </div>
+        <div className="mba-tabs">
+          {[["available","Available"],["attempts","My Attempts"]].map(([v,l]) => (
+            <button key={v} className={`mba-tab ${tab===v?"active":""}`} onClick={()=>setTab(v)}>{l}</button>
+          ))}
+        </div>
+      </div>
+
+      {tab==="available" && (
+        quizzes.length===0
+          ? <div className="mba-card mba-empty"><ClipboardList size={36} style={{color:T.border,margin:"0 auto 8px"}}/><p>No assessments available yet</p></div>
+          : <div style={{ display:"flex",flexDirection:"column",gap:12 }}>
+              {quizzes.map(q => (
+                <div key={q.id} className="mba-card" style={{ padding:18 }}>
+                  <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10 }}>
+                    <div>
+                      <h3 style={{ fontSize:15,fontWeight:700,color:T.navy,marginBottom:4 }}>{q.title}</h3>
+                      <p style={{ fontSize:13,color:T.muted }}>{q.course_name||q.course}</p>
+                    </div>
+                    <span className="mba-pill mba-pill-navy" style={{ fontSize:11 }}>
+                      {q.questions?.length||q.question_count||0} Qs
+                    </span>
+                  </div>
+                  <div style={{ display:"flex",gap:14,fontSize:12,color:T.subtle,marginBottom:14 }}>
+                    <span style={{ display:"flex",alignItems:"center",gap:3 }}><Timer size={11}/> {q.duration_minutes||15} min</span>
+                    <span style={{ display:"flex",alignItems:"center",gap:3 }}><Award size={11}/> Pass: {q.passing_score||60}%</span>
+                  </div>
+                  <button className="mba-btn-primary" onClick={() => startQuiz(q)}>
+                    <PlayCircle size={13}/> Start Assessment
+                  </button>
+                </div>
+              ))}
+            </div>
+      )}
+
+      {tab==="attempts" && (
+        attempts.length===0
+          ? <div className="mba-card mba-empty"><Trophy size={36} style={{color:T.border,margin:"0 auto 8px"}}/><p>No attempts yet</p></div>
+          : <div style={{ display:"flex",flexDirection:"column",gap:10 }}>
+              {attempts.map((a,i) => (
+                <div key={i} className="mba-card" style={{ padding:16,display:"flex",alignItems:"center",gap:14 }}>
+                  <div style={{ width:52,height:52,borderRadius:"50%",background:a.score>=75?T.greenSoft:a.score>=50?T.goldSoft:T.redSoft,border:`2px solid ${a.score>=75?T.green:a.score>=50?T.gold:T.red}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0 }}>
+                    <span style={{ fontSize:14,fontWeight:800,color:a.score>=75?T.green:a.score>=50?T.gold:T.red }}>{a.score}%</span>
+                  </div>
+                  <div style={{ flex:1 }}>
+                    <p style={{ fontSize:14,fontWeight:700,color:T.navy }}>{a.quiz_title||a.title}</p>
+                    <p style={{ fontSize:12,color:T.subtle }}>
+                      {a.created_at ? new Date(a.created_at).toLocaleDateString("en-IN") : ""}
+                    </p>
+                  </div>
+                  <span className={`mba-pill ${a.score>=60?"mba-pill-pass":"mba-pill-fail"}`}>
+                    {a.score>=60?"Passed":"Failed"}
+                  </span>
+                </div>
+              ))}
+            </div>
+      )}
     </div>
   );
 }
