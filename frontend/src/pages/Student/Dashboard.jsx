@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
   Routes, Route, Link, useLocation, useNavigate, useParams,
@@ -1453,82 +1452,61 @@ function ProfileManagement() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState({ type:"",text:"" });
   const [profileCompletion, setProfileCompletion] = useState(0);
-  const cached = JSON.parse(localStorage.getItem('upskillize_profile_cache') || '{}');
+
+  // Load from sessionStorage instantly — survives sidebar tab switches
+  const _c = (() => { try { return JSON.parse(sessionStorage.getItem('upskillize_profile_full') || '{}'); } catch { return {}; } })();
+
   const [personalInfo, setPersonalInfo] = useState({
-    full_name: user?.full_name || "",
-    email:     user?.email     || "",
-    phone:     "",
-    date_of_birth: "",
-    gender:    "",
-    profile_photo: null,
-    bio:       ""
+    full_name:     _c.personal?.full_name     || user?.full_name || "",
+    email:         _c.personal?.email         || user?.email     || "",
+    phone:         _c.personal?.phone         || "",
+    date_of_birth: _c.personal?.date_of_birth || "",
+    gender:        _c.personal?.gender        || "",
+    profile_photo: _c.personal?.profile_photo || null,
+    bio:           _c.personal?.bio           || "",
   });
-  const [address, setAddress] = useState({ street:"",city:"",state:"",country:"",postal_code:"" });
+  const [address, setAddress] = useState(_c.address || { street:"",city:"",state:"",country:"",postal_code:"" });
   const [security, setSecurity] = useState({ current_password:"",new_password:"",confirm_password:"" });
   const [showPwd, setShowPwd] = useState({ current:false,new_:false });
-  const [socialLinks, setSocialLinks] = useState({ linkedin:"",github:"",twitter:"",portfolio:"" });
-  const [resume, setResume] = useState({ file:null,uploadedUrl:null,uploadedName:null,uploading:false });
-  const [corporateVisible, setCorporateVisible] = useState(false);
+  const [socialLinks, setSocialLinks] = useState(_c.social || { linkedin:"",github:"",twitter:"",portfolio:"" });
+  const [resume, setResume] = useState({ file:null, uploadedUrl:_c.resume_url||null, uploadedName:_c.resume_name||null, uploading:false });
+  const [corporateVisible, setCorporateVisible] = useState(_c.corporate_visible ?? false);
   const [aiEnhancing, setAiEnhancing] = useState(false);
   const [enhancedBio, setEnhancedBio] = useState("");
-  const [psychoDone, setPsychoDone] = useState(false);
-  const [psychoResult, setPsychoResult] = useState(null);
+  const [psychoDone, setPsychoDone] = useState(!!_c.psycho_result);
+  const [psychoResult, setPsychoResult] = useState(_c.psycho_result || null);
 
-  // FIX 3: Additional Info fields
-  const [additionalInfo, setAdditionalInfo] = useState({
-    education_level: "",
-    institution: "",
-    graduation_year: "",
-    field_of_study: "",
-    work_experience_years: "",
-    current_employer: "",
-    current_designation: "",
-    skills: "",
-    languages: "",
-    certifications: "",
-    hobbies: "",
-    emergency_contact_name: "",
-    emergency_contact_phone: "",
-    emergency_contact_relation: "",
+  const [additionalInfo, setAdditionalInfo] = useState(_c.additional || {
+    education_level: "", institution: "", graduation_year: "", field_of_study: "",
+    work_experience_years: "", current_employer: "", current_designation: "",
+    skills: "", languages: "", certifications: "", hobbies: "",
+    emergency_contact_name: "", emergency_contact_phone: "", emergency_contact_relation: "",
   });
 
-  // FIX 6: Job Preferences
-  const [jobPrefs, setJobPrefs] = useState({
-    preferred_role: "",
-    preferred_location: "",
-    preferred_salary_min: "",
-    preferred_salary_max: "",
-    employment_type: "",
-    work_mode: "",
-    notice_period: "",
-    open_to_relocation: false,
-    industries: "",
-    company_size: "",
-    key_skills: "",
-    career_goals: "",
+  const [jobPrefs, setJobPrefs] = useState(_c.job_preferences || {
+    preferred_role: "", preferred_location: "", preferred_salary_min: "",
+    preferred_salary_max: "", employment_type: "", work_mode: "",
+    notice_period: "", open_to_relocation: "", industries: "",
+    company_size: "", key_skills: "", career_goals: "",
   });
 
   useEffect(() => {
-  api.get("/student/profile/complete").then(r => {
-    if (r.data.success) {
-      const d = r.data.profile;
-
-      // Always load from backend — source of truth
-      if (d.personal) {
-        setPersonalInfo(p => ({ ...p, ...d.personal }));
-        // Update cache with latest from server
-        localStorage.setItem('upskillize_profile_cache', JSON.stringify(d.personal));
+    api.get("/student/profile/complete").then(r => {
+      if (r.data.success) {
+        const d = r.data.profile;
+        // Cache full profile in sessionStorage — instant on next tab switch
+        sessionStorage.setItem('upskillize_profile_full', JSON.stringify(d));
+        if (d.personal)        setPersonalInfo(p  => ({ ...p,  ...d.personal }));
+        if (d.address)         setAddress(d.address);
+        if (d.social)          setSocialLinks(d.social);
+        if (d.additional)      setAdditionalInfo(a => ({ ...a,  ...d.additional }));
+        if (d.job_preferences) setJobPrefs(p       => ({ ...p,  ...d.job_preferences }));
+        if (d.corporate_visible !== undefined) setCorporateVisible(d.corporate_visible);
+        if (d.resume_url)      setResume(rv => ({ ...rv, uploadedUrl: d.resume_url, uploadedName: d.resume_name }));
+        if (d.psycho_result)   { setPsychoResult(d.psycho_result); setPsychoDone(true); }
       }
-      if (d.address)  setAddress(d.address);
-      if (d.social)   setSocialLinks(d.social);
-      if (d.additional) setAdditionalInfo(a => ({ ...a, ...d.additional }));
-      if (d.job_preferences) setJobPrefs(p => ({ ...p, ...d.job_preferences }));
-      if (d.corporate_visible !== undefined) setCorporateVisible(d.corporate_visible);
-      if (d.resume_url) setResume(rv => ({ ...rv, uploadedUrl: d.resume_url, uploadedName: d.resume_name }));
-      if (d.psycho_result) { setPsychoResult(d.psycho_result); setPsychoDone(true); }
-    }
-  }).catch(()=>{});
-}, []);
+    }).catch(()=>{});
+  }, []);
 
   useEffect(() => {
     const fields = [personalInfo.full_name,personalInfo.phone,personalInfo.date_of_birth,personalInfo.gender,personalInfo.bio,address.city,address.state,address.country,socialLinks.linkedin,resume.uploadedUrl,additionalInfo.skills,jobPrefs.preferred_role];
@@ -1727,6 +1705,9 @@ function ProfileManagement() {
 
               <button className="mba-btn-primary" onClick={save(async () => {
                 await api.put("/student/profile/additional", additionalInfo);
+                // Update sessionStorage cache
+                const _cur = (() => { try { return JSON.parse(sessionStorage.getItem('upskillize_profile_full') || '{}'); } catch { return {}; } })();
+                sessionStorage.setItem('upskillize_profile_full', JSON.stringify({ ..._cur, additional: additionalInfo }));
                 showMsg("success","Additional information saved!");
               })} disabled={saving}><Save size={13} /> {saving?"Saving...":"Save Additional Info"}</button>
             </div>
@@ -1907,6 +1888,9 @@ function ProfileManagement() {
 
               <button className="mba-btn-primary" onClick={save(async () => {
                 await api.put("/student/profile/job-preferences", jobPrefs);
+                // Update sessionStorage cache
+                const _cur = (() => { try { return JSON.parse(sessionStorage.getItem('upskillize_profile_full') || '{}'); } catch { return {}; } })();
+                sessionStorage.setItem('upskillize_profile_full', JSON.stringify({ ..._cur, job_preferences: jobPrefs }));
                 showMsg("success","Job preferences saved!");
               })} disabled={saving}><Save size={13} /> {saving?"Saving...":"Save Job Preferences"}</button>
             </div>
