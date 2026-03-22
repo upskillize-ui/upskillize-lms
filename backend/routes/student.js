@@ -348,13 +348,25 @@ router.get('/gamification', ...studentOnly, async (req, res) => {
 // ============================================================
 router.get('/profile/complete', ...studentOnly, async (req, res) => {
   try {
-    const user = await User.findByPk(req.user.id, {
-      attributes: { exclude: ['password_hash'] }
-    });
+    // ✅ FIX: Use raw SQL instead of User.findByPk()
+    // User.findByPk() only returns columns defined in the Sequelize model.
+    // The extra profile columns (bio, gender, city, state, linkedin, skills, etc.)
+    // were added later via raw SQL migrations and are NOT in the model definition,
+    // so findByPk() silently ignores them — causing the profile to appear blank
+    // after saving. Raw SQL returns ALL actual columns from the database.
+    const { sequelize } = require('../config/database');
+    const [rows] = await sequelize.query(
+      'SELECT * FROM users WHERE id = ? LIMIT 1',
+      { replacements: [req.user.id] }
+    );
+    const user = rows[0];
 
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
+
+    // Never send password hash to frontend
+    delete user.password_hash;
 
     let psycho_result = null;
     try { if (user.psycho_result) psycho_result = JSON.parse(user.psycho_result); } catch {}
