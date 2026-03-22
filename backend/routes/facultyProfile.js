@@ -977,7 +977,12 @@ router.get('/notifications', authMiddleware, async (req, res) => {
 // ══════════════════════════════════════════════════════════════
 router.get('/settings', authMiddleware, async (req, res) => {
   try {
-    const user = await User.findByPk(req.user.id).catch(() => null);
+    // ✅ FIX: Use rawFetchUser instead of User.findByPk()
+    // language, timezone, email_notifications, sms_notifications, theme were
+    // added via raw SQL migration and are NOT in the Sequelize User model.
+    // User.findByPk() silently ignores them and returns undefined for all.
+    const { sequelize } = require('../config/database');
+    const user = await rawFetchUser(req.user.id, sequelize);
     res.json({
       success: true,
       general: {
@@ -998,7 +1003,10 @@ router.get('/settings', authMiddleware, async (req, res) => {
 router.put('/settings/general', authMiddleware, async (req, res) => {
   try {
     const { language, timezone } = req.body;
-    await User.update({ language, timezone }, { where: { id: req.user.id } });
+    // ✅ FIX: Use rawUpdate — language & timezone are migrated columns
+    // not in the Sequelize model, so User.update() silently skips them.
+    const { sequelize } = require('../config/database');
+    await rawUpdate('users', { language, timezone }, 'id = ?', [req.user.id], sequelize);
     res.json({ success: true, message: 'Settings updated' });
   } catch (error) { res.status(500).json({ success: false, message: 'Error updating settings' }); }
 });
@@ -1006,7 +1014,13 @@ router.put('/settings/general', authMiddleware, async (req, res) => {
 router.put('/settings/notifications', authMiddleware, async (req, res) => {
   try {
     const { emailNotifications, smsNotifications } = req.body;
-    await User.update({ email_notifications: emailNotifications, sms_notifications: smsNotifications }, { where: { id: req.user.id } });
+    // ✅ FIX: Use rawUpdate — email_notifications, sms_notifications are
+    // migrated columns not in the Sequelize model, so User.update() skips them.
+    const { sequelize } = require('../config/database');
+    await rawUpdate('users',
+      { email_notifications: emailNotifications, sms_notifications: smsNotifications },
+      'id = ?', [req.user.id], sequelize
+    );
     res.json({ success: true, message: 'Notification settings updated' });
   } catch (error) { res.status(500).json({ success: false, message: 'Error updating settings' }); }
 });
@@ -1313,13 +1327,21 @@ router.get('/course-content/:courseId', authMiddleware, async (req, res) => {
 // ══════════════════════════════════════════════════════════════
 router.get('/corporate/profiles', authMiddleware, async (req, res) => {
   try {
-    const students = await User.findAll({
-      where: { role: 'student', corporate_visible: true },
-      attributes: ['id', 'full_name', 'email', 'phone', 'profile_photo',
-                   'skills', 'bio', 'linkedin', 'github', 'portfolio',
-                   'current_designation', 'current_employer'],
-    }).catch(() => []);
-    res.json({ success: true, profiles: students });
+    // ✅ FIX: Use raw SQL instead of User.findAll() with specific attributes.
+    // skills, bio, linkedin, github, portfolio, current_designation,
+    // current_employer, corporate_visible were added via raw SQL migration
+    // and are NOT in the Sequelize User model — findAll() with attributes
+    // list silently returns undefined for all of them.
+    const { sequelize } = require('../config/database');
+    const [profiles] = await sequelize.query(
+      `SELECT id, full_name, email, phone, profile_photo,
+              skills, bio, linkedin, github, portfolio,
+              current_designation, current_employer
+       FROM users
+       WHERE role = 'student' AND corporate_visible = TRUE`,
+      { type: sequelize.QueryTypes.SELECT }
+    );
+    res.json({ success: true, profiles: profiles || [] });
   } catch (error) {
     console.error('GET /faculty/corporate/profiles error:', error);
     res.json({ success: true, profiles: [] });
