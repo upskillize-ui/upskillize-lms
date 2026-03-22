@@ -2950,6 +2950,8 @@ function StudentAssignments() {
             <div className="mba-metric-value">{m.count}</div>
           </div>
         ))}
+ <button onClick={()=>setShowAiRev(v=>!v)} style={{marginLeft:"auto",fontSize:13,padding:"8px 18px",display:"flex",alignItems:"center",gap:6,background:"#1a2744",color:"#fff",border:"none",borderRadius:8,fontFamily:"Plus Jakarta Sans,sans-serif",fontWeight:700,cursor:"pointer"}}><Bot size={14}/> AiRev</button>
+```
       </div>
  
       {/* Filter tabs */}
@@ -2960,7 +2962,9 @@ function StudentAssignments() {
         ))}
       </div>
  
-      {filtered.length===0 ? (
+      {showAiRev ? (
+        <AiRevPanel assignment={selected || { id: 1, title: "Assignment Review", description: "Submit your work for AI review" }} submissionNotes="" onClose={() => setShowAiRev(false)} />
+      ) : filtered.length===0 ? (
         <div className="mba-card mba-empty">
           <ClipboardList size={36} style={{color:T.border,margin:"0 auto 8px"}}/>
           <p>No {filter} assignments</p>
