@@ -235,13 +235,19 @@ router.get('/gamification', ...studentOnly, async (req, res) => {
 // ============================================================
 router.get('/profile/complete', ...studentOnly, async (req, res) => {
   try {
-    const user = await User.findByPk(req.user.id, {
-      attributes: { exclude: ['password_hash'] }
-    });
+    const { sequelize } = require('../config/database');
 
-    if (!user) {
+    // Use raw SQL — bypasses Sequelize model cache, returns ALL columns including new ones
+    const [rows] = await sequelize.query(
+      `SELECT * FROM users WHERE id = ? LIMIT 1`,
+      { replacements: [req.user.id] }
+    );
+
+    if (!rows.length) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
+
+    const user = rows[0];
 
     let psycho_result = null;
     try { if (user.psycho_result) psycho_result = JSON.parse(user.psycho_result); } catch {}
@@ -899,32 +905,50 @@ router.put('/profile/additional', ...studentOnly, async (req, res) => {
     } = req.body;
 
     const { sequelize } = require('../config/database');
-    const [cols] = await sequelize.query(
-      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
-       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users'`
+
+    // Use raw SQL to bypass Sequelize model cache — works in production
+    await sequelize.query(
+      `UPDATE users SET
+        education_level = ?,
+        institution = ?,
+        graduation_year = ?,
+        field_of_study = ?,
+        work_experience_years = ?,
+        current_employer = ?,
+        current_designation = ?,
+        skills = ?,
+        languages = ?,
+        certifications = ?,
+        hobbies = ?,
+        emergency_contact_name = ?,
+        emergency_contact_phone = ?,
+        emergency_contact_relation = ?
+       WHERE id = ?`,
+      {
+        replacements: [
+          education_level || null,
+          institution || null,
+          graduation_year || null,
+          field_of_study || null,
+          work_experience_years || null,
+          current_employer || null,
+          current_designation || null,
+          skills || null,
+          languages || null,
+          certifications || null,
+          hobbies || null,
+          emergency_contact_name || null,
+          emergency_contact_phone || null,
+          emergency_contact_relation || null,
+          req.user.id
+        ]
+      }
     );
-    const existingCols = cols.map(c => c.COLUMN_NAME);
-
-    const allFields = {
-      education_level, institution, graduation_year, field_of_study,
-      work_experience_years, current_employer, current_designation,
-      skills, languages, certifications, hobbies,
-      emergency_contact_name, emergency_contact_phone, emergency_contact_relation
-    };
-
-    const updateData = {};
-    Object.keys(allFields).forEach(k => {
-      if (existingCols.includes(k)) updateData[k] = allFields[k] || null;
-    });
-
-    if (Object.keys(updateData).length > 0) {
-      await User.update(updateData, { where: { id: req.user.id } });
-    }
 
     return res.json({ success: true, message: 'Additional information saved' });
   } catch (error) {
     console.error('Error saving additional info:', error);
-    res.status(500).json({ success: false, message: 'Server error' });
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 });
 
@@ -941,31 +965,46 @@ router.put('/profile/job-preferences', ...studentOnly, async (req, res) => {
     } = req.body;
 
     const { sequelize } = require('../config/database');
-    const [cols] = await sequelize.query(
-      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
-       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users'`
+
+    // Use raw SQL to bypass Sequelize model cache — works in production
+    await sequelize.query(
+      `UPDATE users SET
+        preferred_role = ?,
+        preferred_location = ?,
+        preferred_salary_min = ?,
+        preferred_salary_max = ?,
+        employment_type = ?,
+        work_mode = ?,
+        notice_period = ?,
+        open_to_relocation = ?,
+        industries = ?,
+        company_size = ?,
+        key_skills = ?,
+        career_goals = ?
+       WHERE id = ?`,
+      {
+        replacements: [
+          preferred_role || null,
+          preferred_location || null,
+          preferred_salary_min || null,
+          preferred_salary_max || null,
+          employment_type || null,
+          work_mode || null,
+          notice_period || null,
+          open_to_relocation || null,
+          industries || null,
+          company_size || null,
+          key_skills || null,
+          career_goals || null,
+          req.user.id
+        ]
+      }
     );
-    const existingCols = cols.map(c => c.COLUMN_NAME);
-
-    const allFields = {
-      preferred_role, preferred_location, preferred_salary_min, preferred_salary_max,
-      employment_type, work_mode, notice_period, open_to_relocation,
-      industries, company_size, key_skills, career_goals
-    };
-
-    const updateData = {};
-    Object.keys(allFields).forEach(k => {
-      if (existingCols.includes(k)) updateData[k] = allFields[k] || null;
-    });
-
-    if (Object.keys(updateData).length > 0) {
-      await User.update(updateData, { where: { id: req.user.id } });
-    }
 
     return res.json({ success: true, message: 'Job preferences saved' });
   } catch (error) {
     console.error('Error saving job preferences:', error);
-    res.status(500).json({ success: false, message: 'Server error' });
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 });
 
