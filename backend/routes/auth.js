@@ -90,19 +90,43 @@ router.post('/register', [
 
     // Notify admin about new registration
     try {
-      await sendEmail(
-        process.env.ADMIN_EMAIL || 'upskillize@gmail.com',
-        `New ${role} registration pending approval`,
-        `<h2>New Registration</h2>
-         <p><strong>Name:</strong> ${full_name}</p>
-         <p><strong>Email:</strong> ${email}</p>
-         <p><strong>Role:</strong> ${role}</p>
-         <p><strong>Phone:</strong> ${phone || 'Not provided'}</p>
-         <p>Please log in to the admin panel to approve or reject this account.</p>`
-      );
-    } catch (emailError) {
-      console.error('Error sending admin notification email:', emailError);
-    }
+  const approveToken = jwt.sign(
+    { userId: user.id, action: 'approve' },
+    process.env.JWT_SECRET,
+    { expiresIn: '7d' }
+  );
+  const rejectToken = jwt.sign(
+    { userId: user.id, action: 'reject' },
+    process.env.JWT_SECRET,
+    { expiresIn: '7d' }
+  );
+
+  const approveLink = `${process.env.BACKEND_URL || 'https://upskillize-lms-backend.onrender.com'}/api/auth/quick-approve?token=${approveToken}`;
+  const rejectLink  = `${process.env.BACKEND_URL || 'https://upskillize-lms-backend.onrender.com'}/api/auth/quick-reject?token=${rejectToken}`;
+
+  await sendEmail(
+    'upskillize@gmail.com',
+    `New ${role} registration — ${full_name}`,
+    `<h2>New Registration Request</h2>
+     <p><strong>Name:</strong> ${full_name}</p>
+     <p><strong>Email:</strong> ${email}</p>
+     <p><strong>Role:</strong> ${role}</p>
+     <p><strong>Phone:</strong> ${phone || 'Not provided'}</p>
+     <br/>
+     <a href="${approveLink}" style="background:#1a2744;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;margin-right:12px;">
+       ✅ APPROVE
+     </a>
+     &nbsp;&nbsp;
+     <a href="${rejectLink}" style="background:#c0392b;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;">
+       ❌ REJECT
+     </a>
+     <br/><br/>
+     <p style="color:#999;font-size:12px;">These links expire in 7 days.</p>`
+  );
+} catch (emailError) {
+  console.error('Error sending admin notification email:', emailError);
+}
+
 
     res.status(201).json({
       success: true,
@@ -493,6 +517,74 @@ router.post('/admin/deactivate/:id', authMiddleware, requireAdmin, async (req, r
   } catch (error) {
     console.error('Deactivate user error:', error);
     res.status(500).json({ success: false, message: 'Error deactivating user' });
+  }
+});
+
+// ── ONE-CLICK APPROVE from email link ──────────────────────
+router.get('/quick-approve', async (req, res) => {
+  try {
+    const { token } = req.query;
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (decoded.action !== 'approve') return res.send('Invalid link.');
+
+    const user = await User.findByPk(decoded.userId);
+    if (!user) return res.send('User not found.');
+    if (user.is_active) return res.send(`${user.full_name} is already active.`);
+
+    await user.update({ is_active: true });
+
+    // Email the user
+    await sendEmail(
+      user.email,
+      'Your Upskillize account has been approved!',
+      `<h2>Welcome ${user.full_name}!</h2>
+       <p>Your <strong>${user.role}</strong> account has been approved.</p>
+       <p><a href="${process.env.FRONTEND_URL}/login">Click here to login</a></p>`
+    ).catch(() => {});
+
+    res.send(`
+      <h2 style="font-family:sans-serif;color:#1a2744;">
+        ✅ ${user.full_name} (${user.email}) approved successfully!
+      </h2>
+      <p style="font-family:sans-serif;">They have been notified by email.</p>
+    `);
+  } catch (err) {
+    res.send('Link expired or invalid. Please approve from the admin panel.');
+  }
+});
+
+// ── ONE-CLICK REJECT from email link ───────────────────────
+router.get('/quick-reject', async (req, res) => {
+  try {
+    const { token } = req.query;
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (decoded.action !== 'reject') return res.send('Invalid link.');
+
+    const user = await User.findByPk(decoded.userId);
+    if (!user) return res.send('User not found.');
+
+    const name  = user.full_name;
+    const email = user.email;
+    const role  = user.role;
+
+    await user.destroy();
+
+    await sendEmail(
+      email,
+      'Your Upskillize registration was not approved',
+      `<p>Hi ${name},</p>
+       <p>Unfortunately your <strong>${role}</strong> account was not approved at this time.</p>
+       <p>Contact support@upskillize.com if you think this is a mistake.</p>`
+    ).catch(() => {});
+
+    res.send(`
+      <h2 style="font-family:sans-serif;color:#c0392b;">
+        ❌ ${name} (${email}) rejected and removed.
+      </h2>
+      <p style="font-family:sans-serif;">They have been notified by email.</p>
+    `);
+  } catch (err) {
+    res.send('Link expired or invalid. Please reject from the admin panel.');
   }
 });
 
