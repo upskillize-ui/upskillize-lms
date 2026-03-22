@@ -91,7 +91,7 @@ router.post('/register', [
     // Notify admin about new registration
     try {
       await sendEmail(
-        process.env.ADMIN_EMAIL || 'admin@upskillize.com',
+        process.env.ADMIN_EMAIL || 'upskillize@gmail.com',
         `New ${role} registration pending approval`,
         `<h2>New Registration</h2>
          <p><strong>Name:</strong> ${full_name}</p>

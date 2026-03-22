@@ -67,8 +67,8 @@ router.get('/recent-activity', ...adminOnly, async (req, res) => {
         limit: 5,
         order: [['created_at', 'DESC']],
         include: [
-          { model: Student, include: [{ model: User, attributes: ['full_name', 'email'] }] },
-          { model: Course, attributes: ['course_name'] },
+          { model: Student, as: 'Student', include: [{ model: User, as: 'User', attributes: ['full_name', 'email'] }] },
+          { model: Course, as: 'Course', attributes: ['course_name'] },
         ]
       });
       recentEnrollments.forEach(e => {
@@ -333,8 +333,8 @@ router.post('/users/:id/activate', ...adminOnly, async (req, res) => {
 router.get('/students', ...adminOnly, async (req, res) => {
   try {
     const students = await Student.findAll({
-      include: [{ model: User, attributes: ['id', 'full_name', 'email', 'phone', 'created_at'] }],
-      order: [[User, 'created_at', 'DESC']],
+      include: [{ model: User, as: 'User', attributes: ['id', 'full_name', 'email', 'phone', 'created_at'] }],
+      order: [[{ model: User, as: 'User' }, 'created_at', 'DESC']],
     });
 
     const data = students.map(s => ({
@@ -360,8 +360,8 @@ router.get('/students', ...adminOnly, async (req, res) => {
 router.get('/faculty', ...adminOnly, async (req, res) => {
   try {
     const faculty = await Faculty.findAll({
-      include: [{ model: User, attributes: ['id', 'full_name', 'email', 'phone', 'created_at'] }],
-      order: [[User, 'created_at', 'DESC']],
+      include: [{ model: User, as: 'User', attributes: ['id', 'full_name', 'email', 'phone', 'created_at'] }],
+      order: [[{ model: User, as: 'User' }, 'created_at', 'DESC']],
     });
 
     const data = faculty.map(f => ({
@@ -397,7 +397,7 @@ router.get('/courses/approval', ...adminOnly, async (req, res) => {
   try {
     const courses = await Course.findAll({
       order: [['created_at', 'DESC']],
-      include: [{ model: Faculty, include: [{ model: User, attributes: ['full_name'] }] }],
+      include: [{ model: Faculty, as: 'Faculty', include: [{ model: User, as: 'User', attributes: ['full_name'] }] }],
     });
 
     const data = courses.map(c => ({
@@ -507,8 +507,8 @@ router.get('/payments', ...adminOnly, async (req, res) => {
     const payments = await Payment.findAll({
       order: [['created_at', 'DESC']],
       include: [
-        { model: User, attributes: ['full_name', 'email'], required: false },
-        { model: Course, attributes: ['course_name'], required: false },
+        { model: User, as: 'User', attributes: ['full_name', 'email'], required: false },
+        { model: Course, as: 'Course', attributes: ['course_name'], required: false },
       ],
     });
 
@@ -555,8 +555,8 @@ router.get('/enrollments', ...adminOnly, async (req, res) => {
       limit: parseInt(limit), offset,
       order: [['created_at', 'DESC']],
       include: [
-        { model: Student, include: [{ model: User, attributes: ['id', 'full_name', 'email'] }] },
-        { model: Course, attributes: ['id', 'course_name', 'course_code'] },
+        { model: Student, as: 'Student', include: [{ model: User, as: 'User', attributes: ['id', 'full_name', 'email'] }] },
+        { model: Course, as: 'Course', attributes: ['id', 'course_name', 'course_code'] },
       ]
     });
 
@@ -684,31 +684,31 @@ router.post('/reports/generate', ...adminOnly, async (req, res) => {
       data = await Enrollment.findAll({
         where: { created_at: dateFilter },
         include: [
-          { model: Student, include: [{ model: User, attributes: ['full_name', 'email'] }] },
-          { model: Course, attributes: ['course_name'] }
+          { model: Student, as: 'Student', include: [{ model: User, as: 'User', attributes: ['full_name', 'email'] }] },
+          { model: Course, as: 'Course', attributes: ['course_name'] }
         ]
       });
     } else if (type === 'revenue' || type === 'payment-transactions') {
       data = await Payment.findAll({
         where: { created_at: dateFilter },
         include: [
-          { model: User, attributes: ['full_name', 'email'] },
-          { model: Course, attributes: ['course_name'] }
+          { model: User, as: 'User', attributes: ['full_name', 'email'] },
+          { model: Course, as: 'Course', attributes: ['course_name'] }
         ]
       });
     } else if (type === 'completion') {
       data = await Enrollment.findAll({
         where: { completion_status: 'completed', updated_at: dateFilter },
         include: [
-          { model: Student, include: [{ model: User, attributes: ['full_name', 'email'] }] },
-          { model: Course, attributes: ['course_name'] }
+          { model: Student, as: 'Student', include: [{ model: User, as: 'User', attributes: ['full_name', 'email'] }] },
+          { model: Course, as: 'Course', attributes: ['course_name'] }
         ]
       });
     } else if (type === 'faculty-activity') {
       data = await Faculty.findAll({
         include: [
-          { model: User, attributes: ['full_name', 'email'] },
-          { model: Course, attributes: ['course_name', 'is_active', 'created_at'] }
+          { model: User, as: 'User', attributes: ['full_name', 'email'] },
+          { model: Course, as: 'Course', attributes: ['course_name', 'is_active', 'created_at'] }
         ]
       });
     }
@@ -730,7 +730,7 @@ router.get('/content', ...adminOnly, async (req, res) => {
   try {
     const courses = await Course.findAll({
       where: { is_active: false },
-      include: [{ model: Faculty, include: [{ model: User, attributes: ['full_name'] }] }],
+      include: [{ model: Faculty, as: 'Faculty', include: [{ model: User, as: 'User', attributes: ['full_name'] }] }],
       order: [['created_at', 'DESC']]
     });
 
@@ -777,7 +777,7 @@ router.get('/audit-logs', ...adminOnly, async (req, res) => {
   try {
     const { Notification } = require('../models');
     const logs = await Notification.findAll({
-      include: [{ model: User, attributes: ['full_name', 'role'] }],
+      include: [{ model: User, as: 'User', attributes: ['full_name', 'role'] }],
       order: [['created_at', 'DESC']],
       limit: 200
     });
