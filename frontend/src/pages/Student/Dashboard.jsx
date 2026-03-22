@@ -1633,7 +1633,8 @@ function ProfileManagement() {
                 const r = await api.put("/student/profile/personal", personalInfo);
                 if (r.data.success) {
                   showMsg("success","Personal information saved!");
-                  localStorage.setItem('upskillize_profile_cache', JSON.stringify(personalInfo));
+                  const _cur = (() => { try { return JSON.parse(sessionStorage.getItem('upskillize_profile_full') || '{}'); } catch { return {}; } })();
+                  sessionStorage.setItem('upskillize_profile_full', JSON.stringify({ ..._cur, personal: { ..._cur.personal, ...personalInfo } }));
                   if (updateUser) updateUser({ full_name:personalInfo.full_name, phone:personalInfo.phone, gender:personalInfo.gender, bio:personalInfo.bio, profile_photo:personalInfo.profile_photo||null });
                 }
               })} disabled={saving}><Save size={13} /> {saving?"Saving...":"Save Personal Info"}</button>
@@ -1654,7 +1655,14 @@ function ProfileManagement() {
                   </select>
                 </div>
               </div>
-              <button className="mba-btn-primary" onClick={save(async () => { await api.put("/student/profile/address",address); showMsg("success","Address saved!"); })} disabled={saving}><Save size={13} /> {saving?"Saving...":"Save Address"}</button>
+              <button className="mba-btn-primary" onClick={save(async () => {
+                const r = await api.put("/student/profile/address", address);
+                if (r.data.success) {
+                  showMsg("success","Address saved!");
+                  const _cur = (() => { try { return JSON.parse(sessionStorage.getItem('upskillize_profile_full') || '{}'); } catch { return {}; } })();
+                  sessionStorage.setItem('upskillize_profile_full', JSON.stringify({ ..._cur, address }));
+                } else { showMsg("error","Failed to save address"); }
+              })} disabled={saving}><Save size={13} /> {saving?"Saving...":"Save Address"}</button>
             </div>
           )}
 
@@ -1739,7 +1747,14 @@ function ProfileManagement() {
                     <input key={k} type="url" className="mba-input" value={socialLinks[k]} onChange={e=>setSocialLinks(s=>({...s,[k]:e.target.value}))} placeholder={`${l}: ${ph}`} />
                   ))}
                 </div>
-                <button className="mba-btn-primary" style={{ marginTop:12 }} onClick={save(async () => { await api.put("/student/profile/social",socialLinks); showMsg("success","Links saved!"); })} disabled={saving}><Save size={13} /> Save Links</button>
+                <button className="mba-btn-primary" style={{ marginTop:12 }} onClick={save(async () => {
+                  const r = await api.put("/student/profile/social", socialLinks);
+                  if (r.data.success) {
+                    showMsg("success","Links saved!");
+                    const _cur = (() => { try { return JSON.parse(sessionStorage.getItem('upskillize_profile_full') || '{}'); } catch { return {}; } })();
+                    sessionStorage.setItem('upskillize_profile_full', JSON.stringify({ ..._cur, social: socialLinks }));
+                  } else { showMsg("error","Failed to save links"); }
+                })} disabled={saving}><Save size={13} /> Save Links</button>
               </div>
             </div>
           )}

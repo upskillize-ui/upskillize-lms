@@ -3836,6 +3836,7 @@ export default function FacultyDashboard() {
               <Route path="/notifications"           element={<FacultyNotifications />} />
               <Route path="/help"                    element={<FacultyHelp />} />
               <Route path="/settings"                element={<FacultySettings />} />
+              <Route path="/profile" element={<FacultyProfile />} />
             </Routes>
           </div>
         </main>
