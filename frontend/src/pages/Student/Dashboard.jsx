@@ -6,6 +6,8 @@ import { useAuth } from "../../context/AuthContext";
 import api from "../../services/api";
 import CoursePlayer from "./CoursePlayer";
 import BrowseCourses from "../../pages/BrowseCourses";
+import AiRevPanel from "../../components/AiRevPanel";
+import AIEnhancer from "../../components/AIEnhancer";
 import {
   BookOpen, TrendingUp, Award, PlayCircle, Clock, Bell,
   MessageSquare, HelpCircle, CreditCard, BarChart3, Download,
@@ -1563,49 +1565,7 @@ function ProfileManagement() {
     setAiEnhancing(false);
   };
 
-  const AGENT_URL = "https://upskill25-ai-enhancer.hf.space";
 
-  // Load existing profile on tab open
-  useEffect(() => {
-    if (activeTab === "ai_enhance" && !aiProfile && !aiProfileGenerating) {
-      (async () => {
-        try {
-          const token = localStorage.getItem("token");
-          const res = await fetch(`${AGENT_URL}/api/v1/profile/me`, {
-            headers: { "Authorization": `Bearer ${token}` },
-          });
-          if (res.ok) {
-            const data = await res.json();
-            if (data && data.slug && data.status === "completed") {
-              // Fetch the rendered HTML
-              try {
-                const htmlRes = await fetch(`${AGENT_URL}/api/v1/profile/public/${data.slug}`);
-                const html = htmlRes.ok ? await htmlRes.text() : null;
-                setAiProfile({
-                  slug: data.slug,
-                  html: html,
-                  url: data.public_url || `${AGENT_URL}/api/v1/profile/public/${data.slug}`,
-                  download_url: data.download_url || `${AGENT_URL}/api/v1/profile/download/${data.slug}`,
-                  visibility: data.visibility || "private",
-                  student_name: data.student_name,
-                  views: data.views || 0,
-                });
-              } catch {
-                setAiProfile({
-                  slug: data.slug, html: null,
-                  url: data.public_url || `${AGENT_URL}/api/v1/profile/public/${data.slug}`,
-                  download_url: data.download_url || `${AGENT_URL}/api/v1/profile/download/${data.slug}`,
-                  visibility: data.visibility || "private",
-                  student_name: data.student_name,
-                  views: data.views || 0,
-                });
-              }
-            }
-          }
-        } catch {}
-      })();
-    }
-  }, [activeTab]);
 
   const handleToggleProfileVisibility = async () => {
     if (!aiProfile) return;
@@ -1625,38 +1585,6 @@ function ProfileManagement() {
     } catch { showMsg("error", "Failed to update visibility"); }
   };
 
-  const handleGenerateAIProfile = async () => {
-    setAiProfileGenerating(true);
-    setAiProfileError("");
-    setAiProfile(null);
-    try {
-      const token = localStorage.getItem("token");
-      const res = await fetch(`${AGENT_URL}/api/v1/profile/generate`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
-        },
-        body: JSON.stringify({ force_regenerate: true }),
-      });
-      const data = await res.json();
-      if (res.ok && data.slug) {
-        // Fetch rendered HTML
-        try {
-          const profileRes = await fetch(`${AGENT_URL}/api/v1/profile/public/${data.slug}`);
-          const html = profileRes.ok ? await profileRes.text() : null;
-          setAiProfile({ slug: data.slug, html, url: data.profile_url, download_url: data.download_url, time: data.generation_time, visibility: "private", views: 0 });
-        } catch {
-          setAiProfile({ slug: data.slug, html: null, url: data.profile_url, download_url: data.download_url, time: data.generation_time, visibility: "private", views: 0 });
-        }
-      } else {
-        setAiProfileError(data.detail || data.message || "Failed to generate profile. Please try again.");
-      }
-    } catch (err) {
-      setAiProfileError("Could not connect to AI agent. Please try again later.");
-    }
-    setAiProfileGenerating(false);
-  };
 
 
   // FIX 3: Updated tabs order — Personal, Address, Additional Info, Resume, Psychometric, AI Enhancer, Corporate View, Job Preferences, Security
@@ -1859,116 +1787,9 @@ function ProfileManagement() {
           {/* PSYCHOMETRIC TAB */}
           {activeTab==="psychometric" && <PsychometricTest psychoDone={psychoDone} setPsychoDone={setPsychoDone} psychoResult={psychoResult} setPsychoResult={setPsychoResult} showMsg={showMsg} />}
 
-          {/* AI ENHANCER TAB — ONE-CLICK PROFILE GENERATOR */}
+          {/* AI ENHANCER TAB — Extracted to AIEnhancer component */}
           {activeTab==="ai_enhance" && (
-            <div>
-              {!aiProfile ? (
-                <div style={{ textAlign:"center",padding:"40px 20px" }}>
-                  <div style={{ width:80,height:80,borderRadius:"50%",background:"linear-gradient(135deg,#1A2744,#2a3f6f)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 20px",fontSize:36 }}>🚀</div>
-                  <h3 style={{ fontSize:20,fontWeight:800,color:T.navy,marginBottom:8 }}>Generate Your AI Profile</h3>
-                  <p style={{ fontSize:14,color:T.muted,maxWidth:480,margin:"0 auto 8px",lineHeight:1.6 }}>
-                    Our AI reads your courses, quiz scores, case studies, psychometric results, and all LMS activity — then creates a professional, recruiter-ready profile in seconds.
-                  </p>
-                  <div style={{ display:"flex",flexWrap:"wrap",justifyContent:"center",gap:8,margin:"16px 0 24px" }}>
-                    {["📚 Courses","📝 Quiz Scores","📋 Case Studies","🧠 Psychometric","📊 Performance","🏆 Certificates"].map(item => (
-                      <span key={item} style={{ fontSize:12,padding:"5px 12px",background:T.bg,border:`1px solid ${T.border}`,borderRadius:20,color:T.muted }}>{item}</span>
-                    ))}
-                  </div>
-
-                  {aiProfileError && (
-                    <div style={{ background:"#fef2f2",border:"1px solid #fecaca",borderRadius:10,padding:"12px 16px",marginBottom:16,maxWidth:480,margin:"0 auto 16px" }}>
-                      <p style={{ fontSize:13,color:"#dc2626" }}>{aiProfileError}</p>
-                    </div>
-                  )}
-
-                  <button
-                    className="mba-btn-gold"
-                    onClick={handleGenerateAIProfile}
-                    disabled={aiProfileGenerating}
-                    style={{ fontSize:15,padding:"14px 32px",borderRadius:10 }}
-                  >
-                    <Sparkles size={16} />
-                    {aiProfileGenerating ? "Generating Profile..." : "✨ Generate My AI Profile"}
-                  </button>
-
-                  {aiProfileGenerating && (
-                    <div style={{ marginTop:20 }}>
-                      <div className="mba-spinner" style={{ width:24,height:24,borderWidth:3,margin:"0 auto 10px" }} />
-                      <p style={{ fontSize:13,color:T.muted }}>AI is analyzing your LMS data and building your profile...</p>
-                      <p style={{ fontSize:11,color:T.subtle,marginTop:4 }}>This takes 10-15 seconds</p>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div>
-                  <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16,flexWrap:"wrap",gap:10 }}>
-                    <div>
-                      <h3 style={{ fontSize:16,fontWeight:800,color:T.navy,marginBottom:4 }}>✅ AI Profile Generated!</h3>
-                      <div style={{ display:"flex",alignItems:"center",gap:8,marginTop:4 }}>
-                        {aiProfile.time && <span style={{ fontSize:12,color:T.subtle }}>Generated in {aiProfile.time}s</span>}
-                        <span style={{ fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:12,background:aiProfile.visibility==="public"?"#dcfce7":"#f1f5f9",color:aiProfile.visibility==="public"?"#16a34a":"#64748b" }}>
-                          {aiProfile.visibility==="public"?"🌐 PUBLIC":"🔒 PRIVATE"}
-                        </span>
-                        {aiProfile.views > 0 && <span style={{ fontSize:11,color:T.subtle }}>{aiProfile.views} views</span>}
-                      </div>
-                    </div>
-                    <div style={{ display:"flex",gap:8,flexWrap:"wrap" }}>
-                      <button className="mba-btn-outline" style={{ fontSize:12,padding:"8px 16px" }} onClick={handleToggleProfileVisibility}>
-                        {aiProfile.visibility==="public"?"🔒 Make Private":"🌐 Make Public"}
-                      </button>
-                      <a href={`${AGENT_URL}/api/v1/profile/public/${aiProfile.slug}`} target="_blank" rel="noopener noreferrer" className="mba-btn-primary" style={{ fontSize:12,padding:"8px 16px",textDecoration:"none" }}>
-                        <Eye size={13} /> View Full Profile
-                      </a>
-                      <a href={`${AGENT_URL}/api/v1/profile/download/${aiProfile.slug}`} target="_blank" rel="noopener noreferrer" className="mba-btn-outline" style={{ fontSize:12,padding:"8px 16px",textDecoration:"none" }}>
-                        📥 Download PDF
-                      </a>
-                      <button className="mba-btn-ghost" style={{ fontSize:12,padding:"8px 16px" }} onClick={() => { 
-                        const link = aiProfile.visibility==="public" 
-                          ? (aiProfile.url || `${AGENT_URL}/api/v1/profile/public/${aiProfile.slug}`) 
-                          : `${AGENT_URL}/api/v1/profile/public/${aiProfile.slug}`;
-                        navigator.clipboard.writeText(link); 
-                        showMsg("success","Profile link copied!"); 
-                      }}>
-                        📋 Copy Link
-                      </button>
-                      <button className="mba-btn-ghost" style={{ fontSize:12,padding:"8px 16px" }} onClick={() => { setAiProfile(null); handleGenerateAIProfile(); }}>
-                        🔄 Regenerate
-                      </button>
-                    </div>
-                  </div>
-
-                  {aiProfile.visibility==="private" && (
-                    <div style={{ background:"#fffbeb",border:"1px solid #fde68a",borderRadius:10,padding:"10px 16px",marginBottom:12,display:"flex",alignItems:"center",gap:8 }}>
-                      <span style={{ fontSize:16 }}>🔒</span>
-                      <p style={{ fontSize:12,color:"#92400e",margin:0 }}>Your profile is <b>private</b>. Only you can see it. Click <b>"Make Public"</b> to share with recruiters and corporates.</p>
-                    </div>
-                  )}
-
-                  {aiProfile.visibility==="public" && (
-                    <div style={{ background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:10,padding:"10px 16px",marginBottom:12,display:"flex",alignItems:"center",gap:8 }}>
-                      <span style={{ fontSize:16 }}>🌐</span>
-                      <p style={{ fontSize:12,color:"#166534",margin:0 }}>Your profile is <b>public</b>. Recruiters and corporates can view it using your shareable link.</p>
-                    </div>
-                  )}
-
-                  {aiProfile.html ? (
-                    <div style={{ border:`1px solid ${T.border}`,borderRadius:12,overflow:"hidden",background:"#060912" }}>
-                      <iframe
-                        srcDoc={aiProfile.html}
-                        title="AI Profile Preview"
-                        style={{ width:"100%",height:700,border:"none" }}
-                        sandbox="allow-same-origin"
-                      />
-                    </div>
-                  ) : (
-                    <div style={{ textAlign:"center",padding:32,background:T.bg,borderRadius:12,border:`1px solid ${T.border}` }}>
-                      <p style={{ fontSize:14,color:T.navy,fontWeight:600,marginBottom:8 }}>Profile generated successfully!</p>
-                      <p style={{ fontSize:13,color:T.muted }}>Click "View Full Profile" to see your AI-generated professional profile.</p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+            <AIEnhancer showMsg={showMsg} />
           )}
 
           {/* FIX 5: CORPORATE VISIBILITY TAB (all fields) */}
@@ -3049,46 +2870,10 @@ function StudentAssignments() {
       .finally(()=>setLoading(false));
   },[]);
  
-  // FIX 9: Call Anthropic API for AI Review of submitted assignment
-  const handleAiRev = async (assignment) => {
-    setAiRevLoading(true);
-    setAiRevResult(null);
+  // AiRev: handled by AiRevPanel component
+  const handleAiRev = (assignment) => {
+    setSelected(assignment);
     setShowAiRev(true);
-    try {
-      const prompt = `You are an expert MBA faculty reviewer. A student has submitted the following assignment.
- 
-Assignment Title: ${assignment.title}
-Course: ${assignment.course_name}
-Description / Requirements: ${assignment.description}
-Student's Submission Notes: ${submitForm.notes || assignment.submission_notes || "(No notes provided)"}
-Total Marks: ${assignment.total_marks}
-Due Date: ${assignment.due_date}
- 
-Please provide a detailed AI review with:
-1. **Strengths** (2-3 bullet points)
-2. **Areas for Improvement** (2-3 bullet points)  
-3. **Suggested Score** (out of ${assignment.total_marks})
-4. **Overall Feedback** (2-3 sentences)
-5. **Key Recommendations** (1-2 actionable tips)
- 
-Keep your response structured, constructive, and encouraging. Be specific to the assignment context.`;
- 
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1000,
-          messages: [{ role: "user", content: prompt }],
-        }),
-      });
-      const data = await response.json();
-      const text = data.content?.map(c => c.text || "").join("\n") || "Could not generate review.";
-      setAiRevResult(text);
-    } catch {
-      setAiRevResult("AI Review is temporarily unavailable. Please try again later.");
-    }
-    setAiRevLoading(false);
   };
  
   const handleSubmitAssignment = async () => {
@@ -3170,12 +2955,22 @@ Keep your response structured, constructive, and encouraging. Be specific to the
       {/* Filter tabs */}
       <div className="mba-tabs" style={{marginBottom:16}}>
         {["all","pending","submitted","graded","overdue"].map(f => (
-          <button key={f} className={`mba-tab ${filter===f?"active":""}`} onClick={()=>setFilter(f)} style={{textTransform:"capitalize"}}>
+          <button key={f} className={`mba-tab ${filter===f&&!showAiRev?"active":""}`} onClick={()=>{setFilter(f);setShowAiRev(false);}} style={{textTransform:"capitalize"}}>
             {f}{f!=="all"&&counts[f]!=null?` (${counts[f]})`:""}</button>
         ))}
+        <button onClick={()=>setShowAiRev(v=>!v)} className={showAiRev?"mba-btn-primary":"mba-btn-gold"} style={{marginLeft:"auto",fontSize:13,padding:"8px 18px",display:"flex",alignItems:"center",gap:6}}>
+          <Bot size={14}/> AiRev
+        </button>
       </div>
  
-      {filtered.length===0 ? (
+      {/* AiRev Panel — always accessible via tab */}
+      {showAiRev ? (
+        <AiRevPanel
+          assignment={selected || { id: 1, title: "Assignment Review", description: "Submit your work for AI review" }}
+          submissionNotes=""
+          onClose={() => setShowAiRev(false)}
+        />
+      ) : filtered.length===0 ? (
         <div className="mba-card mba-empty">
           <ClipboardList size={36} style={{color:T.border,margin:"0 auto 8px"}}/>
           <p>No {filter} assignments</p>
@@ -3255,76 +3050,7 @@ Keep your response structured, constructive, and encouraging. Be specific to the
         );
       })}
  
-      {/* FIX 9: AI Review Modal */}
-      {showAiRev && selected && (
-        <div className="mba-modal-bg">
-          <div className="mba-modal" style={{maxWidth:600}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-              <div>
-                <h3 style={{fontSize:18,fontWeight:800,color:T.navy}}>🤖 AI Assignment Review</h3>
-                <p style={{fontSize:13,color:T.muted,marginTop:2}}>{selected.title}</p>
-              </div>
-              <button onClick={()=>{ setShowAiRev(false); setAiRevResult(null); }}
-                style={{background:"none",border:"none",cursor:"pointer",color:T.muted}}><X size={18}/></button>
-            </div>
- 
-            {aiRevLoading ? (
-              <div style={{textAlign:"center",padding:"32px 20px"}}>
-                <div style={{width:56,height:56,borderRadius:"50%",background:"linear-gradient(135deg,#eef2fb,#fdf8ed)",border:`2px solid ${T.gold}`,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px",animation:"mba-spin 2s linear infinite"}}>
-                  <Bot size={24} style={{color:T.navy}}/>
-                </div>
-                <p style={{fontSize:14,fontWeight:700,color:T.navy,marginBottom:4}}>Analysing your assignment…</p>
-                <p style={{fontSize:13,color:T.muted}}>Claude AI is reviewing your submission and generating personalised feedback</p>
-              </div>
-            ) : aiRevResult ? (
-              <div>
-                <div className="mba-ai-rev" style={{marginBottom:16}}>
-                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
-                    <div style={{width:32,height:32,borderRadius:"50%",background:T.navy,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                      <Bot size={15} style={{color:"#fff"}}/>
-                    </div>
-                    <div>
-                      <p style={{fontSize:13,fontWeight:700,color:T.navy}}>AI Review Complete</p>
-                      <p style={{fontSize:11,color:T.subtle}}>Powered by Claude · For reference only</p>
-                    </div>
-                  </div>
-                  {/* Render markdown-style text */}
-                  <div style={{fontSize:14,color:T.text,lineHeight:1.75,whiteSpace:"pre-wrap"}}>
-                    {aiRevResult.split("\n").map((line, i) => {
-                      if (line.startsWith("**") && line.endsWith("**")) {
-                        return <p key={i} style={{fontWeight:800,color:T.navy,marginTop:12,marginBottom:4}}>{line.replace(/\*\*/g,"")}</p>;
-                      }
-                      if (line.startsWith("- ") || line.startsWith("• ")) {
-                        return <p key={i} style={{paddingLeft:16,color:T.text,marginBottom:3,display:"flex",gap:6}}><span style={{color:T.gold,fontWeight:700,flexShrink:0}}>•</span>{line.slice(2)}</p>;
-                      }
-                      if (line.match(/^\d+\./)) {
-                        return <p key={i} style={{paddingLeft:4,color:T.text,marginBottom:3,fontWeight:600}}>{line}</p>;
-                      }
-                      return line ? <p key={i} style={{marginBottom:3,color:T.text}}>{line}</p> : <br key={i}/>;
-                    })}
-                  </div>
-                </div>
-                <div className="mba-alert-info" style={{marginBottom:16}}>
-                  <AlertCircle size={13}/> This AI review is for self-improvement only. Official grading is done by your faculty.
-                </div>
-                <div style={{display:"flex",gap:8}}>
-                  <button className="mba-btn-ghost" onClick={()=>{ setShowAiRev(false); setAiRevResult(null); }}>Close</button>
-                  <button className="mba-btn-gold" onClick={()=>handleAiRev(selected)} style={{fontSize:13}}>
-                    <Bot size={13}/> Re-analyse
-                  </button>
-                  {selected.status==="pending" && (
-                    <button className="mba-btn-primary" style={{flex:1,justifyContent:"center"}}
-                      onClick={()=>{ setShowAiRev(false); setAiRevResult(null); setShowSubmit(true); }}>
-                      <Upload size={13}/> Submit Assignment
-                    </button>
-                  )}
-                </div>
-              </div>
-            ) : null}
-          </div>
-        </div>
-      )}
- 
+
       {/* Details Modal */}
       {showDetails && selected && (()=>{
         const mM = getMaxMarks(selected);
