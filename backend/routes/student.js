@@ -62,11 +62,11 @@ router.get('/migrate-profile-columns', async (req, res) => {
     'date_of_birth DATE',
     'gender VARCHAR(20)',
     'profile_photo TEXT',
-    'language VARCHAR(10) DEFAULT "en"',
-    'timezone VARCHAR(50) DEFAULT "Asia/Kolkata"',
+    `language VARCHAR(10) DEFAULT 'en'`,
+    `timezone VARCHAR(50) DEFAULT 'Asia/Kolkata'`,
     'email_notifications BOOLEAN DEFAULT TRUE',
     'sms_notifications BOOLEAN DEFAULT FALSE',
-    'theme VARCHAR(20) DEFAULT "light"',
+    `theme VARCHAR(20) DEFAULT 'light'`,
     'two_factor_enabled BOOLEAN DEFAULT FALSE',
     'testgen_active BOOLEAN DEFAULT FALSE',
     'testgen_plan VARCHAR(50)',
@@ -969,6 +969,63 @@ router.post('/payments/testgen', ...studentOnly, async (req, res) => {
 });
 
 // ============================================================
+// PROFILE — GET ADDITIONAL INFO
+// GET /api/student/profile/additional
+// ============================================================
+router.get('/profile/additional', ...studentOnly, async (req, res) => {
+  try {
+    const { sequelize } = require('../config/database');
+
+    // Check which columns exist to avoid crashing on missing ones
+    const [cols] = await sequelize.query(
+      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users'`
+    );
+    const existingCols = cols.map(c => c.COLUMN_NAME);
+
+    const wantedCols = [
+      'education_level', 'institution', 'graduation_year', 'field_of_study',
+      'work_experience_years', 'current_employer', 'current_designation',
+      'skills', 'languages', 'certifications', 'hobbies',
+      'emergency_contact_name', 'emergency_contact_phone', 'emergency_contact_relation'
+    ];
+
+    const safeAttrs = wantedCols.filter(c => existingCols.includes(c));
+
+    const user = await User.findByPk(req.user.id, {
+      attributes: safeAttrs.length > 0 ? safeAttrs : ['id']
+    });
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    return res.json({
+      success: true,
+      additional: {
+        education_level:            user.education_level            || '',
+        institution:                user.institution                || '',
+        graduation_year:            user.graduation_year            || '',
+        field_of_study:             user.field_of_study             || '',
+        work_experience_years:      user.work_experience_years      || '',
+        current_employer:           user.current_employer           || '',
+        current_designation:        user.current_designation        || '',
+        skills:                     user.skills                     || '',
+        languages:                  user.languages                  || '',
+        certifications:             user.certifications             || '',
+        hobbies:                    user.hobbies                    || '',
+        emergency_contact_name:     user.emergency_contact_name     || '',
+        emergency_contact_phone:    user.emergency_contact_phone    || '',
+        emergency_contact_relation: user.emergency_contact_relation || '',
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching additional info:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+});
+
+// ============================================================
 // PROFILE — ADDITIONAL INFO
 // PUT /api/student/profile/additional
 // ============================================================
@@ -983,43 +1040,52 @@ router.put('/profile/additional', ...studentOnly, async (req, res) => {
 
     const { sequelize } = require('../config/database');
 
-    // Raw SQL — bypasses Sequelize model cache, works in production
-    await sequelize.query(
-      `UPDATE users SET
-        education_level = ?,
-        institution = ?,
-        graduation_year = ?,
-        field_of_study = ?,
-        work_experience_years = ?,
-        current_employer = ?,
-        current_designation = ?,
-        skills = ?,
-        languages = ?,
-        certifications = ?,
-        hobbies = ?,
-        emergency_contact_name = ?,
-        emergency_contact_phone = ?,
-        emergency_contact_relation = ?
-       WHERE id = ?`,
-      {
-        replacements: [
-          education_level || null,
-          institution || null,
-          graduation_year || null,
-          field_of_study || null,
-          work_experience_years || null,
-          current_employer || null,
-          current_designation || null,
-          skills || null,
-          languages || null,
-          certifications || null,
-          hobbies || null,
-          emergency_contact_name || null,
-          emergency_contact_phone || null,
-          emergency_contact_relation || null,
-          req.user.id
-        ]
+    // Check which columns actually exist in DB (safe for missing columns)
+    const [cols] = await sequelize.query(
+      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users'`
+    );
+    const existingCols = cols.map(c => c.COLUMN_NAME);
+
+    const allUpdates = {
+      education_level,
+      institution,
+      graduation_year,
+      field_of_study,
+      work_experience_years,
+      current_employer,
+      current_designation,
+      skills,
+      languages,
+      certifications,
+      hobbies,
+      emergency_contact_name,
+      emergency_contact_phone,
+      emergency_contact_relation,
+    };
+
+    // Only include columns that exist in the DB
+    const setClauses = [];
+    const replacements = [];
+    Object.entries(allUpdates).forEach(([key, val]) => {
+      if (existingCols.includes(key)) {
+        setClauses.push(`${key} = ?`);
+        replacements.push(val || null);
       }
+    });
+
+    if (setClauses.length === 0) {
+      // No matching columns found — run migration first
+      return res.status(500).json({
+        success: false,
+        message: 'Profile columns are missing. Please visit /api/student/migrate-profile-columns once to set up the database.'
+      });
+    }
+
+    replacements.push(req.user.id);
+    await sequelize.query(
+      `UPDATE users SET ${setClauses.join(', ')} WHERE id = ?`,
+      { replacements }
     );
 
     return res.json({ success: true, message: 'Additional information saved' });
