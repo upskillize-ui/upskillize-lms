@@ -271,6 +271,36 @@ router.get('/profile/complete', ...studentOnly, async (req, res) => {
           twitter:   user.twitter   || '',
           portfolio: user.portfolio || '',
         },
+        additional: {
+          education_level:            user.education_level            || '',
+          institution:                user.institution                || '',
+          graduation_year:            user.graduation_year            || '',
+          field_of_study:             user.field_of_study             || '',
+          work_experience_years:      user.work_experience_years      || '',
+          current_employer:           user.current_employer           || '',
+          current_designation:        user.current_designation        || '',
+          skills:                     user.skills                     || '',
+          languages:                  user.languages                  || '',
+          certifications:             user.certifications             || '',
+          hobbies:                    user.hobbies                    || '',
+          emergency_contact_name:     user.emergency_contact_name     || '',
+          emergency_contact_phone:    user.emergency_contact_phone    || '',
+          emergency_contact_relation: user.emergency_contact_relation || '',
+        },
+        job_preferences: {
+          preferred_role:       user.preferred_role       || '',
+          preferred_location:   user.preferred_location   || '',
+          preferred_salary_min: user.preferred_salary_min || '',
+          preferred_salary_max: user.preferred_salary_max || '',
+          employment_type:      user.employment_type      || '',
+          work_mode:            user.work_mode            || '',
+          notice_period:        user.notice_period        || '',
+          open_to_relocation:   user.open_to_relocation   || '',
+          industries:           user.industries           || '',
+          company_size:         user.company_size         || '',
+          key_skills:           user.key_skills           || '',
+          career_goals:         user.career_goals         || '',
+        },
         resume_url:        user.resume_url        || null,
         resume_name:       user.resume_name       || null,
         corporate_visible: user.corporate_visible ?? false,
@@ -852,6 +882,90 @@ router.post('/payments/testgen', ...studentOnly, async (req, res) => {
   } catch (error) {
     console.error('TestGen payment error:', error);
     res.status(500).json({ success: false, message: 'Payment processing failed' });
+  }
+});
+
+// ============================================================
+// PROFILE — ADDITIONAL INFO
+// PUT /api/student/profile/additional
+// ============================================================
+router.put('/profile/additional', ...studentOnly, async (req, res) => {
+  try {
+    const {
+      education_level, institution, graduation_year, field_of_study,
+      work_experience_years, current_employer, current_designation,
+      skills, languages, certifications, hobbies,
+      emergency_contact_name, emergency_contact_phone, emergency_contact_relation
+    } = req.body;
+
+    const { sequelize } = require('../config/database');
+    const [cols] = await sequelize.query(
+      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users'`
+    );
+    const existingCols = cols.map(c => c.COLUMN_NAME);
+
+    const allFields = {
+      education_level, institution, graduation_year, field_of_study,
+      work_experience_years, current_employer, current_designation,
+      skills, languages, certifications, hobbies,
+      emergency_contact_name, emergency_contact_phone, emergency_contact_relation
+    };
+
+    const updateData = {};
+    Object.keys(allFields).forEach(k => {
+      if (existingCols.includes(k)) updateData[k] = allFields[k] || null;
+    });
+
+    if (Object.keys(updateData).length > 0) {
+      await User.update(updateData, { where: { id: req.user.id } });
+    }
+
+    return res.json({ success: true, message: 'Additional information saved' });
+  } catch (error) {
+    console.error('Error saving additional info:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// ============================================================
+// PROFILE — JOB PREFERENCES
+// PUT /api/student/profile/job-preferences
+// ============================================================
+router.put('/profile/job-preferences', ...studentOnly, async (req, res) => {
+  try {
+    const {
+      preferred_role, preferred_location, preferred_salary_min, preferred_salary_max,
+      employment_type, work_mode, notice_period, open_to_relocation,
+      industries, company_size, key_skills, career_goals
+    } = req.body;
+
+    const { sequelize } = require('../config/database');
+    const [cols] = await sequelize.query(
+      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users'`
+    );
+    const existingCols = cols.map(c => c.COLUMN_NAME);
+
+    const allFields = {
+      preferred_role, preferred_location, preferred_salary_min, preferred_salary_max,
+      employment_type, work_mode, notice_period, open_to_relocation,
+      industries, company_size, key_skills, career_goals
+    };
+
+    const updateData = {};
+    Object.keys(allFields).forEach(k => {
+      if (existingCols.includes(k)) updateData[k] = allFields[k] || null;
+    });
+
+    if (Object.keys(updateData).length > 0) {
+      await User.update(updateData, { where: { id: req.user.id } });
+    }
+
+    return res.json({ success: true, message: 'Job preferences saved' });
+  } catch (error) {
+    console.error('Error saving job preferences:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 
