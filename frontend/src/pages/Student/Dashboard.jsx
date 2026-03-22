@@ -2955,22 +2955,12 @@ function StudentAssignments() {
       {/* Filter tabs */}
       <div className="mba-tabs" style={{marginBottom:16}}>
         {["all","pending","submitted","graded","overdue"].map(f => (
-          <button key={f} className={`mba-tab ${filter===f&&!showAiRev?"active":""}`} onClick={()=>{setFilter(f);setShowAiRev(false);}} style={{textTransform:"capitalize"}}>
+          <button key={f} className={`mba-tab ${filter===f?"active":""}`} onClick={()=>setFilter(f)} style={{textTransform:"capitalize"}}>
             {f}{f!=="all"&&counts[f]!=null?` (${counts[f]})`:""}</button>
         ))}
-        <button onClick={()=>setShowAiRev(v=>!v)} className={showAiRev?"mba-btn-primary":"mba-btn-gold"} style={{marginLeft:"auto",fontSize:13,padding:"8px 18px",display:"flex",alignItems:"center",gap:6}}>
-          <Bot size={14}/> AiRev
-        </button>
       </div>
  
-      {/* AiRev Panel — always accessible via tab */}
-      {showAiRev ? (
-        <AiRevPanel
-          assignment={selected || { id: 1, title: "Assignment Review", description: "Submit your work for AI review" }}
-          submissionNotes=""
-          onClose={() => setShowAiRev(false)}
-        />
-      ) : filtered.length===0 ? (
+      {filtered.length===0 ? (
         <div className="mba-card mba-empty">
           <ClipboardList size={36} style={{color:T.border,margin:"0 auto 8px"}}/>
           <p>No {filter} assignments</p>
@@ -3032,13 +3022,7 @@ function StudentAssignments() {
                 </button>
               )}
  
-              {/* FIX 9: AI Review button — shown for pending/submitted assignments */}
-              {(a.status==="pending"||a.status==="submitted") && (
-                <button className="mba-btn-gold" onClick={()=>{ setSelected(a); handleAiRev(a); }}
-                  style={{fontSize:13,padding:"8px 14px"}}>
-                  <Bot size={13}/> AI Review
-                </button>
-              )}
+
  
               {a.status==="submitted" && (
                 <span className="mba-pill mba-pill-pass" style={{display:"inline-flex",alignItems:"center",gap:4,padding:"7px 12px"}}>
@@ -3050,6 +3034,14 @@ function StudentAssignments() {
         );
       })}
  
+      {/* AiRev Panel */}
+      {showAiRev && selected && (
+        <AiRevPanel
+          assignment={selected}
+          submissionNotes={submitForm.notes}
+          onClose={() => { setShowAiRev(false); setAiRevResult(null); }}
+        />
+      )}
 
       {/* Details Modal */}
       {showDetails && selected && (()=>{
