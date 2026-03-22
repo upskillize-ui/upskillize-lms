@@ -1004,6 +1004,14 @@ router.post('/payments/testgen', ...studentOnly, async (req, res) => {
 // ============================================================
 router.get('/profile/additional', ...studentOnly, async (req, res) => {
   try {
+    // ── ROLE GUARD ──────────────────────────────────────────
+    // This endpoint is student-only. If a faculty user somehow reaches
+    // this route the rbac middleware already blocks them with 403.
+    // The guard below ensures we never run a DB query with the wrong id.
+    if (req.user.role !== 'student' && req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Access forbidden. Students only.' });
+    }
+
     const { sequelize } = require('../config/database');
 
     // Check which columns exist to avoid crashing on missing ones
@@ -1061,6 +1069,11 @@ router.get('/profile/additional', ...studentOnly, async (req, res) => {
 // ============================================================
 router.put('/profile/additional', ...studentOnly, async (req, res) => {
   try {
+    // ── ROLE GUARD ──────────────────────────────────────────
+    if (req.user.role !== 'student' && req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Access forbidden. Students only.' });
+    }
+
     const {
       education_level, institution, graduation_year, field_of_study,
       work_experience_years, current_employer, current_designation,

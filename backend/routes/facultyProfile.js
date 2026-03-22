@@ -12,6 +12,7 @@ const { User, Faculty, Course, Enrollment, Student, Exam, Result,
         Notification } = require('../models');
 const authMiddleware = require('../middleware/auth');
 
+// ── MULTER: profile photo ──────────────────────────────────
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     const uploadDir = 'uploads/profiles/faculty';
@@ -23,12 +24,11 @@ const storage = multer.diskStorage({
     cb(null, 'profile-' + uniqueSuffix + path.extname(file.originalname));
   }
 });
-
 const upload = multer({
   storage,
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: function (req, file, cb) {
-    const allowedTypes = /jpeg|jpg|png|gif/;
+    const allowedTypes = /jpeg|jpg|png|gif|webp/;
     if (allowedTypes.test(path.extname(file.originalname).toLowerCase()) && allowedTypes.test(file.mimetype)) {
       return cb(null, true);
     }
@@ -36,7 +36,7 @@ const upload = multer({
   }
 });
 
-// ── CONTENT UPLOAD MULTER CONFIG ──────────────────────────
+// ── MULTER: content upload ─────────────────────────────────
 const contentStorage = multer.diskStorage({
   destination: function (req, file, cb) {
     const dir = path.join(__dirname, '../uploads/content');
@@ -58,9 +58,7 @@ const contentUpload = multer({
   }
 });
 
-
-// ── SHARED HELPER: ensure faculty_content table exists ─────
-// Called once at startup so every route avoids repeating DDL
+// ── HELPER: ensure faculty_content table exists ────────────
 let _contentTableReady = false;
 async function ensureContentTable(sequelize) {
   if (_contentTableReady) return;
@@ -81,7 +79,6 @@ async function ensureContentTable(sequelize) {
       created_at    TIMESTAMP     DEFAULT CURRENT_TIMESTAMP
     )
   `);
-  // One-time safe column additions (idempotent)
   for (const sql of [
     'ALTER TABLE faculty_content ADD COLUMN display_order INT DEFAULT 1',
     'ALTER TABLE faculty_content ADD COLUMN duration VARCHAR(100)',
@@ -91,62 +88,358 @@ async function ensureContentTable(sequelize) {
   _contentTableReady = true;
 }
 
-// ── PROFILE PHOTO ──────────────────────────────────────────
-router.post('/profile/photo', authMiddleware, upload.single('photo'), async (req, res) => {
+// ── HELPER: safe column check ──────────────────────────────
+// Returns a Set of column names that currently exist in the given table.
+async function getExistingColumns(sequelize, tableName) {
+  const [cols] = await sequelize.query(
+    `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?`,
+    { replacements: [tableName] }
+  );
+  return new Set(cols.map(c => c.COLUMN_NAME));
+}
+
+// ── HELPER: safe update ────────────────────────────────────
+// Only includes keys that actually exist as columns in the table.
+async function safeUpdate(model, tableName, updates, where, sequelize) {
+  const existing = await getExistingColumns(sequelize, tableName);
+  const safe = {};
+  for (const [k, v] of Object.entries(updates)) {
+    if (existing.has(k)) safe[k] = v;
+  }
+  if (Object.keys(safe).length > 0) {
+    await model.update(safe, { where });
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// GET /api/faculty/profile
+// ── WAS MISSING (404) — now added ──────────────────────────
+// Dashboard.jsx calls this on mount: api.get("/faculty/profile")
+// ══════════════════════════════════════════════════════════════
+router.get('/profile', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findByPk(req.user.id, {
+      attributes: { exclude: ['password_hash', 'password'] },
+    });
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
+
+    // Flat profile object — matches every field Dashboard.jsx setState calls
+    const profile = {
+      // ── users table ──────────────────────────────────────
+      full_name:     user.full_name     || '',
+      email:         user.email         || '',
+      phone_number:  user.phone         || '',   // Dashboard uses phone_number
+      phone:         user.phone         || '',
+      profile_photo: user.profile_photo || null,
+      date_of_birth: user.date_of_birth || '',
+      gender:        user.gender        || '',
+      bio:           user.bio           || '',
+      // address
+      address_line1:  user.address_line1  || '',
+      address_line2:  user.address_line2  || '',
+      city:           user.city           || '',
+      state:          user.state          || '',
+      country:        user.country        || '',
+      postal_code:    user.postal_code    || '',
+      // emergency
+      emergency_contact_name:  user.emergency_contact_name  || '',
+      emergency_contact_phone: user.emergency_contact_phone || '',
+      // additional
+      edu_degree:      user.edu_degree      || '',
+      edu_institution: user.edu_institution || '',
+      edu_year:        user.edu_year        || '',
+      edu_grade:       user.edu_grade       || '',
+      certifications:  user.certifications  || '',
+      languages_known: user.languages_known || '',
+      skills:          user.skills          || '',
+      achievements:    user.achievements    || '',
+      publications:    user.publications    || '',
+      // social
+      linkedin: user.linkedin || '',
+      github:   user.github   || '',
+      twitter:  user.twitter  || '',
+      website:  user.website  || '',
+      // bank
+      account_holder_name:     user.account_holder_name     || '',
+      bank_name:               user.bank_name               || '',
+      ifsc_code:               user.ifsc_code               || '',
+      branch_name:             user.branch_name             || '',
+      account_type:            user.account_type            || 'savings',
+      pan_number:              user.pan_number              || '',
+      uan_number:              user.uan_number              || '',
+      // ── faculty table ─────────────────────────────────────
+      employee_id:      faculty?.employee_id      || '',
+      department:       faculty?.department       || '',
+      qualifications:   faculty?.qualifications   || '',
+      qualification:    faculty?.qualifications   || '',  // Dashboard uses both keys
+      subjects:         faculty?.subjects         || '',
+      experience_years: faculty?.experience_years || '',
+      // professional extras (stored on users)
+      designation:    user.designation    || '',
+      specialization: user.specialization || '',
+      joining_date:   user.joining_date   || '',
+    };
+
+    return res.json({ success: true, profile });
+  } catch (error) {
+    console.error('GET /faculty/profile error:', error);
+    res.status(500).json({ success: false, message: 'Error fetching profile' });
+  }
+});
+
+// ══════════════════════════════════════════════════════════════
+// POST /api/faculty/profile/photo
+// FIX: Dashboard sends field name "profile_photo", not "photo"
+//      Response key changed from imageUrl → photo_url
+// ══════════════════════════════════════════════════════════════
+router.post('/profile/photo', authMiddleware, upload.single('profile_photo'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded' });
-    const imageUrl = `/uploads/profiles/faculty/${req.file.filename}`;
-    await User.update({ profile_photo: imageUrl }, { where: { id: req.user.id, role: 'faculty' } });
-     res.json({ success: true, imageUrl });   // ← photo_url to match frontend
+    const photo_url = `/uploads/profiles/faculty/${req.file.filename}`;
+    await User.update({ profile_photo: photo_url }, { where: { id: req.user.id } });
+    res.json({ success: true, photo_url });   // Dashboard reads r.data.photo_url
   } catch (error) {
+    console.error('Photo upload error:', error);
     res.status(500).json({ success: false, message: 'Error uploading profile photo' });
   }
 });
 
-// ── PROFILE PERSONAL ───────────────────────────────────────
+// ══════════════════════════════════════════════════════════════
+// PUT /api/faculty/profile/personal
+// FIX: also saves date_of_birth, gender, bio; safe column check
+// ══════════════════════════════════════════════════════════════
 router.put('/profile/personal', authMiddleware, async (req, res) => {
   try {
-    const { full_name, phone_number } = req.body;
+    const { full_name, phone_number, date_of_birth, gender, bio } = req.body;
     if (!full_name?.trim()) return res.status(400).json({ success: false, message: 'Full name is required' });
-    const [updated] = await User.update(
-      { full_name: full_name.trim(), phone: phone_number?.trim() || null },
-      { where: { id: req.user.id, role: 'faculty' } }
-    );
-    if (updated === 0) return res.status(404).json({ success: false, message: 'Faculty profile not found' });
+
+    const { sequelize } = require('../config/database');
+    await safeUpdate(User, 'users', {
+      full_name:     full_name.trim(),
+      phone:         phone_number?.trim() || null,
+      date_of_birth: date_of_birth        || null,
+      gender:        gender               || null,
+      bio:           bio?.trim()          || null,
+    }, { id: req.user.id }, sequelize);
+
     res.json({ success: true, message: 'Personal information updated successfully' });
   } catch (error) {
+    console.error('PUT /faculty/profile/personal error:', error);
     res.status(500).json({ success: false, message: 'Error updating personal information' });
   }
 });
 
-// ── PROFILE PROFESSIONAL ───────────────────────────────────
+// ══════════════════════════════════════════════════════════════
+// PUT /api/faculty/profile/professional
+// FIX: was a stub — now actually saves to Faculty table + users
+// ══════════════════════════════════════════════════════════════
 router.put('/profile/professional', authMiddleware, async (req, res) => {
   try {
+    const { designation, department, qualification, specialization,
+            experience_years, joining_date, employee_id } = req.body;
+
+    const { sequelize } = require('../config/database');
+
+    // Save Faculty table fields
+    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
+    if (faculty) {
+      const facultyUpdates = {};
+      if (department        !== undefined) facultyUpdates.department      = department        || null;
+      if (qualification     !== undefined) facultyUpdates.qualifications  = qualification    || null;
+      if (experience_years  !== undefined) facultyUpdates.experience_years= experience_years  ? parseInt(experience_years) : null;
+      if (Object.keys(facultyUpdates).length > 0) await faculty.update(facultyUpdates);
+    }
+
+    // Save extra columns on users table (designation, specialization, joining_date)
+    await safeUpdate(User, 'users', {
+      designation:    designation    || null,
+      specialization: specialization || null,
+      joining_date:   joining_date   || null,
+    }, { id: req.user.id }, sequelize);
+
     res.json({ success: true, message: 'Professional information updated successfully' });
   } catch (error) {
+    console.error('PUT /faculty/profile/professional error:', error);
     res.status(500).json({ success: false, message: 'Error updating professional information' });
   }
 });
 
-// ── PROFILE CONTACT ────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════
+// PUT /api/faculty/profile/contact
+// FIX: was a stub — now actually saves address + emergency contact
+// ══════════════════════════════════════════════════════════════
 router.put('/profile/contact', authMiddleware, async (req, res) => {
   try {
+    const { address_line1, address_line2, city, state, country, postal_code,
+            emergency_contact_name, emergency_contact_phone } = req.body;
+
+    const { sequelize } = require('../config/database');
+    await safeUpdate(User, 'users', {
+      address_line1, address_line2, city, state, country, postal_code,
+      emergency_contact_name, emergency_contact_phone,
+    }, { id: req.user.id }, sequelize);
+
     res.json({ success: true, message: 'Contact information updated successfully' });
   } catch (error) {
+    console.error('PUT /faculty/profile/contact error:', error);
     res.status(500).json({ success: false, message: 'Error updating contact information' });
   }
 });
 
-// ── PROFILE SOCIAL ─────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════
+// PUT /api/faculty/profile/additional
+// NEW ROUTE — was missing entirely
+// Saves edu details, certifications, skills, achievements, publications
+// ══════════════════════════════════════════════════════════════
+router.put('/profile/additional', authMiddleware, async (req, res) => {
+  try {
+    const { edu_degree, edu_institution, edu_year, edu_grade,
+            certifications, languages_known, skills,
+            achievements, publications } = req.body;
+
+    const { sequelize } = require('../config/database');
+    await safeUpdate(User, 'users', {
+      edu_degree, edu_institution, edu_year, edu_grade,
+      certifications, languages_known, skills,
+      achievements, publications,
+    }, { id: req.user.id }, sequelize);
+
+    res.json({ success: true, message: 'Additional information updated successfully' });
+  } catch (error) {
+    console.error('PUT /faculty/profile/additional error:', error);
+    res.status(500).json({ success: false, message: 'Error updating additional information' });
+  }
+});
+
+// ══════════════════════════════════════════════════════════════
+// PUT /api/faculty/profile/social
+// FIX: was a stub — now actually saves linkedin/github/twitter/website
+// ══════════════════════════════════════════════════════════════
 router.put('/profile/social', authMiddleware, async (req, res) => {
   try {
+    const { linkedin, github, twitter, website } = req.body;
+
+    const { sequelize } = require('../config/database');
+    await safeUpdate(User, 'users', {
+      linkedin: linkedin || null,
+      github:   github   || null,
+      twitter:  twitter  || null,
+      website:  website  || null,
+    }, { id: req.user.id }, sequelize);
+
     res.json({ success: true, message: 'Social links updated successfully' });
   } catch (error) {
+    console.error('PUT /faculty/profile/social error:', error);
     res.status(500).json({ success: false, message: 'Error updating social links' });
   }
 });
 
-// ── DASHBOARD STATS ────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════
+// PUT /api/faculty/profile/bank
+// NEW ROUTE — was missing entirely
+// ══════════════════════════════════════════════════════════════
+router.put('/profile/bank', authMiddleware, async (req, res) => {
+  try {
+    const { account_holder_name, bank_name, account_number,
+            ifsc_code, branch_name, account_type,
+            pan_number, uan_number } = req.body;
+
+    const { sequelize } = require('../config/database');
+    await safeUpdate(User, 'users', {
+      account_holder_name, bank_name, account_number,
+      ifsc_code, branch_name,
+      account_type: account_type || 'savings',
+      pan_number, uan_number,
+    }, { id: req.user.id }, sequelize);
+
+    res.json({ success: true, message: 'Bank details saved securely' });
+  } catch (error) {
+    console.error('PUT /faculty/profile/bank error:', error);
+    res.status(500).json({ success: false, message: 'Error saving bank details' });
+  }
+});
+
+// ══════════════════════════════════════════════════════════════
+// ONE-TIME MIGRATION
+// GET /api/faculty/migrate-profile-columns
+// Run once to add all missing columns to users table.
+// Safe to re-run — skips existing columns.
+// ══════════════════════════════════════════════════════════════
+router.get('/migrate-profile-columns', async (req, res) => {
+  const { sequelize } = require('../config/database');
+  const columns = [
+    // personal
+    "date_of_birth DATE",
+    "gender VARCHAR(20)",
+    "bio TEXT",
+    // professional extras (on users, not faculty table)
+    "designation VARCHAR(255)",
+    "specialization VARCHAR(255)",
+    "joining_date DATE",
+    // contact
+    "address_line1 VARCHAR(255)",
+    "address_line2 VARCHAR(255)",
+    "city VARCHAR(100)",
+    "state VARCHAR(100)",
+    "country VARCHAR(100)",
+    "postal_code VARCHAR(20)",
+    "emergency_contact_name VARCHAR(255)",
+    "emergency_contact_phone VARCHAR(50)",
+    // additional
+    "edu_degree VARCHAR(255)",
+    "edu_institution VARCHAR(255)",
+    "edu_year VARCHAR(10)",
+    "edu_grade VARCHAR(50)",
+    "certifications TEXT",
+    "languages_known VARCHAR(255)",
+    "skills TEXT",
+    "achievements TEXT",
+    "publications TEXT",
+    // social
+    "linkedin VARCHAR(500)",
+    "github VARCHAR(500)",
+    "twitter VARCHAR(500)",
+    "website VARCHAR(500)",
+    // bank
+    "account_holder_name VARCHAR(255)",
+    "bank_name VARCHAR(255)",
+    "account_number VARCHAR(100)",
+    "ifsc_code VARCHAR(20)",
+    "branch_name VARCHAR(255)",
+    "account_type VARCHAR(50) DEFAULT 'savings'",
+    "pan_number VARCHAR(20)",
+    "uan_number VARCHAR(20)",
+  ];
+
+  const results = [];
+  for (const col of columns) {
+    const name = col.split(' ')[0];
+    try {
+      await sequelize.query(`ALTER TABLE users ADD COLUMN ${col}`);
+      results.push({ column: name, status: 'added' });
+    } catch (e) {
+      if (e.original?.errno === 1060 || e.parent?.errno === 1060) {
+        results.push({ column: name, status: 'already_exists' });
+      } else {
+        results.push({ column: name, status: 'error', message: e.message });
+      }
+    }
+  }
+
+  const added    = results.filter(r => r.status === 'added').length;
+  const existing = results.filter(r => r.status === 'already_exists').length;
+  const errors   = results.filter(r => r.status === 'error');
+  return res.json({ success: true, added, existing, errors, results });
+});
+
+
+// ══════════════════════════════════════════════════════════════
+// DASHBOARD STATS
+// GET /api/faculty/dashboard/stats
+// ══════════════════════════════════════════════════════════════
 router.get('/dashboard/stats', authMiddleware, async (req, res) => {
   try {
     const userId = req.user.id;
@@ -206,29 +499,11 @@ router.get('/dashboard/stats', authMiddleware, async (req, res) => {
       ? await Exam.count({ where: { course_id: { [Op.in]: courseIds }, is_active: true } })
       : 0;
 
-    // ─────────────────────────────────────────────────────────────────────
-    // FIX: Added  as: 'user'  to the nested Student include.
-    //
-    // The Student model defines its User association with a lowercase alias:
-    //   Student.belongsTo(User, { as: 'user', foreignKey: 'user_id' })
-    //
-    // Sequelize throws EagerLoadingError when the 'as' value doesn't exactly
-    // match the alias defined in the association (case-sensitive).
-    //
-    // BEFORE (broken):
-    //   include: [{ model: Student, include: [{ model: User, attributes: ['full_name'] }] }]
-    //
-    // AFTER (fixed — lowercase 'user'):
-    //   include: [{ model: Student, include: [{ model: User, as: 'user', attributes: ['full_name'] }] }]
-    // ─────────────────────────────────────────────────────────────────────
     const recentEnrollments = courseIds.length > 0
       ? await Enrollment.findAll({
           where: { course_id: { [Op.in]: courseIds } },
           include: [
-            {
-              model: Student,
-              include: [{ model: User, as: 'user', attributes: ['full_name'] }]  // ✅ FIXED — lowercase alias
-            },
+            { model: Student, include: [{ model: User, as: 'user', attributes: ['full_name'] }] },
             { model: Course, attributes: ['course_name'] }
           ],
           order: [['created_at', 'DESC']],
@@ -258,7 +533,9 @@ router.get('/dashboard/stats', authMiddleware, async (req, res) => {
   }
 });
 
-// ── QUIZZES ────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════
+// QUIZZES
+// ══════════════════════════════════════════════════════════════
 router.get('/quizzes', authMiddleware, async (req, res) => {
   try {
     const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
@@ -289,7 +566,9 @@ router.get('/quizzes', authMiddleware, async (req, res) => {
   }
 });
 
-// ── COURSES ────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════
+// COURSES
+// ══════════════════════════════════════════════════════════════
 router.get('/courses', authMiddleware, async (req, res) => {
   try {
     const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
@@ -297,7 +576,7 @@ router.get('/courses', authMiddleware, async (req, res) => {
 
     const courses = await Course.findAll({
       where: { faculty_id: faculty.id, is_active: true },
-      attributes: ['id', 'course_name', ['course_code', 'code']], // alias so frontend c.code works
+      attributes: ['id', 'course_name', ['course_code', 'code']],
       order: [['course_name', 'ASC']]
     });
 
@@ -308,7 +587,9 @@ router.get('/courses', authMiddleware, async (req, res) => {
   }
 });
 
-// ── STUDENTS ───────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════
+// STUDENTS
+// ══════════════════════════════════════════════════════════════
 router.get('/students', authMiddleware, async (req, res) => {
   try {
     const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
@@ -324,16 +605,12 @@ router.get('/students', authMiddleware, async (req, res) => {
     const enrollments = await Enrollment.findAll({
       where: { course_id: { [Op.in]: courseIds } },
       include: [
-        {
-          model: Student,
-          include: [{ model: User, as: 'user', attributes: ['full_name', 'email', 'phone', 'profile_photo'] }]  // ✅ lowercase alias matches model definition
-        },
+        { model: Student, include: [{ model: User, as: 'user', attributes: ['full_name', 'email', 'phone', 'profile_photo'] }] },
         { model: Course, attributes: ['course_name'] }
       ],
       order: [['created_at', 'DESC']]
     });
 
-    // Deduplicate by student_id, attach all enrolled courses
     const studentMap = {};
     for (const e of enrollments) {
       const sid = e.student_id;
@@ -349,9 +626,7 @@ router.get('/students', authMiddleware, async (req, res) => {
           enrolled_at: e.created_at
         };
       }
-      if (e.Course?.course_name) {
-        studentMap[sid].courses.push(e.Course.course_name);
-      }
+      if (e.Course?.course_name) studentMap[sid].courses.push(e.Course.course_name);
     }
 
     res.json({ success: true, students: Object.values(studentMap) });
@@ -361,7 +636,9 @@ router.get('/students', authMiddleware, async (req, res) => {
   }
 });
 
-// ── CONTENT GET ────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════
+// CONTENT — GET
+// ══════════════════════════════════════════════════════════════
 router.get('/content', authMiddleware, async (req, res) => {
   try {
     const { sequelize } = require('../config/database');
@@ -385,9 +662,10 @@ router.get('/content', authMiddleware, async (req, res) => {
   }
 });
 
-// ── CONTENT UPLOAD POST ────────────────────────────────────
+// ══════════════════════════════════════════════════════════════
+// CONTENT — UPLOAD
+// ══════════════════════════════════════════════════════════════
 router.post('/content/upload', authMiddleware, (req, res, next) => {
-  // Run multer, but don't crash if no file — record metadata only
   contentUpload.single('file')(req, res, (err) => {
     if (err && err.code !== 'LIMIT_UNEXPECTED_FILE') {
       return res.status(400).json({ success: false, message: err.message });
@@ -400,952 +678,40 @@ router.post('/content/upload', authMiddleware, (req, res, next) => {
     const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
     if (!faculty) return res.status(404).json({ success: false, message: 'Faculty not found' });
 
-    // Fields come from multipart/form-data (parsed by multer into req.body)
-    const title       = (req.body.title       || '').trim();
-    const description = (req.body.description || '').trim();
-    const type        = (req.body.type        || 'video').trim();
-    const course_id   = req.body.course || req.body.course_id || null;
-    const duration    = (req.body.duration    || '').toString();
-    const order       = parseInt(req.body.order) || 1;
-
-    if (!title) return res.status(400).json({ success: false, message: 'Title is required' });
-
-    // File saved by multer (may be undefined if no file provided)
-    const file_path = req.file ? '/uploads/content/' + req.file.filename : '';
-    const file_size = req.file ? (req.file.size / 1024 / 1024).toFixed(1) + ' MB' : '';
-
     await ensureContentTable(sequelize);
 
-    const [result] = await sequelize.query(`
-      INSERT INTO faculty_content (title, description, type, course_id, faculty_id, file_path, file_size, duration, display_order)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, { replacements: [title, description, type, course_id || null, faculty.id, file_path, file_size, duration, order] });
-
-    // Get course name for response
-    let courseName = '';
-    if (course_id) {
-      try {
-        const [rows] = await sequelize.query('SELECT course_name FROM courses WHERE id = ?', { replacements: [course_id] });
-        courseName = rows[0]?.course_name || '';
-      } catch(e) {}
-    }
-
-    res.json({
-      success: true,
-      content: {
-        id: result, title, description, type,
-        course: courseName, course_id,
-        file_path, size: file_size,
-        duration, status: 'published', views: 0,
-        uploadDate: new Date().toLocaleDateString('en-IN')
-      }
-    });
-  } catch (error) {
-    console.error('POST /faculty/content/upload error:', error.message);
-    res.status(500).json({ success: false, message: 'Upload error: ' + error.message });
-  }
-});
-
-// ── ANNOUNCEMENTS GET ──────────────────────────────────────
-router.get('/announcements', authMiddleware, async (req, res) => {
-  try {
-    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
-    if (!faculty) return res.json({ success: true, announcements: [] });
-    const { sequelize } = require('../config/database');
-    await sequelize.query(`CREATE TABLE IF NOT EXISTS announcements (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      title VARCHAR(255), message TEXT,
-      course VARCHAR(255), priority VARCHAR(50) DEFAULT 'Medium',
-      faculty_id INT, views INT DEFAULT 0,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )`);
-    const [rows] = await sequelize.query(
-      `SELECT *, DATE_FORMAT(created_at,'%d %b %Y') as date
-       FROM announcements WHERE faculty_id = ? ORDER BY created_at DESC`,
-      { replacements: [faculty.id] }
-    );
-    res.json({ success: true, announcements: rows });
-  } catch (e) {
-    console.error(e);
-    res.json({ success: true, announcements: [] });
-  }
-});
-
-// ── ANNOUNCEMENTS POST (with student notifications) ────────
-router.post('/announcements', authMiddleware, async (req, res) => {
-  try {
-    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
-    const { title, message, course, priority } = req.body;
-    const { sequelize } = require('../config/database');
-
-    // Save announcement
-    const [result] = await sequelize.query(
-      `INSERT INTO announcements (title, message, course, priority, faculty_id) VALUES (?,?,?,?,?)`,
-      { replacements: [title, message, course || 'All', priority || 'Medium', faculty.id] }
-    );
-
-    console.log('✅ Announcement saved, id:', result);
-    console.log('📋 course value received:', course);
-
-    // Find course IDs
-    let courseIds = [];
-    if (course && course !== 'All') {
-      const courseRecord = await Course.findOne({ where: { id: course, faculty_id: faculty.id } });
-      console.log('📚 courseRecord found:', courseRecord?.id);
-      if (courseRecord) courseIds = [courseRecord.id];
-    } else {
-      const allCourses = await Course.findAll({ where: { faculty_id: faculty.id }, attributes: ['id'] });
-      courseIds = allCourses.map(c => c.id);
-      console.log('📚 all courseIds:', courseIds);
-    }
-
-    console.log('📚 Final courseIds:', courseIds);
-
-    if (courseIds.length > 0) {
-      const enrollments = await Enrollment.findAll({
-        where: { course_id: courseIds },
-        attributes: ['student_id']
-      });
-
-      console.log('👥 Enrollments found:', enrollments.length);
-
-      const studentIds = [...new Set(enrollments.map(e => e.student_id).filter(Boolean))];
-
-      const students = await Student.findAll({
-        where: { id: studentIds },
-        attributes: ['user_id']
-      });
-
-      const userIds = [...new Set(students.map(s => s.user_id).filter(Boolean))];
-      console.log('👥 userIds to notify:', userIds);
-
-      if (userIds.length > 0) {
-        await Notification.bulkCreate(
-          userIds.map(user_id => ({
-            user_id,
-            title,
-            message,
-            type: 'announcement',
-            is_read: false,
-            created_at: new Date(),
-            updated_at: new Date()
-          }))
-        );
-        console.log('✅ Notifications inserted for userIds:', userIds);
-      } else {
-        console.log('⚠️ No userIds found — no notifications inserted');
-      }
-    } else {
-      console.log('⚠️ No courseIds found — no notifications inserted');
-    }
-
-    res.json({ success: true, announcement: { id: result, title, message, course, priority, date: new Date().toLocaleDateString(), views: 0 } });
-  } catch (e) {
-    console.error('❌ FULL ERROR:', e);
-    res.status(500).json({ success: false, message: e.message });
-  }
-});
-
-// ── ANNOUNCEMENTS DELETE ───────────────────────────────────
-router.delete('/announcements/:id', authMiddleware, async (req, res) => {
-  try {
-    const { sequelize } = require('../config/database');
-    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
-    await sequelize.query(
-      `DELETE FROM announcements WHERE id = ? AND faculty_id = ?`,
-      { replacements: [req.params.id, faculty.id] }
-    );
-    res.json({ success: true });
-  } catch (e) {
-    res.status(500).json({ success: false, message: e.message });
-  }
-});
-
-// ── MESSAGES ───────────────────────────────────────────────
-router.get('/messages', authMiddleware, async (req, res) => {
-  res.json({ success: true, messages: [] });
-});
-
-// ── ASSIGNMENTS GET ────────────────────────────────────────
-router.get('/assignments', authMiddleware, async (req, res) => {
-  try {
-    const { sequelize } = require('../config/database');
-    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
-    if (!faculty) return res.json({ success: true, assignments: [] });
-
-    await sequelize.query(`CREATE TABLE IF NOT EXISTS assignments (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      title VARCHAR(255), description TEXT,
-      course_id INT, faculty_id INT,
-      due_date DATE, total_marks INT DEFAULT 100,
-      rubric JSON, status VARCHAR(50) DEFAULT 'active',
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-    )`);
-    await sequelize.query(`CREATE TABLE IF NOT EXISTS assignment_submissions (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      assignment_id INT, student_id INT,
-      file_path VARCHAR(500), file_name VARCHAR(255),
-      notes TEXT, grade INT, feedback TEXT,
-      status VARCHAR(50) DEFAULT 'submitted',
-      submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )`);
-
-    const [rows] = await sequelize.query(`
-      SELECT a.*,
-        COALESCE(c.course_name, 'Unknown') as course,
-        (SELECT COUNT(*) FROM enrollments e WHERE e.course_id = a.course_id) as totalStudents,
-        (SELECT COUNT(*) FROM assignment_submissions s WHERE s.assignment_id = a.id) as submissions,
-        (SELECT COUNT(*) FROM assignment_submissions s WHERE s.assignment_id = a.id AND s.status='graded') as graded
-      FROM assignments a
-      LEFT JOIN courses c ON c.id = a.course_id
-      WHERE a.faculty_id = ?
-      ORDER BY a.created_at DESC`,
-      { replacements: [faculty.id] }
-    );
-
-    res.json({
-      success: true,
-      assignments: rows.map(r => ({
-        ...r,
-        dueDate: r.due_date,
-        rubric: r.rubric ? (typeof r.rubric === 'string' ? JSON.parse(r.rubric) : r.rubric) : null
-      }))
-    });
-  } catch (e) {
-    console.error(e);
-    res.json({ success: true, assignments: [] });
-  }
-});
-
-// ── ASSIGNMENTS POST ───────────────────────────────────────
-router.post('/assignments', authMiddleware, async (req, res) => {
-  try {
-    const { sequelize } = require('../config/database');
-    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
-    const { title, description, course, dueDate, totalMarks, rubric } = req.body;
-    const [result] = await sequelize.query(
-      `INSERT INTO assignments (title, description, course_id, faculty_id, due_date, total_marks, rubric)
-       VALUES (?,?,?,?,?,?,?)`,
-      { replacements: [title, description, course, faculty.id, dueDate, totalMarks || 100, JSON.stringify(rubric || {})] }
-    );
-    res.json({
-      success: true,
-      assignment: { id: result, title, description, course, dueDate, totalMarks, rubric, status: 'active', submissions: 0, graded: 0, totalStudents: 0 }
-    });
-  } catch (e) {
-    res.status(500).json({ success: false, message: e.message });
-  }
-});
-
-// ── ASSIGNMENTS SUBMISSIONS GET ────────────────────────────
-router.get('/assignments/:id/submissions', authMiddleware, async (req, res) => {
-  try {
-    const { sequelize } = require('../config/database');
-    const [rows] = await sequelize.query(`
-      SELECT s.*, u.full_name as studentName, s.submitted_at as submittedDate
-      FROM assignment_submissions s
-      JOIN students st ON st.id = s.student_id
-      JOIN users u ON u.id = st.user_id
-      WHERE s.assignment_id = ?`,
-      { replacements: [req.params.id] }
-    );
-    res.json({ success: true, submissions: rows });
-  } catch (e) {
-    res.json({ success: true, submissions: [] });
-  }
-});
-
-// ── ASSIGNMENTS GRADE POST ─────────────────────────────────
-router.post('/assignments/:id/grade', authMiddleware, async (req, res) => {
-  try {
-    const { sequelize } = require('../config/database');
-    const { studentId, student_id, submission_id, grade, feedback } = req.body;
-    const resolvedStudentId = studentId || student_id;
-    const resolvedGrade = parseInt(grade) || 0;
-
-    if (submission_id) {
-      await sequelize.query(
-        `UPDATE assignment_submissions SET grade=?, feedback=?, status='graded' WHERE id=?`,
-        { replacements: [resolvedGrade, feedback || '', submission_id] }
-      );
-    } else {
-      await sequelize.query(
-        `UPDATE assignment_submissions SET grade=?, feedback=?, status='graded'
-         WHERE assignment_id=? AND student_id=?`,
-        { replacements: [resolvedGrade, feedback || '', req.params.id, resolvedStudentId] }
-      );
-    }
-    res.json({ success: true, grade: resolvedGrade });
-  } catch (e) {
-    res.status(500).json({ success: false, message: e.message });
-  }
-});
-
-// ── ASSIGNMENTS DELETE ─────────────────────────────────────
-router.delete('/assignments/:id', [authMiddleware, rbac(['faculty','admin'])], async (req, res) => {
-  try {
-    const { sequelize } = require('../config/database');
-    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
-    if (!faculty) {
-      return res.status(404).json({ success: false, message: 'Faculty not found' });
-    }
-    await sequelize.query(
-      `DELETE FROM assignments WHERE id = ? AND faculty_id = ?`,
-      { replacements: [req.params.id, faculty.id] }
-    );
-    res.json({ success: true, message: 'Assignment deleted successfully' });
-  } catch (error) {
-    console.error('Delete assignment error:', error);
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
-});
-
-// ── NOTIFICATIONS GET ──────────────────────────────────────
-router.get('/notifications', authMiddleware, async (req, res) => {
-  try {
-    const notifications = await Notification.findAll({
-      where: { user_id: req.user.id },
-      order: [['created_at', 'DESC']],
-      limit: 20
-    });
-    res.json({
-      success: true,
-      notifications: notifications.map(n => ({
-        id: n.id,
-        title: n.title,
-        message: n.message,
-        type: n.type || 'info',
-        time: n.created_at,
-        read: n.is_read || false
-      }))
-    });
-  } catch (error) {
-    console.error('GET /faculty/notifications error:', error);
-    res.json({ success: true, notifications: [] });
-  }
-});
-
-// ── SETTINGS GET ───────────────────────────────────────────
-router.get('/settings', authMiddleware, async (req, res) => {
-  try {
-    const { sequelize } = require('../config/database');
-
-    // Create table if not exists
-    await sequelize.query(`
-      CREATE TABLE IF NOT EXISTS faculty_settings (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        faculty_id INT NOT NULL UNIQUE,
-        settings JSON,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-      )
-    `);
-
-    const [rows] = await sequelize.query(
-      `SELECT settings FROM faculty_settings WHERE faculty_id = ?`,
-      { replacements: [req.user.id] }
-    );
-
-    const saved = rows[0]?.settings
-      ? (typeof rows[0].settings === 'string' ? JSON.parse(rows[0].settings) : rows[0].settings)
-      : {};
-
-    // Deep merge saved settings over defaults
-    const defaults = {
-      general: {
-        institution_name: '', academic_year: '2025-2026',
-        semester: 'Spring 2025', default_language: 'en',
-        timezone: 'Asia/Kolkata', date_format: 'DD/MM/YYYY', time_format: '24h'
-      },
-      notifications: {
-        email_notifications: true, student_query_alerts: true,
-        assignment_submission_alerts: true, exam_reminders: true,
-        course_updates: false, system_announcements: true,
-        daily_digest: false, weekly_report: false
-      },
-      course: {
-        auto_enroll: false, allow_late_submissions: true,
-        late_penalty_percentage: 10, max_late_days: 3,
-        default_passing_grade: 40, attendance_required: 75,
-        enable_discussion_forum: true, enable_peer_review: false
-      },
-      security: {
-        two_factor_auth: false, session_timeout: 30,
-        password_expiry_days: 90, force_password_change: false,
-        allow_multiple_sessions: true, ip_whitelist_enabled: false,
-        login_attempt_limit: 5
-      },
-      integrations: {
-        google_classroom: false, microsoft_teams: false,
-        zoom_enabled: false, zoom_api_key: '',
-        email_service: 'smtp', smtp_host: '', smtp_port: '',
-        smtp_username: '', storage_provider: 'local', max_upload_size: 100
-      }
-    };
-
-    const merged = {
-      general:      { ...defaults.general,      ...(saved.general || {}) },
-      notifications:{ ...defaults.notifications, ...(saved.notifications || {}) },
-      course:       { ...defaults.course,        ...(saved.course || {}) },
-      security:     { ...defaults.security,      ...(saved.security || {}) },
-      integrations: { ...defaults.integrations,  ...(saved.integrations || {}) }
-    };
-
-    res.json({ success: true, settings: merged });
-  } catch (error) {
-    console.error('GET /faculty/settings error:', error);
-    res.status(500).json({ success: false, message: 'Error fetching settings' });
-  }
-});
-
-// ── SETTINGS UPSERT HELPER ─────────────────────────────────
-async function upsertSettings(userId, section, data) {
-  const { sequelize } = require('../config/database');
-  const [rows] = await sequelize.query(
-    `SELECT settings FROM faculty_settings WHERE faculty_id = ?`,
-    { replacements: [userId] }
-  );
-  const current = rows[0]?.settings
-    ? (typeof rows[0].settings === 'string' ? JSON.parse(rows[0].settings) : rows[0].settings)
-    : {};
-  current[section] = { ...(current[section] || {}), ...data };
-  await sequelize.query(
-    `INSERT INTO faculty_settings (faculty_id, settings)
-     VALUES (?, ?)
-     ON DUPLICATE KEY UPDATE settings = ?, updated_at = NOW()`,
-    { replacements: [userId, JSON.stringify(current), JSON.stringify(current)] }
-  );
-}
-
-// ── SETTINGS PUT ───────────────────────────────────────────
-router.put('/settings/general', authMiddleware, async (req, res) => {
-  try {
-    await upsertSettings(req.user.id, 'general', req.body);
-    res.json({ success: true, message: 'General settings updated successfully' });
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ success: false, message: 'Error updating general settings' });
-  }
-});
-
-router.put('/settings/notifications', authMiddleware, async (req, res) => {
-  try {
-    await upsertSettings(req.user.id, 'notifications', req.body);
-    res.json({ success: true, message: 'Notification settings updated successfully' });
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ success: false, message: 'Error updating notification settings' });
-  }
-});
-
-router.put('/settings/course', authMiddleware, async (req, res) => {
-  try {
-    await upsertSettings(req.user.id, 'course', req.body);
-    res.json({ success: true, message: 'Course settings updated successfully' });
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ success: false, message: 'Error updating course settings' });
-  }
-});
-
-router.put('/settings/security', authMiddleware, async (req, res) => {
-  try {
-    await upsertSettings(req.user.id, 'security', req.body);
-    res.json({ success: true, message: 'Security settings updated successfully' });
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ success: false, message: 'Error updating security settings' });
-  }
-});
-
-router.put('/settings/integrations', authMiddleware, async (req, res) => {
-  try {
-    await upsertSettings(req.user.id, 'integrations', req.body);
-    res.json({ success: true, message: 'Integration settings updated successfully' });
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ success: false, message: 'Error updating integration settings' });
-  }
-});
-
-// ── ANALYTICS ──────────────────────────────────────────────
-router.get('/analytics', authMiddleware, async (req, res) => {
-  try {
-    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
-    if (!faculty) return res.json({ success: true, analytics: {} });
-
-    const courses = await Course.findAll({
-      where: { faculty_id: faculty.id },
-      attributes: ['id', 'course_name']
-    });
-    const courseIds = courses.map(c => c.id);
-
-    if (courseIds.length === 0) {
-      return res.json({
-        success: true,
-        analytics: {
-          avgPerformance: 0, videoCompletion: 0,
-          watchTime: 0, engagement: 0,
-          coursePerformance: [], videoAnalytics: []
-        }
-      });
-    }
-
-    // Average performance from Results
-    let avgPerformance = 0;
-    try {
-      const exams = await Exam.findAll({
-        where: { course_id: { [Op.in]: courseIds } },
-        attributes: ['id']
-      });
-      const examIds = exams.map(e => e.id);
-      if (examIds.length > 0) {
-        const results = await Result.findAll({
-          where: { exam_id: { [Op.in]: examIds } },
-          attributes: ['score', 'total_marks']
-        });
-        if (results.length > 0) {
-          const total = results.reduce((s, r) =>
-            s + (r.total_marks > 0 ? (r.score / r.total_marks) * 100 : 0), 0);
-          avgPerformance = Math.round(total / results.length);
-        }
-      }
-    } catch (e) { console.error('Analytics exam error:', e.message); }
-
-    // ✅ FIX: 'title' removed from Lesson attributes — column does not exist in lessons table
-    let videoCompletion = 0, watchTime = 0, videoAnalytics = [];
-    try {
-      const modules = await CourseModule.findAll({
-        where: { course_id: { [Op.in]: courseIds } },
-        attributes: ['id']
-      });
-      const moduleIds = modules.map(m => m.id);
-
-      if (moduleIds.length > 0) {
-        const lessons = await Lesson.findAll({
-          where: { course_module_id: { [Op.in]: moduleIds } },
-          attributes: ['id']   // 'title' and 'duration' removed — columns do not exist in lessons table
-        });
-        const lessonIds = lessons.map(l => l.id);
-
-        if (lessonIds.length > 0) {
-          const watchHistory = await VideoWatchHistory.findAll({
-            where: { lesson_id: { [Op.in]: lessonIds } },
-            attributes: ['lesson_id', 'total_watch_time', 'completed']
-          });
-
-          const totalSeconds = watchHistory.reduce((s, w) => s + (w.total_watch_time || 0), 0);
-          watchTime = Math.round(totalSeconds / 3600);
-
-          const completed = watchHistory.filter(w => w.completed).length;
-          videoCompletion = watchHistory.length > 0
-            ? Math.round((completed / watchHistory.length) * 100) : 0;
-
-          videoAnalytics = lessons.slice(0, 10).map(lesson => {
-            const views = watchHistory.filter(w => w.lesson_id === lesson.id);
-            const avgSecs = views.length > 0
-              ? Math.round(views.reduce((s, w) => s + (w.total_watch_time || 0), 0) / views.length) : 0;
-            const completionRate = views.length > 0
-              ? Math.round((views.filter(w => w.completed).length / views.length) * 100) : 0;
-            return {
-              title: `Lesson ${lesson.id}`,   // fallback label since title col doesn't exist
-              views: views.length,
-              completion: completionRate,
-              avgWatchTime: `${Math.floor(avgSecs / 60)}m ${avgSecs % 60}s`,
-              dropOffPoint: completionRate < 50 ? 'Early' : completionRate < 80 ? 'Middle' : 'Late'
-            };
-          });
-        }
-      }
-    } catch (e) { console.error('Analytics video error:', e.message); }
-
-    // Enrollment engagement
-    let engagement = 0;
-    try {
-      const totalEnrollments = await Enrollment.count({ where: { course_id: { [Op.in]: courseIds } } });
-      const activeEnrollments = await Enrollment.count({
-        where: {
-          course_id: { [Op.in]: courseIds },
-          completion_status: { [Op.in]: ['in_progress', 'enrolled'] }
-        }
-      });
-      engagement = totalEnrollments > 0
-        ? Math.round((activeEnrollments / totalEnrollments) * 100) : 0;
-    } catch (e) { console.error('Analytics engagement error:', e.message); }
-
-    // Per-course breakdown
-    let coursePerformance = [];
-    try {
-      coursePerformance = await Promise.all(courses.map(async (course) => {
-        try {
-          const enrollCount = await Enrollment.count({ where: { course_id: course.id } });
-          const completed = await Enrollment.count({
-            where: { course_id: course.id, completion_status: 'completed' }
-          });
-          const courseExams = await Exam.findAll({
-            where: { course_id: course.id }, attributes: ['id']
-          });
-          let avgScore = 0;
-          if (courseExams.length > 0) {
-            const courseResults = await Result.findAll({
-              where: { exam_id: { [Op.in]: courseExams.map(e => e.id) } },
-              attributes: ['score', 'total_marks']
-            });
-            if (courseResults.length > 0) {
-              const t = courseResults.reduce((s, r) =>
-                s + (r.total_marks > 0 ? (r.score / r.total_marks) * 100 : 0), 0);
-              avgScore = Math.round(t / courseResults.length);
-            }
-          }
-          return {
-            course: course.course_name,
-            students: enrollCount,
-            avgScore,
-            completion: enrollCount > 0 ? Math.round((completed / enrollCount) * 100) : 0
-          };
-        } catch (e) {
-          return { course: course.course_name, students: 0, avgScore: 0, completion: 0 };
-        }
-      }));
-    } catch (e) { console.error('Analytics coursePerformance error:', e.message); }
-
-    res.json({
-      success: true,
-      analytics: {
-        avgPerformance, videoCompletion, watchTime, engagement,
-        coursePerformance, videoAnalytics
-      }
-    });
-  } catch (error) {
-    console.error('GET /faculty/analytics error:', error);
-    res.status(500).json({ success: false, message: error.message });
-  }
-});
-
-// ── LIVE CLASSES GET ───────────────────────────────────────
-router.get('/live-classes', authMiddleware, async (req, res) => {
-  try {
-    const { sequelize } = require('../config/database');
-    await sequelize.query(`
-      CREATE TABLE IF NOT EXISTS live_classes (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        title VARCHAR(255) NOT NULL,
-        course_id INT,
-        faculty_id INT NOT NULL,
-        date DATE,
-        time TIME,
-        duration INT DEFAULT 60,
-        platform VARCHAR(100) DEFAULT 'Zoom',
-        link VARCHAR(500),
-        status VARCHAR(50) DEFAULT 'scheduled',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
-    if (!faculty) return res.json({ success: true, liveClasses: [] });
-
-    const [rows] = await sequelize.query(`
-      SELECT lc.*, COALESCE(c.course_name, '') as course
-      FROM live_classes lc
-      LEFT JOIN courses c ON c.id = lc.course_id
-      WHERE lc.faculty_id = ?
-      ORDER BY lc.date DESC, lc.time DESC
-    `, { replacements: [faculty.id] });
-
-    res.json({ success: true, liveClasses: rows });
-  } catch (error) {
-    console.error('GET /faculty/live-classes error:', error);
-    res.status(500).json({ success: false, message: 'Error fetching live classes' });
-  }
-});
-
-// ── LIVE CLASSES POST ──────────────────────────────────────
-router.post('/live-classes', authMiddleware, async (req, res) => {
-  try {
-    const { sequelize } = require('../config/database');
-    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
-    if (!faculty) return res.status(404).json({ success: false, message: 'Faculty not found' });
-
-    const { title, course, date, time, duration, platform, link } = req.body;
-    if (!title || !date || !time) {
-      return res.status(400).json({ success: false, message: 'Title, date and time are required' });
-    }
-
-    const [result] = await sequelize.query(`
-      INSERT INTO live_classes (title, course_id, faculty_id, date, time, duration, platform, link, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'scheduled')
-    `, { replacements: [title, course || null, faculty.id, date, time, duration || 60, platform || 'Zoom', link || ''] });
-
-    // Fetch course name for response
-    let courseName = '';
-    if (course) {
-      const courseRecord = await Course.findOne({ where: { id: course }, attributes: ['course_name'] });
-      courseName = courseRecord?.course_name || '';
-    }
-
-    res.json({
-      success: true,
-      liveClass: {
-        id: result, title, course: courseName,
-        date, time, duration: duration || 60,
-        platform: platform || 'Zoom', link: link || '',
-        status: 'scheduled'
-      }
-    });
-  } catch (error) {
-    console.error('POST /faculty/live-classes error:', error);
-    res.status(500).json({ success: false, message: 'Error scheduling live class' });
-  }
-});
-
-// ── BATCHES GET ────────────────────────────────────────────
-router.get('/batches', authMiddleware, async (req, res) => {
-  try {
-    const { sequelize } = require('../config/database');
-    await sequelize.query(`
-      CREATE TABLE IF NOT EXISTS batches (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        faculty_id INT NOT NULL,
-        courses JSON,
-        schedule VARCHAR(255),
-        start_date DATE,
-        end_date DATE,
-        status VARCHAR(50) DEFAULT 'active',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-    await sequelize.query(`
-      CREATE TABLE IF NOT EXISTS batch_students (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        batch_id INT NOT NULL,
-        student_id INT NOT NULL,
-        enrolled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE KEY unique_batch_student (batch_id, student_id)
-      )
-    `);
-
-    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
-    if (!faculty) return res.json({ success: true, batches: [] });
-
-    const [rows] = await sequelize.query(`
-      SELECT b.*,
-        (SELECT COUNT(*) FROM batch_students bs WHERE bs.batch_id = b.id) as students
-      FROM batches b
-      WHERE b.faculty_id = ?
-      ORDER BY b.created_at DESC
-    `, { replacements: [faculty.id] });
-
-    res.json({
-      success: true,
-      batches: rows.map(b => ({
-        ...b,
-        courses: b.courses ? (typeof b.courses === 'string' ? JSON.parse(b.courses) : b.courses) : [],
-        startDate: b.start_date,
-        endDate: b.end_date
-      }))
-    });
-  } catch (error) {
-    console.error('GET /faculty/batches error:', error);
-    res.status(500).json({ success: false, message: 'Error fetching batches' });
-  }
-});
-
-// ── BATCHES POST ───────────────────────────────────────────
-router.post('/batches', authMiddleware, async (req, res) => {
-  try {
-    const { sequelize } = require('../config/database');
-    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
-    if (!faculty) return res.status(404).json({ success: false, message: 'Faculty not found' });
-
-    const { name, courses, schedule, startDate, endDate } = req.body;
-    if (!name || !schedule) {
-      return res.status(400).json({ success: false, message: 'Name and schedule are required' });
-    }
-
-    const coursesArr = Array.isArray(courses) ? courses : (courses ? [courses] : []);
-
-    const [result] = await sequelize.query(`
-      INSERT INTO batches (name, faculty_id, courses, schedule, start_date, end_date, status)
-      VALUES (?, ?, ?, ?, ?, ?, 'active')
-    `, {
-      replacements: [
-        name, faculty.id, JSON.stringify(coursesArr),
-        schedule, startDate || null, endDate || null
-      ]
-    });
-
-    res.json({
-      success: true,
-      batch: {
-        id: result, name, courses: coursesArr,
-        schedule, startDate, endDate,
-        status: 'active', students: 0
-      }
-    });
-  } catch (error) {
-    console.error('POST /faculty/batches error:', error);
-    res.status(500).json({ success: false, message: 'Error creating batch' });
-  }
-});
-
-// ── BATCHES DELETE ─────────────────────────────────────────
-router.delete('/batches/:id', authMiddleware, async (req, res) => {
-  try {
-    const { sequelize } = require('../config/database');
-    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
-    if (!faculty) return res.status(404).json({ success: false, message: 'Faculty not found' });
-
-    await sequelize.query(
-      `DELETE FROM batches WHERE id = ? AND faculty_id = ?`,
-      { replacements: [req.params.id, faculty.id] }
-    );
-    res.json({ success: true, message: 'Batch deleted successfully' });
-  } catch (error) {
-    console.error('DELETE /faculty/batches/:id error:', error);
-    res.status(500).json({ success: false, message: 'Error deleting batch' });
-  }
-});
-
-// ── BATCHES STUDENTS GET ───────────────────────────────────
-router.get('/batches/:id/students', authMiddleware, async (req, res) => {
-  try {
-    const { sequelize } = require('../config/database');
-    const [rows] = await sequelize.query(`
-      SELECT s.id, u.full_name as name, u.email,
-             u.phone, bs.enrolled_at as enrollmentDate
-      FROM batch_students bs
-      JOIN students s ON s.id = bs.student_id
-      JOIN users u ON u.id = s.user_id
-      WHERE bs.batch_id = ?
-      ORDER BY u.full_name ASC
-    `, { replacements: [req.params.id] });
-
-    res.json({ success: true, students: rows });
-  } catch (error) {
-    console.error('GET /faculty/batches/:id/students error:', error);
-    res.json({ success: true, students: [] });
-  }
-});
-
-// ── DOUBTS GET ─────────────────────────────────────────────
-router.get('/doubts', authMiddleware, async (req, res) => {
-  try {
-    const { sequelize } = require('../config/database');
+    const { title, description, type, course_id, display_order, duration } = req.body;
+    const file_path = req.file ? `/uploads/content/${req.file.filename}` : req.body.file_path || null;
+    const file_size = req.file ? `${(req.file.size / (1024 * 1024)).toFixed(2)} MB` : null;
 
     await sequelize.query(`
-      CREATE TABLE IF NOT EXISTS doubts (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        subject VARCHAR(255),
-        question TEXT,
-        student_id INT,
-        course_id INT,
-        priority VARCHAR(50) DEFAULT 'medium',
-        status VARCHAR(50) DEFAULT 'pending',
-        reply TEXT,
-        replied_at TIMESTAMP NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
+      INSERT INTO faculty_content (title, description, type, course_id, faculty_id, file_path, file_size, duration, display_order, status, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'published', NOW())
+    `, { replacements: [title || 'Untitled', description || null, type || 'video', course_id || null, faculty.id, file_path, file_size, duration || null, display_order || 1] });
 
-    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
-    if (!faculty) return res.json({ success: true, doubts: [] });
-
-    const courses = await Course.findAll({
-      where: { faculty_id: faculty.id },
-      attributes: ['id', 'course_name']
-    });
-    const courseIds = courses.map(c => c.id);
-    if (courseIds.length === 0) return res.json({ success: true, doubts: [] });
-
-    const [rows] = await sequelize.query(`
-      SELECT d.*,
-        COALESCE(u.full_name, 'Unknown Student') as student_name,
-        COALESCE(c.course_name, 'General') as course
-      FROM doubts d
-      LEFT JOIN students s ON s.id = d.student_id
-      LEFT JOIN users u ON u.id = s.user_id
-      LEFT JOIN courses c ON c.id = d.course_id
-      WHERE d.course_id IN (${courseIds.map(() => '?').join(',')})
-      ORDER BY d.created_at DESC
-    `, { replacements: courseIds });
-
-    res.json({ success: true, doubts: rows });
+    res.json({ success: true, message: 'Content uploaded successfully', file_path });
   } catch (error) {
-    console.error('GET /faculty/doubts error:', error);
-    res.json({ success: true, doubts: [] });
+    console.error('POST /faculty/content/upload error:', error);
+    res.status(500).json({ success: false, message: 'Upload failed: ' + error.message });
   }
 });
 
-// ── DOUBTS REPLY POST ──────────────────────────────────────
-router.post('/doubts/:id/reply', authMiddleware, async (req, res) => {
-  try {
-    const { sequelize } = require('../config/database');
-    const { reply } = req.body;
-    if (!reply?.trim()) {
-      return res.status(400).json({ success: false, message: 'Reply is required' });
-    }
-
-    await sequelize.query(
-      `UPDATE doubts SET reply = ?, status = 'resolved', replied_at = NOW() WHERE id = ?`,
-      { replacements: [reply.trim(), req.params.id] }
-    );
-
-    res.json({ success: true, message: 'Reply sent successfully' });
-  } catch (error) {
-    console.error('POST /faculty/doubts/:id/reply error:', error);
-    res.status(500).json({ success: false, message: 'Error sending reply' });
-  }
-});
-
-
-// ── STUDENT: GET COURSE CONTENT ───────────────────────────
-// Called by student portal CoursePlayer to load faculty-uploaded materials
-router.get('/course-content/:courseId', authMiddleware, async (req, res) => {
-  try {
-    const { sequelize } = require('../config/database');
-    const courseId = req.params.courseId;
-
-    await ensureContentTable(sequelize);
-
-    const [content] = await sequelize.query(`
-      SELECT fc.id, fc.title, fc.description, fc.type, fc.file_path,
-             fc.file_size, fc.duration, fc.display_order, fc.views,
-             fc.created_at,
-             u.full_name AS instructor_name
-      FROM faculty_content fc
-      LEFT JOIN faculty f ON fc.faculty_id = f.id
-      LEFT JOIN users u ON f.user_id = u.id
-      WHERE fc.course_id = ? AND fc.status = 'published'
-      ORDER BY fc.display_order ASC, fc.created_at ASC
-    `, { replacements: [courseId] });
-
-    res.json({ success: true, content: content || [] });
-  } catch (error) {
-    console.error('GET /faculty/course-content error:', error.message);
-    res.json({ success: true, content: [] });
-  }
-});
-
-// ============================================================
-// PUT /faculty/content/:id — Edit content metadata
-// ============================================================
+// ══════════════════════════════════════════════════════════════
+// CONTENT — UPDATE
+// ══════════════════════════════════════════════════════════════
 router.put('/content/:id', authMiddleware, async (req, res) => {
   try {
     const { sequelize } = require('../config/database');
-    const { id } = req.params;
-    const { title, description, duration, order } = req.body;
+    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
+    if (!faculty) return res.status(404).json({ success: false, message: 'Faculty not found' });
 
-    if (!title) return res.status(400).json({ success: false, message: 'Title is required' });
+    const { title, description, type, course_id, display_order, duration, status } = req.body;
 
-    await sequelize.query(
-      `UPDATE faculty_content
-       SET title = ?, description = ?, duration = ?, display_order = ?
-       WHERE id = ?`,
-      { replacements: [title, description || '', duration || null, order || 1, id] }
-    );
+    await sequelize.query(`
+      UPDATE faculty_content
+      SET title=?, description=?, type=?, course_id=?, display_order=?, duration=?, status=?
+      WHERE id=? AND faculty_id=?
+    `, { replacements: [title, description, type, course_id, display_order || 1, duration, status || 'published', req.params.id, faculty.id] });
 
     res.json({ success: true, message: 'Content updated successfully' });
   } catch (error) {
@@ -1354,38 +720,29 @@ router.put('/content/:id', authMiddleware, async (req, res) => {
   }
 });
 
-// ============================================================
-// DELETE /faculty/content/:id — Delete a content item
-// ============================================================
+// ══════════════════════════════════════════════════════════════
+// CONTENT — DELETE
+// ══════════════════════════════════════════════════════════════
 router.delete('/content/:id', authMiddleware, async (req, res) => {
   try {
     const { sequelize } = require('../config/database');
-    const { id } = req.params;
-
-    // Resolve faculty_id for the logged-in user
     const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
-    if (!faculty) return res.status(403).json({ success: false, message: 'Faculty not found' });
+    if (!faculty) return res.status(404).json({ success: false, message: 'Faculty not found' });
 
-    // Get file path AND verify ownership before deleting
     const [rows] = await sequelize.query(
-      `SELECT file_path FROM faculty_content WHERE id = ? AND faculty_id = ?`,
-      { replacements: [id, faculty.id] }
+      `SELECT file_path FROM faculty_content WHERE id=? AND faculty_id=?`,
+      { replacements: [req.params.id, faculty.id] }
     );
 
-    if (rows.length === 0) {
-      return res.status(404).json({ success: false, message: 'Content not found or access denied' });
+    if (rows.length > 0 && rows[0].file_path) {
+      const full = path.join(__dirname, '..', rows[0].file_path);
+      if (fs.existsSync(full)) fs.unlinkSync(full);
     }
 
     await sequelize.query(
-      `DELETE FROM faculty_content WHERE id = ? AND faculty_id = ?`,
-      { replacements: [id, faculty.id] }
+      `DELETE FROM faculty_content WHERE id=? AND faculty_id=?`,
+      { replacements: [req.params.id, faculty.id] }
     );
-
-    // Remove physical file from disk (silent fail — may not exist on Render)
-    if (rows[0].file_path) {
-      const filePath = path.join(__dirname, '..', rows[0].file_path);
-      fs.unlink(filePath, () => {});
-    }
 
     res.json({ success: true, message: 'Content deleted successfully' });
   } catch (error) {
@@ -1394,28 +751,586 @@ router.delete('/content/:id', authMiddleware, async (req, res) => {
   }
 });
 
-// ============================================================
-// GET /student/course-content/:courseId — Student-accessible
-// ============================================================
+// ══════════════════════════════════════════════════════════════
+// ANNOUNCEMENTS
+// ══════════════════════════════════════════════════════════════
+router.get('/announcements', authMiddleware, async (req, res) => {
+  try {
+    const { sequelize } = require('../config/database');
+    await sequelize.query(`
+      CREATE TABLE IF NOT EXISTS announcements (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        content TEXT,
+        faculty_id INT,
+        course_id INT,
+        priority VARCHAR(50) DEFAULT 'normal',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
+    if (!faculty) return res.json({ success: true, announcements: [] });
+
+    const [rows] = await sequelize.query(
+      `SELECT a.*, COALESCE(c.course_name,'All Courses') AS course_name
+       FROM announcements a
+       LEFT JOIN courses c ON c.id = a.course_id
+       WHERE a.faculty_id = ?
+       ORDER BY a.created_at DESC`,
+      { replacements: [faculty.id] }
+    );
+    res.json({ success: true, announcements: rows });
+  } catch (error) {
+    console.error('GET /faculty/announcements error:', error);
+    res.json({ success: true, announcements: [] });
+  }
+});
+
+router.post('/announcements', authMiddleware, async (req, res) => {
+  try {
+    const { sequelize } = require('../config/database');
+    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
+    if (!faculty) return res.status(404).json({ success: false, message: 'Faculty not found' });
+
+    const { title, content, course_id, priority } = req.body;
+    if (!title?.trim()) return res.status(400).json({ success: false, message: 'Title is required' });
+
+    await sequelize.query(
+      `INSERT INTO announcements (title, content, faculty_id, course_id, priority, created_at)
+       VALUES (?, ?, ?, ?, ?, NOW())`,
+      { replacements: [title.trim(), content || null, faculty.id, course_id || null, priority || 'normal'] }
+    );
+    res.json({ success: true, message: 'Announcement posted' });
+  } catch (error) {
+    console.error('POST /faculty/announcements error:', error);
+    res.status(500).json({ success: false, message: 'Error posting announcement' });
+  }
+});
+
+router.delete('/announcements/:id', authMiddleware, async (req, res) => {
+  try {
+    const { sequelize } = require('../config/database');
+    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
+    if (!faculty) return res.status(404).json({ success: false, message: 'Faculty not found' });
+
+    await sequelize.query(
+      `DELETE FROM announcements WHERE id=? AND faculty_id=?`,
+      { replacements: [req.params.id, faculty.id] }
+    );
+    res.json({ success: true, message: 'Announcement deleted' });
+  } catch (error) {
+    console.error('DELETE /faculty/announcements error:', error);
+    res.status(500).json({ success: false, message: 'Error deleting announcement' });
+  }
+});
+
+// ══════════════════════════════════════════════════════════════
+// MESSAGES
+// ══════════════════════════════════════════════════════════════
+router.get('/messages', authMiddleware, async (req, res) => {
+  res.json({ success: true, messages: [] });
+});
+
+// ══════════════════════════════════════════════════════════════
+// ASSIGNMENTS
+// ══════════════════════════════════════════════════════════════
+router.get('/assignments', authMiddleware, async (req, res) => {
+  try {
+    const { sequelize } = require('../config/database');
+    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
+    if (!faculty) return res.json({ success: true, assignments: [] });
+
+    await sequelize.query(`
+      CREATE TABLE IF NOT EXISTS assignments (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        title VARCHAR(255), description TEXT,
+        course_id INT, faculty_id INT,
+        due_date DATE, total_marks INT DEFAULT 100,
+        rubric JSON, status VARCHAR(50) DEFAULT 'active',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )
+    `);
+
+    const courseIds = (await Course.findAll({ where: { faculty_id: faculty.id }, attributes: ['id'] })).map(c => c.id);
+    if (!courseIds.length) return res.json({ success: true, assignments: [] });
+
+    const placeholders = courseIds.map(() => '?').join(',');
+    const [assignments] = await sequelize.query(
+      `SELECT a.*, c.course_name
+       FROM assignments a
+       LEFT JOIN courses c ON c.id = a.course_id
+       WHERE a.faculty_id = ? AND a.course_id IN (${placeholders})
+       ORDER BY a.due_date ASC`,
+      { replacements: [faculty.id, ...courseIds] }
+    );
+
+    res.json({ success: true, assignments });
+  } catch (e) {
+    console.error('GET /faculty/assignments error:', e);
+    res.json({ success: true, assignments: [] });
+  }
+});
+
+router.post('/assignments', authMiddleware, async (req, res) => {
+  try {
+    const { sequelize } = require('../config/database');
+    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
+    if (!faculty) return res.status(404).json({ success: false, message: 'Faculty not found' });
+
+    const { title, description, course_id, due_date, total_marks, rubric } = req.body;
+    if (!title?.trim()) return res.status(400).json({ success: false, message: 'Title is required' });
+
+    await sequelize.query(
+      `INSERT INTO assignments (title, description, course_id, faculty_id, due_date, total_marks, rubric, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'active', NOW(), NOW())`,
+      { replacements: [title, description || null, course_id || null, faculty.id, due_date || null, total_marks || 100, rubric ? JSON.stringify(rubric) : null] }
+    );
+    res.json({ success: true, message: 'Assignment created' });
+  } catch (e) {
+    console.error('POST /faculty/assignments error:', e);
+    res.status(500).json({ success: false, message: 'Error creating assignment' });
+  }
+});
+
+router.get('/assignments/:id/submissions', authMiddleware, async (req, res) => {
+  try {
+    const { sequelize } = require('../config/database');
+    const [submissions] = await sequelize.query(
+      `SELECT s.*, u.full_name AS student_name
+       FROM assignment_submissions s
+       LEFT JOIN students st ON st.id = s.student_id
+       LEFT JOIN users u ON u.id = st.user_id
+       WHERE s.assignment_id = ?`,
+      { replacements: [req.params.id] }
+    ).catch(() => [[]]);
+    res.json({ success: true, submissions });
+  } catch (e) {
+    res.json({ success: true, submissions: [] });
+  }
+});
+
+router.post('/assignments/:id/grade', authMiddleware, async (req, res) => {
+  try {
+    const { sequelize } = require('../config/database');
+    const { submission_id, grade, feedback } = req.body;
+    await sequelize.query(
+      `UPDATE assignment_submissions SET grade=?, feedback=?, status='graded' WHERE id=?`,
+      { replacements: [grade, feedback || null, submission_id] }
+    );
+    res.json({ success: true, message: 'Grade saved' });
+  } catch (e) {
+    res.status(500).json({ success: false, message: 'Error saving grade' });
+  }
+});
+
+router.delete('/assignments/:id', [authMiddleware, rbac(['faculty', 'admin'])], async (req, res) => {
+  try {
+    const { sequelize } = require('../config/database');
+    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
+    await sequelize.query(
+      `UPDATE assignments SET status='deleted' WHERE id=? AND faculty_id=?`,
+      { replacements: [req.params.id, faculty?.id] }
+    );
+    res.json({ success: true, message: 'Assignment deleted' });
+  } catch (e) {
+    res.status(500).json({ success: false, message: 'Error deleting assignment' });
+  }
+});
+
+// ══════════════════════════════════════════════════════════════
+// NOTIFICATIONS
+// ══════════════════════════════════════════════════════════════
+router.get('/notifications', authMiddleware, async (req, res) => {
+  try {
+    const notifications = await Notification.findAll({
+      where: { user_id: req.user.id },
+      order: [['created_at', 'DESC']],
+      limit: 30
+    }).catch(() => []);
+    res.json({
+      success: true,
+      notifications: notifications.map(n => ({
+        id: n.id, title: n.title, message: n.message,
+        type: n.type || 'info', time: n.created_at, read: n.is_read || false
+      }))
+    });
+  } catch (error) {
+    res.json({ success: true, notifications: [] });
+  }
+});
+
+// ══════════════════════════════════════════════════════════════
+// SETTINGS
+// ══════════════════════════════════════════════════════════════
+router.get('/settings', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findByPk(req.user.id).catch(() => null);
+    res.json({
+      success: true,
+      general: {
+        language: user?.language || 'en',
+        timezone: user?.timezone || 'Asia/Kolkata',
+      },
+      notifications: {
+        emailNotifications: user?.email_notifications ?? true,
+        smsNotifications:   user?.sms_notifications   ?? false,
+      },
+      appearance: { theme: user?.theme || 'light' }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Error fetching settings' });
+  }
+});
+
+router.put('/settings/general', authMiddleware, async (req, res) => {
+  try {
+    const { language, timezone } = req.body;
+    await User.update({ language, timezone }, { where: { id: req.user.id } });
+    res.json({ success: true, message: 'Settings updated' });
+  } catch (error) { res.status(500).json({ success: false, message: 'Error updating settings' }); }
+});
+
+router.put('/settings/notifications', authMiddleware, async (req, res) => {
+  try {
+    const { emailNotifications, smsNotifications } = req.body;
+    await User.update({ email_notifications: emailNotifications, sms_notifications: smsNotifications }, { where: { id: req.user.id } });
+    res.json({ success: true, message: 'Notification settings updated' });
+  } catch (error) { res.status(500).json({ success: false, message: 'Error updating settings' }); }
+});
+
+router.put('/settings/course', authMiddleware, async (req, res) => {
+  res.json({ success: true, message: 'Course settings updated' });
+});
+
+router.put('/settings/security', authMiddleware, async (req, res) => {
+  try {
+    const bcrypt = require('bcryptjs');
+    const { current_password, new_password } = req.body;
+    if (!current_password || !new_password) return res.status(400).json({ success: false, message: 'Both passwords required' });
+    if (new_password.length < 6) return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
+
+    const user = await User.findByPk(req.user.id);
+    const valid = await bcrypt.compare(current_password, user.password_hash || user.password);
+    if (!valid) return res.status(401).json({ success: false, message: 'Current password is incorrect' });
+
+    const hashed = await bcrypt.hash(new_password, 10);
+    const field = user.password_hash !== undefined ? { password_hash: hashed } : { password: hashed };
+    await User.update(field, { where: { id: req.user.id } });
+    res.json({ success: true, message: 'Password changed successfully' });
+  } catch (error) {
+    console.error('Security settings error:', error);
+    res.status(500).json({ success: false, message: 'Error changing password' });
+  }
+});
+
+router.put('/settings/integrations', authMiddleware, async (req, res) => {
+  res.json({ success: true, message: 'Integrations updated' });
+});
+
+// ══════════════════════════════════════════════════════════════
+// ANALYTICS
+// ══════════════════════════════════════════════════════════════
+router.get('/analytics', authMiddleware, async (req, res) => {
+  try {
+    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
+    if (!faculty) return res.json({ success: true, analytics: {} });
+
+    const courses = await Course.findAll({ where: { faculty_id: faculty.id }, attributes: ['id', 'course_name'] });
+    const courseIds = courses.map(c => c.id);
+
+    const totalStudents = courseIds.length > 0
+      ? await Enrollment.count({ where: { course_id: { [Op.in]: courseIds } }, distinct: true, col: 'student_id' })
+      : 0;
+
+    const completedEnrollments = courseIds.length > 0
+      ? await Enrollment.count({ where: { course_id: { [Op.in]: courseIds }, completion_status: 'completed' } })
+      : 0;
+
+    const completionRate = totalStudents > 0 ? Math.round((completedEnrollments / totalStudents) * 100) : 0;
+
+    const courseAnalytics = await Promise.all(courses.map(async (c) => {
+      const enrolled   = await Enrollment.count({ where: { course_id: c.id } });
+      const completed  = await Enrollment.count({ where: { course_id: c.id, completion_status: 'completed' } });
+      return { course_name: c.course_name, enrolled, completed };
+    }));
+
+    res.json({
+      success: true,
+      analytics: { totalStudents, completionRate, courseAnalytics, totalCourses: courses.length }
+    });
+  } catch (error) {
+    console.error('GET /faculty/analytics error:', error);
+    res.status(500).json({ success: false, message: 'Error fetching analytics' });
+  }
+});
+
+// ══════════════════════════════════════════════════════════════
+// LIVE CLASSES
+// ══════════════════════════════════════════════════════════════
+router.get('/live-classes', authMiddleware, async (req, res) => {
+  try {
+    const { sequelize } = require('../config/database');
+    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
+    if (!faculty) return res.json({ success: true, classes: [] });
+
+    await sequelize.query(`
+      CREATE TABLE IF NOT EXISTS live_classes (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        title VARCHAR(255), description TEXT,
+        faculty_id INT, course_id INT,
+        scheduled_at DATETIME, duration_minutes INT DEFAULT 60,
+        meeting_link VARCHAR(500), platform VARCHAR(100) DEFAULT 'zoom',
+        status VARCHAR(50) DEFAULT 'scheduled',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    const [classes] = await sequelize.query(
+      `SELECT lc.*, COALESCE(c.course_name,'General') AS course_name
+       FROM live_classes lc
+       LEFT JOIN courses c ON c.id = lc.course_id
+       WHERE lc.faculty_id = ?
+       ORDER BY lc.scheduled_at DESC`,
+      { replacements: [faculty.id] }
+    );
+    res.json({ success: true, classes });
+  } catch (error) {
+    console.error('GET /faculty/live-classes error:', error);
+    res.json({ success: true, classes: [] });
+  }
+});
+
+router.post('/live-classes', authMiddleware, async (req, res) => {
+  try {
+    const { sequelize } = require('../config/database');
+    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
+    if (!faculty) return res.status(404).json({ success: false, message: 'Faculty not found' });
+
+    const { title, description, course_id, scheduled_at, duration_minutes, meeting_link, platform } = req.body;
+    if (!title?.trim()) return res.status(400).json({ success: false, message: 'Title is required' });
+
+    await sequelize.query(
+      `INSERT INTO live_classes (title, description, faculty_id, course_id, scheduled_at, duration_minutes, meeting_link, platform, status, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'scheduled', NOW())`,
+      { replacements: [title, description || null, faculty.id, course_id || null, scheduled_at || null, duration_minutes || 60, meeting_link || null, platform || 'zoom'] }
+    );
+    res.json({ success: true, message: 'Live class scheduled' });
+  } catch (error) {
+    console.error('POST /faculty/live-classes error:', error);
+    res.status(500).json({ success: false, message: 'Error scheduling class' });
+  }
+});
+
+// ══════════════════════════════════════════════════════════════
+// BATCHES
+// ══════════════════════════════════════════════════════════════
+router.get('/batches', authMiddleware, async (req, res) => {
+  try {
+    const { sequelize } = require('../config/database');
+    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
+    if (!faculty) return res.json({ success: true, batches: [] });
+
+    await sequelize.query(`
+      CREATE TABLE IF NOT EXISTS batches (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255), description TEXT,
+        faculty_id INT, course_id INT,
+        start_date DATE, end_date DATE,
+        max_students INT DEFAULT 30, status VARCHAR(50) DEFAULT 'active',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    const [batches] = await sequelize.query(
+      `SELECT b.*, COALESCE(c.course_name,'General') AS course_name,
+              (SELECT COUNT(*) FROM enrollments e WHERE e.course_id = b.course_id) AS student_count
+       FROM batches b
+       LEFT JOIN courses c ON c.id = b.course_id
+       WHERE b.faculty_id = ?
+       ORDER BY b.created_at DESC`,
+      { replacements: [faculty.id] }
+    );
+    res.json({ success: true, batches });
+  } catch (error) {
+    console.error('GET /faculty/batches error:', error);
+    res.json({ success: true, batches: [] });
+  }
+});
+
+router.post('/batches', authMiddleware, async (req, res) => {
+  try {
+    const { sequelize } = require('../config/database');
+    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
+    if (!faculty) return res.status(404).json({ success: false, message: 'Faculty not found' });
+
+    const { name, description, course_id, start_date, end_date, max_students } = req.body;
+    if (!name?.trim()) return res.status(400).json({ success: false, message: 'Batch name is required' });
+
+    await sequelize.query(
+      `INSERT INTO batches (name, description, faculty_id, course_id, start_date, end_date, max_students, status, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'active', NOW())`,
+      { replacements: [name, description || null, faculty.id, course_id || null, start_date || null, end_date || null, max_students || 30] }
+    );
+    res.json({ success: true, message: 'Batch created' });
+  } catch (error) {
+    console.error('POST /faculty/batches error:', error);
+    res.status(500).json({ success: false, message: 'Error creating batch' });
+  }
+});
+
+router.delete('/batches/:id', authMiddleware, async (req, res) => {
+  try {
+    const { sequelize } = require('../config/database');
+    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
+    await sequelize.query(
+      `DELETE FROM batches WHERE id=? AND faculty_id=?`,
+      { replacements: [req.params.id, faculty?.id] }
+    );
+    res.json({ success: true, message: 'Batch deleted' });
+  } catch (e) {
+    res.status(500).json({ success: false, message: 'Error deleting batch' });
+  }
+});
+
+router.get('/batches/:id/students', authMiddleware, async (req, res) => {
+  try {
+    const { sequelize } = require('../config/database');
+    const [batch] = await sequelize.query(
+      `SELECT * FROM batches WHERE id=? LIMIT 1`,
+      { replacements: [req.params.id] }
+    );
+    if (!batch.length) return res.status(404).json({ success: false, message: 'Batch not found' });
+
+    const enrollments = batch[0].course_id
+      ? await Enrollment.findAll({
+          where: { course_id: batch[0].course_id },
+          include: [{ model: Student, include: [{ model: User, as: 'user', attributes: ['full_name', 'email'] }] }]
+        }).catch(() => [])
+      : [];
+
+    const students = enrollments.map(e => ({
+      id: e.student_id,
+      name: e.Student?.user?.full_name || 'Unknown',
+      email: e.Student?.user?.email || '',
+      status: e.completion_status || 'enrolled'
+    }));
+
+    res.json({ success: true, students });
+  } catch (e) {
+    res.json({ success: true, students: [] });
+  }
+});
+
+// ══════════════════════════════════════════════════════════════
+// DOUBTS
+// ══════════════════════════════════════════════════════════════
+router.get('/doubts', authMiddleware, async (req, res) => {
+  try {
+    const { sequelize } = require('../config/database');
+    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
+    if (!faculty) return res.json({ success: true, doubts: [] });
+
+    await sequelize.query(`
+      CREATE TABLE IF NOT EXISTS doubts (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        student_id INT, faculty_id INT, course_id INT,
+        question TEXT, answer TEXT,
+        status VARCHAR(50) DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        answered_at TIMESTAMP NULL
+      )
+    `);
+
+    const courseIds = (await Course.findAll({ where: { faculty_id: faculty.id }, attributes: ['id'] })).map(c => c.id);
+    if (!courseIds.length) return res.json({ success: true, doubts: [] });
+
+    const placeholders = courseIds.map(() => '?').join(',');
+    const [doubts] = await sequelize.query(
+      `SELECT d.*, u.full_name AS student_name, c.course_name
+       FROM doubts d
+       LEFT JOIN students s ON s.id = d.student_id
+       LEFT JOIN users u ON u.id = s.user_id
+       LEFT JOIN courses c ON c.id = d.course_id
+       WHERE d.course_id IN (${placeholders})
+       ORDER BY d.created_at DESC`,
+      { replacements: courseIds }
+    );
+    res.json({ success: true, doubts });
+  } catch (error) {
+    console.error('GET /faculty/doubts error:', error);
+    res.json({ success: true, doubts: [] });
+  }
+});
+
+router.post('/doubts/:id/reply', authMiddleware, async (req, res) => {
+  try {
+    const { sequelize } = require('../config/database');
+    const { answer } = req.body;
+    await sequelize.query(
+      `UPDATE doubts SET answer=?, status='answered', answered_at=NOW() WHERE id=?`,
+      { replacements: [answer, req.params.id] }
+    );
+    res.json({ success: true, message: 'Reply sent' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Error sending reply' });
+  }
+});
+
+// ══════════════════════════════════════════════════════════════
+// COURSE CONTENT (for faculty)
+// ══════════════════════════════════════════════════════════════
+router.get('/course-content/:courseId', authMiddleware, async (req, res) => {
+  try {
+    const { sequelize } = require('../config/database');
+    await ensureContentTable(sequelize);
+    const [content] = await sequelize.query(`
+      SELECT * FROM faculty_content
+      WHERE course_id=? AND status='published'
+      ORDER BY display_order ASC, created_at ASC
+    `, { replacements: [req.params.courseId] });
+    res.json({ success: true, content: content || [] });
+  } catch (error) {
+    console.error('GET /faculty/course-content error:', error);
+    res.json({ success: true, content: [] });
+  }
+});
+
+// ══════════════════════════════════════════════════════════════
+// CORPORATE PORTAL — student profiles visible to recruiters
+// ══════════════════════════════════════════════════════════════
+router.get('/corporate/profiles', authMiddleware, async (req, res) => {
+  try {
+    const students = await User.findAll({
+      where: { role: 'student', corporate_visible: true },
+      attributes: ['id', 'full_name', 'email', 'phone', 'profile_photo',
+                   'skills', 'bio', 'linkedin', 'github', 'portfolio',
+                   'current_designation', 'current_employer'],
+    }).catch(() => []);
+    res.json({ success: true, profiles: students });
+  } catch (error) {
+    console.error('GET /faculty/corporate/profiles error:', error);
+    res.json({ success: true, profiles: [] });
+  }
+});
+
+// ══════════════════════════════════════════════════════════════
+// STUDENT COURSE CONTENT (student-accessible via faculty routes)
+// ══════════════════════════════════════════════════════════════
 router.get('/student/course-content/:courseId', authMiddleware, async (req, res) => {
   try {
     const { sequelize } = require('../config/database');
-    const courseId = req.params.courseId;
-
     await ensureContentTable(sequelize);
-
     const [content] = await sequelize.query(`
       SELECT fc.id, fc.title, fc.description, fc.type, fc.file_path,
-             fc.file_size, fc.duration, fc.display_order, fc.views,
-             fc.created_at,
+             fc.file_size, fc.duration, fc.display_order, fc.views, fc.created_at,
              u.full_name AS instructor_name
       FROM faculty_content fc
       LEFT JOIN faculty f ON fc.faculty_id = f.id
       LEFT JOIN users u ON f.user_id = u.id
       WHERE fc.course_id = ? AND fc.status = 'published'
       ORDER BY fc.display_order ASC, fc.created_at ASC
-    `, { replacements: [courseId] });
-
+    `, { replacements: [req.params.courseId] });
     res.json({ success: true, content: content || [] });
   } catch (error) {
     console.error('GET /student/course-content error:', error.message);
