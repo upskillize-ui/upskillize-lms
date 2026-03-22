@@ -88,18 +88,39 @@ async function ensureContentTable(sequelize) {
   _contentTableReady = true;
 }
 
-// ── HELPER: safe column check ──────────────────────────────
-// Returns a Set of column names that currently exist in the given table.
-async function getExistingColumns(sequelize, tableName) {
-  const [cols] = await sequelize.query(
-    `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
-     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?`,
-    { replacements: [tableName] }
+
+
+// ── HELPER: raw SQL update ─────────────────────────────────
+// Uses raw SQL — bypasses Sequelize model cache so newly-added
+// columns (bio, designation, city, linkedin, bank fields etc.)
+// are always written even if absent from the Sequelize model.
+async function rawUpdate(tableName, updates, whereClause, whereValues, sequelize) {
+  const setClauses = [];
+  const vals = [];
+  for (const [k, v] of Object.entries(updates)) {
+    if (v !== undefined) {
+      setClauses.push(k + ' = ?');
+      vals.push((v === '' || v === null) ? null : v);
+    }
+  }
+  if (setClauses.length === 0) return;
+  vals.push(...whereValues);
+  await sequelize.query(
+    'UPDATE ' + tableName + ' SET ' + setClauses.join(', ') + ' WHERE ' + whereClause,
+    { replacements: vals }
   );
-  return new Set(cols.map(c => c.COLUMN_NAME));
 }
 
-
+// ── HELPER: raw SQL user fetch ─────────────────────────────
+// Bypasses Sequelize model so ALL columns are returned,
+// including ones added after the model was written.
+async function rawFetchUser(userId, sequelize) {
+  const [rows] = await sequelize.query(
+    'SELECT * FROM users WHERE id = ? LIMIT 1',
+    { replacements: [userId] }
+  );
+  return rows[0] || null;
+}
 
 // ══════════════════════════════════════════════════════════════
 // GET /api/faculty/profile
