@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
   Routes, Route, Link, useLocation, useNavigate, useParams,
@@ -1566,6 +1565,66 @@ function ProfileManagement() {
 
   const AGENT_URL = "https://upskill25-ai-enhancer.hf.space";
 
+  // Load existing profile on tab open
+  useEffect(() => {
+    if (activeTab === "ai_enhance" && !aiProfile && !aiProfileGenerating) {
+      (async () => {
+        try {
+          const token = localStorage.getItem("token");
+          const res = await fetch(`${AGENT_URL}/api/v1/profile/me`, {
+            headers: { "Authorization": `Bearer ${token}` },
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data && data.slug && data.status === "completed") {
+              // Fetch the rendered HTML
+              try {
+                const htmlRes = await fetch(`${AGENT_URL}/api/v1/profile/public/${data.slug}`);
+                const html = htmlRes.ok ? await htmlRes.text() : null;
+                setAiProfile({
+                  slug: data.slug,
+                  html: html,
+                  url: data.public_url || `${AGENT_URL}/api/v1/profile/public/${data.slug}`,
+                  download_url: data.download_url || `${AGENT_URL}/api/v1/profile/download/${data.slug}`,
+                  visibility: data.visibility || "private",
+                  student_name: data.student_name,
+                  views: data.views || 0,
+                });
+              } catch {
+                setAiProfile({
+                  slug: data.slug, html: null,
+                  url: data.public_url || `${AGENT_URL}/api/v1/profile/public/${data.slug}`,
+                  download_url: data.download_url || `${AGENT_URL}/api/v1/profile/download/${data.slug}`,
+                  visibility: data.visibility || "private",
+                  student_name: data.student_name,
+                  views: data.views || 0,
+                });
+              }
+            }
+          }
+        } catch {}
+      })();
+    }
+  }, [activeTab]);
+
+  const handleToggleProfileVisibility = async () => {
+    if (!aiProfile) return;
+    const newVis = aiProfile.visibility === "public" ? "private" : "public";
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${AGENT_URL}/api/v1/profile/toggle-visibility`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        body: JSON.stringify({ visibility: newVis }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAiProfile(prev => ({ ...prev, visibility: data.visibility, url: data.public_url || prev.url }));
+        showMsg("success", `Profile is now ${data.visibility}`);
+      }
+    } catch { showMsg("error", "Failed to update visibility"); }
+  };
+
   const handleGenerateAIProfile = async () => {
     setAiProfileGenerating(true);
     setAiProfileError("");
@@ -1582,12 +1641,13 @@ function ProfileManagement() {
       });
       const data = await res.json();
       if (res.ok && data.slug) {
-        const profileRes = await fetch(`${AGENT_URL}/api/v1/profile/public/${data.slug}`);
-        if (profileRes.ok) {
-          const html = await profileRes.text();
-          setAiProfile({ slug: data.slug, html, url: data.profile_url, time: data.generation_time });
-        } else {
-          setAiProfile({ slug: data.slug, html: null, url: data.profile_url, time: data.generation_time });
+        // Fetch rendered HTML
+        try {
+          const profileRes = await fetch(`${AGENT_URL}/api/v1/profile/public/${data.slug}`);
+          const html = profileRes.ok ? await profileRes.text() : null;
+          setAiProfile({ slug: data.slug, html, url: data.profile_url, download_url: data.download_url, time: data.generation_time, visibility: "private", views: 0 });
+        } catch {
+          setAiProfile({ slug: data.slug, html: null, url: data.profile_url, download_url: data.download_url, time: data.generation_time, visibility: "private", views: 0 });
         }
       } else {
         setAiProfileError(data.detail || data.message || "Failed to generate profile. Please try again.");
@@ -1844,16 +1904,31 @@ function ProfileManagement() {
                   <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16,flexWrap:"wrap",gap:10 }}>
                     <div>
                       <h3 style={{ fontSize:16,fontWeight:800,color:T.navy,marginBottom:4 }}>✅ AI Profile Generated!</h3>
-                      {aiProfile.time && <p style={{ fontSize:12,color:T.subtle }}>Generated in {aiProfile.time}s</p>}
+                      <div style={{ display:"flex",alignItems:"center",gap:8,marginTop:4 }}>
+                        {aiProfile.time && <span style={{ fontSize:12,color:T.subtle }}>Generated in {aiProfile.time}s</span>}
+                        <span style={{ fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:12,background:aiProfile.visibility==="public"?"#dcfce7":"#f1f5f9",color:aiProfile.visibility==="public"?"#16a34a":"#64748b" }}>
+                          {aiProfile.visibility==="public"?"🌐 PUBLIC":"🔒 PRIVATE"}
+                        </span>
+                        {aiProfile.views > 0 && <span style={{ fontSize:11,color:T.subtle }}>{aiProfile.views} views</span>}
+                      </div>
                     </div>
                     <div style={{ display:"flex",gap:8,flexWrap:"wrap" }}>
-                      <a href={aiProfile.url || `https://upskill25-ai-enhancer.hf.space/api/v1/profile/public/${aiProfile.slug}`} target="_blank" rel="noopener noreferrer" className="mba-btn-primary" style={{ fontSize:12,padding:"8px 16px",textDecoration:"none" }}>
+                      <button className="mba-btn-outline" style={{ fontSize:12,padding:"8px 16px" }} onClick={handleToggleProfileVisibility}>
+                        {aiProfile.visibility==="public"?"🔒 Make Private":"🌐 Make Public"}
+                      </button>
+                      <a href={`${AGENT_URL}/api/v1/profile/public/${aiProfile.slug}`} target="_blank" rel="noopener noreferrer" className="mba-btn-primary" style={{ fontSize:12,padding:"8px 16px",textDecoration:"none" }}>
                         <Eye size={13} /> View Full Profile
                       </a>
-                      <a href={`https://upskill25-ai-enhancer.hf.space/api/v1/profile/download/${aiProfile.slug}`} target="_blank" rel="noopener noreferrer" className="mba-btn-outline" style={{ fontSize:12,padding:"8px 16px",textDecoration:"none" }}>
-                        Download Profile
+                      <a href={`${AGENT_URL}/api/v1/profile/download/${aiProfile.slug}`} target="_blank" rel="noopener noreferrer" className="mba-btn-outline" style={{ fontSize:12,padding:"8px 16px",textDecoration:"none" }}>
+                        📥 Download PDF
                       </a>
-                      <button className="mba-btn-ghost" style={{ fontSize:12,padding:"8px 16px" }} onClick={() => { navigator.clipboard.writeText(aiProfile.url || `https://upskillize.com/profile/${aiProfile.slug}`); showMsg("success","Profile link copied!"); }}>
+                      <button className="mba-btn-ghost" style={{ fontSize:12,padding:"8px 16px" }} onClick={() => { 
+                        const link = aiProfile.visibility==="public" 
+                          ? (aiProfile.url || `${AGENT_URL}/api/v1/profile/public/${aiProfile.slug}`) 
+                          : `${AGENT_URL}/api/v1/profile/public/${aiProfile.slug}`;
+                        navigator.clipboard.writeText(link); 
+                        showMsg("success","Profile link copied!"); 
+                      }}>
                         📋 Copy Link
                       </button>
                       <button className="mba-btn-ghost" style={{ fontSize:12,padding:"8px 16px" }} onClick={() => { setAiProfile(null); handleGenerateAIProfile(); }}>
@@ -1861,6 +1936,20 @@ function ProfileManagement() {
                       </button>
                     </div>
                   </div>
+
+                  {aiProfile.visibility==="private" && (
+                    <div style={{ background:"#fffbeb",border:"1px solid #fde68a",borderRadius:10,padding:"10px 16px",marginBottom:12,display:"flex",alignItems:"center",gap:8 }}>
+                      <span style={{ fontSize:16 }}>🔒</span>
+                      <p style={{ fontSize:12,color:"#92400e",margin:0 }}>Your profile is <b>private</b>. Only you can see it. Click <b>"Make Public"</b> to share with recruiters and corporates.</p>
+                    </div>
+                  )}
+
+                  {aiProfile.visibility==="public" && (
+                    <div style={{ background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:10,padding:"10px 16px",marginBottom:12,display:"flex",alignItems:"center",gap:8 }}>
+                      <span style={{ fontSize:16 }}>🌐</span>
+                      <p style={{ fontSize:12,color:"#166534",margin:0 }}>Your profile is <b>public</b>. Recruiters and corporates can view it using your shareable link.</p>
+                    </div>
+                  )}
 
                   {aiProfile.html ? (
                     <div style={{ border:`1px solid ${T.border}`,borderRadius:12,overflow:"hidden",background:"#060912" }}>
