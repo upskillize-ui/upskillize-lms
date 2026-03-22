@@ -245,3 +245,23 @@ router.delete('/:id', authMiddleware, rbac(['faculty', 'admin']), async (req, re
 });
 
 module.exports = router;
+// GET /api/quizzes/available - quizzes for student's enrolled courses
+router.get('/available', authMiddleware, async (req, res) => {
+  try {
+    const { Student, Enrollment, Quiz, QuizQuestion } = require('../models');
+    const student = await Student.findOne({ where: { user_id: req.user.id } });
+    if (!student) return res.json({ success: true, quizzes: [] });
+    const enrollments = await Enrollment.findAll({ where: { student_id: student.id }, attributes: ['course_id'] });
+    const courseIds = enrollments.map(e => e.course_id);
+    if (!courseIds.length) return res.json({ success: true, quizzes: [] });
+    const quizzes = await Quiz.findAll({ where: { course_id: courseIds } });
+    const result = await Promise.all(quizzes.map(async q => {
+      const qCount = await QuizQuestion.count({ where: { quiz_id: q.id } });
+      return { id: q.id, title: q.title, course_id: q.course_id, time_limit: q.time_limit, total_questions: qCount };
+    }));
+    return res.json({ success: true, quizzes: result });
+  } catch (e) {
+    console.error('GET /quizzes/available error:', e);
+    res.json({ success: true, quizzes: [] });
+  }
+});
