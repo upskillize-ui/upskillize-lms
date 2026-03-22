@@ -99,18 +99,7 @@ async function getExistingColumns(sequelize, tableName) {
   return new Set(cols.map(c => c.COLUMN_NAME));
 }
 
-// ── HELPER: safe update ────────────────────────────────────
-// Only includes keys that actually exist as columns in the table.
-async function safeUpdate(model, tableName, updates, where, sequelize) {
-  const existing = await getExistingColumns(sequelize, tableName);
-  const safe = {};
-  for (const [k, v] of Object.entries(updates)) {
-    if (existing.has(k)) safe[k] = v;
-  }
-  if (Object.keys(safe).length > 0) {
-    await model.update(safe, { where });
-  }
-}
+
 
 // ══════════════════════════════════════════════════════════════
 // GET /api/faculty/profile
@@ -119,68 +108,70 @@ async function safeUpdate(model, tableName, updates, where, sequelize) {
 // ══════════════════════════════════════════════════════════════
 router.get('/profile', authMiddleware, async (req, res) => {
   try {
-    const user = await User.findByPk(req.user.id, {
-      attributes: { exclude: ['password_hash', 'password'] },
-    });
+    const { sequelize } = require('../config/database');
+    // Raw SQL fetch — returns ALL columns including newly-added ones
+    // that Sequelize model doesn't know about yet
+    const user = await rawFetchUser(req.user.id, sequelize);
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
     const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
 
-    // Flat profile object — matches every field Dashboard.jsx setState calls
+    const str = (v) => (v === null || v === undefined) ? '' : String(v);
+
     const profile = {
-      // ── users table ──────────────────────────────────────
-      full_name:     user.full_name     || '',
-      email:         user.email         || '',
-      phone_number:  user.phone         || '',   // Dashboard uses phone_number
-      phone:         user.phone         || '',
+      // ── users table (raw SQL so all new columns are included) ─
+      full_name:     str(user.full_name),
+      email:         str(user.email),
+      phone_number:  str(user.phone),     // Dashboard uses phone_number
+      phone:         str(user.phone),
       profile_photo: user.profile_photo || null,
-      date_of_birth: user.date_of_birth || '',
-      gender:        user.gender        || '',
-      bio:           user.bio           || '',
+      date_of_birth: str(user.date_of_birth),
+      gender:        str(user.gender),
+      bio:           str(user.bio),
       // address
-      address_line1:  user.address_line1  || '',
-      address_line2:  user.address_line2  || '',
-      city:           user.city           || '',
-      state:          user.state          || '',
-      country:        user.country        || '',
-      postal_code:    user.postal_code    || '',
+      address_line1:  str(user.address_line1),
+      address_line2:  str(user.address_line2),
+      city:           str(user.city),
+      state:          str(user.state),
+      country:        str(user.country),
+      postal_code:    str(user.postal_code),
       // emergency
-      emergency_contact_name:  user.emergency_contact_name  || '',
-      emergency_contact_phone: user.emergency_contact_phone || '',
+      emergency_contact_name:  str(user.emergency_contact_name),
+      emergency_contact_phone: str(user.emergency_contact_phone),
       // additional
-      edu_degree:      user.edu_degree      || '',
-      edu_institution: user.edu_institution || '',
-      edu_year:        user.edu_year        || '',
-      edu_grade:       user.edu_grade       || '',
-      certifications:  user.certifications  || '',
-      languages_known: user.languages_known || '',
-      skills:          user.skills          || '',
-      achievements:    user.achievements    || '',
-      publications:    user.publications    || '',
+      edu_degree:      str(user.edu_degree),
+      edu_institution: str(user.edu_institution),
+      edu_year:        str(user.edu_year),
+      edu_grade:       str(user.edu_grade),
+      certifications:  str(user.certifications),
+      languages_known: str(user.languages_known),
+      skills:          str(user.skills),
+      achievements:    str(user.achievements),
+      publications:    str(user.publications),
       // social
-      linkedin: user.linkedin || '',
-      github:   user.github   || '',
-      twitter:  user.twitter  || '',
-      website:  user.website  || '',
+      linkedin: str(user.linkedin),
+      github:   str(user.github),
+      twitter:  str(user.twitter),
+      website:  str(user.website),
       // bank
-      account_holder_name:     user.account_holder_name     || '',
-      bank_name:               user.bank_name               || '',
-      ifsc_code:               user.ifsc_code               || '',
-      branch_name:             user.branch_name             || '',
-      account_type:            user.account_type            || 'savings',
-      pan_number:              user.pan_number              || '',
-      uan_number:              user.uan_number              || '',
-      // ── faculty table ─────────────────────────────────────
-      employee_id:      faculty?.employee_id      || '',
-      department:       faculty?.department       || '',
-      qualifications:   faculty?.qualifications   || '',
-      qualification:    faculty?.qualifications   || '',  // Dashboard uses both keys
-      subjects:         faculty?.subjects         || '',
+      account_holder_name: str(user.account_holder_name),
+      bank_name:           str(user.bank_name),
+      ifsc_code:           str(user.ifsc_code),
+      branch_name:         str(user.branch_name),
+      account_type:        str(user.account_type) || 'savings',
+      pan_number:          str(user.pan_number),
+      uan_number:          str(user.uan_number),
+      // ── faculty table ────────────────────────────────────
+      employee_id:      str(faculty?.employee_id),
+      department:       str(faculty?.department),
+      qualifications:   str(faculty?.qualifications),
+      qualification:    str(faculty?.qualifications),  // Dashboard uses both keys
+      subjects:         str(faculty?.subjects),
       experience_years: faculty?.experience_years || '',
-      // professional extras (stored on users)
-      designation:    user.designation    || '',
-      specialization: user.specialization || '',
-      joining_date:   user.joining_date   || '',
+      // professional extras (stored on users via raw SQL)
+      designation:    str(user.designation),
+      specialization: str(user.specialization),
+      joining_date:   str(user.joining_date),
     };
 
     return res.json({ success: true, profile });
@@ -217,13 +208,13 @@ router.put('/profile/personal', authMiddleware, async (req, res) => {
     if (!full_name?.trim()) return res.status(400).json({ success: false, message: 'Full name is required' });
 
     const { sequelize } = require('../config/database');
-    await safeUpdate(User, 'users', {
+    await rawUpdate('users', {
       full_name:     full_name.trim(),
       phone:         phone_number?.trim() || null,
       date_of_birth: date_of_birth        || null,
       gender:        gender               || null,
       bio:           bio?.trim()          || null,
-    }, { id: req.user.id }, sequelize);
+    }, 'id = ?', [req.user.id], sequelize);
 
     res.json({ success: true, message: 'Personal information updated successfully' });
   } catch (error) {
@@ -254,11 +245,11 @@ router.put('/profile/professional', authMiddleware, async (req, res) => {
     }
 
     // Save extra columns on users table (designation, specialization, joining_date)
-    await safeUpdate(User, 'users', {
+    await rawUpdate('users', {
       designation:    designation    || null,
       specialization: specialization || null,
       joining_date:   joining_date   || null,
-    }, { id: req.user.id }, sequelize);
+    }, 'id = ?', [req.user.id], sequelize);
 
     res.json({ success: true, message: 'Professional information updated successfully' });
   } catch (error) {
@@ -277,10 +268,10 @@ router.put('/profile/contact', authMiddleware, async (req, res) => {
             emergency_contact_name, emergency_contact_phone } = req.body;
 
     const { sequelize } = require('../config/database');
-    await safeUpdate(User, 'users', {
+    await rawUpdate('users', {
       address_line1, address_line2, city, state, country, postal_code,
       emergency_contact_name, emergency_contact_phone,
-    }, { id: req.user.id }, sequelize);
+    }, 'id = ?', [req.user.id], sequelize);
 
     res.json({ success: true, message: 'Contact information updated successfully' });
   } catch (error) {
@@ -301,11 +292,11 @@ router.put('/profile/additional', authMiddleware, async (req, res) => {
             achievements, publications } = req.body;
 
     const { sequelize } = require('../config/database');
-    await safeUpdate(User, 'users', {
+    await rawUpdate('users', {
       edu_degree, edu_institution, edu_year, edu_grade,
       certifications, languages_known, skills,
       achievements, publications,
-    }, { id: req.user.id }, sequelize);
+    }, 'id = ?', [req.user.id], sequelize);
 
     res.json({ success: true, message: 'Additional information updated successfully' });
   } catch (error) {
@@ -323,12 +314,12 @@ router.put('/profile/social', authMiddleware, async (req, res) => {
     const { linkedin, github, twitter, website } = req.body;
 
     const { sequelize } = require('../config/database');
-    await safeUpdate(User, 'users', {
+    await rawUpdate('users', {
       linkedin: linkedin || null,
       github:   github   || null,
       twitter:  twitter  || null,
       website:  website  || null,
-    }, { id: req.user.id }, sequelize);
+    }, 'id = ?', [req.user.id], sequelize);
 
     res.json({ success: true, message: 'Social links updated successfully' });
   } catch (error) {
@@ -348,12 +339,12 @@ router.put('/profile/bank', authMiddleware, async (req, res) => {
             pan_number, uan_number } = req.body;
 
     const { sequelize } = require('../config/database');
-    await safeUpdate(User, 'users', {
+    await rawUpdate('users', {
       account_holder_name, bank_name, account_number,
       ifsc_code, branch_name,
       account_type: account_type || 'savings',
       pan_number, uan_number,
-    }, { id: req.user.id }, sequelize);
+    }, 'id = ?', [req.user.id], sequelize);
 
     res.json({ success: true, message: 'Bank details saved securely' });
   } catch (error) {
