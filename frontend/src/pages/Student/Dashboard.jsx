@@ -2950,8 +2950,6 @@ function StudentAssignments() {
             <div className="mba-metric-value">{m.count}</div>
           </div>
         ))}
- <button onClick={()=>setShowAiRev(v=>!v)} style={{marginLeft:"auto",fontSize:13,padding:"8px 18px",display:"flex",alignItems:"center",gap:6,background:"#1a2744",color:"#fff",border:"none",borderRadius:8,fontFamily:"Plus Jakarta Sans,sans-serif",fontWeight:700,cursor:"pointer"}}><Bot size={14}/> AiRev</button>
-```
       </div>
  
       {/* Filter tabs */}
@@ -2960,6 +2958,7 @@ function StudentAssignments() {
           <button key={f} className={`mba-tab ${filter===f?"active":""}`} onClick={()=>setFilter(f)} style={{textTransform:"capitalize"}}>
             {f}{f!=="all"&&counts[f]!=null?` (${counts[f]})`:""}</button>
         ))}
+        <button onClick={()=>setShowAiRev(v=>!v)} style={{marginLeft:"auto",fontSize:13,padding:"8px 18px",display:"flex",alignItems:"center",gap:6,background:"#1a2744",color:"#fff",border:"none",borderRadius:8,fontFamily:"Plus Jakarta Sans,sans-serif",fontWeight:700,cursor:"pointer"}}><Bot size={14}/> AiRev</button>
       </div>
  
       {showAiRev ? (
@@ -3038,14 +3037,7 @@ function StudentAssignments() {
         );
       })}
  
-      {/* AiRev Panel */}
-      {showAiRev && selected && (
-        <AiRevPanel
-          assignment={selected}
-          submissionNotes={submitForm.notes}
-          onClose={() => { setShowAiRev(false); setAiRevResult(null); }}
-        />
-      )}
+
 
       {/* Details Modal */}
       {showDetails && selected && (()=>{
