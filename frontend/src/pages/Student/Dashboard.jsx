@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
   Routes, Route, Link, useLocation, useNavigate, useParams,
@@ -6,7 +7,6 @@ import { useAuth } from "../../context/AuthContext";
 import api from "../../services/api";
 import CoursePlayer from "./CoursePlayer";
 import BrowseCourses from "../../pages/BrowseCourses";
-import StudentAssignments from "./StudentAssignments";
 import {
   BookOpen, TrendingUp, Award, PlayCircle, Clock, Bell,
   MessageSquare, HelpCircle, CreditCard, BarChart3, Download,
@@ -1452,58 +1452,78 @@ function ProfileManagement() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState({ type:"",text:"" });
   const [profileCompletion, setProfileCompletion] = useState(0);
-
-  // Load from sessionStorage instantly — survives sidebar tab switches
-  const _c = (() => { try { return JSON.parse(sessionStorage.getItem('upskillize_profile_full') || '{}'); } catch { return {}; } })();
-
+  const cached = JSON.parse(localStorage.getItem('upskillize_profile_cache') || '{}');
   const [personalInfo, setPersonalInfo] = useState({
-    full_name:     _c.personal?.full_name     || user?.full_name || "",
-    email:         _c.personal?.email         || user?.email     || "",
-    phone:         _c.personal?.phone         || "",
-    date_of_birth: _c.personal?.date_of_birth || "",
-    gender:        _c.personal?.gender        || "",
-    profile_photo: _c.personal?.profile_photo || null,
-    bio:           _c.personal?.bio           || "",
+    full_name: cached.full_name || user?.full_name || "",
+    email: cached.email || user?.email || "",
+    phone: cached.phone || "",
+    date_of_birth: cached.date_of_birth || "",
+    gender: cached.gender || "",
+    profile_photo: cached.profile_photo || null,
+    bio: cached.bio || ""
   });
-  const [address, setAddress] = useState(_c.address || { street:"",city:"",state:"",country:"",postal_code:"" });
+  const [address, setAddress] = useState({ street:"",city:"",state:"",country:"",postal_code:"" });
   const [security, setSecurity] = useState({ current_password:"",new_password:"",confirm_password:"" });
   const [showPwd, setShowPwd] = useState({ current:false,new_:false });
-  const [socialLinks, setSocialLinks] = useState(_c.social || { linkedin:"",github:"",twitter:"",portfolio:"" });
-  const [resume, setResume] = useState({ file:null, uploadedUrl:_c.resume_url||null, uploadedName:_c.resume_name||null, uploading:false });
-  const [corporateVisible, setCorporateVisible] = useState(_c.corporate_visible ?? false);
+  const [socialLinks, setSocialLinks] = useState({ linkedin:"",github:"",twitter:"",portfolio:"" });
+  const [resume, setResume] = useState({ file:null,uploadedUrl:null,uploadedName:null,uploading:false });
+  const [corporateVisible, setCorporateVisible] = useState(false);
   const [aiEnhancing, setAiEnhancing] = useState(false);
   const [enhancedBio, setEnhancedBio] = useState("");
-  const [psychoDone, setPsychoDone] = useState(!!_c.psycho_result);
-  const [psychoResult, setPsychoResult] = useState(_c.psycho_result || null);
+  const [aiProfile, setAiProfile] = useState(null);
+  const [aiProfileGenerating, setAiProfileGenerating] = useState(false);
+  const [aiProfileError, setAiProfileError] = useState("");
+  const [psychoDone, setPsychoDone] = useState(false);
+  const [psychoResult, setPsychoResult] = useState(null);
 
-  const [additionalInfo, setAdditionalInfo] = useState(_c.additional || {
-    education_level: "", institution: "", graduation_year: "", field_of_study: "",
-    work_experience_years: "", current_employer: "", current_designation: "",
-    skills: "", languages: "", certifications: "", hobbies: "",
-    emergency_contact_name: "", emergency_contact_phone: "", emergency_contact_relation: "",
+  // FIX 3: Additional Info fields
+  const [additionalInfo, setAdditionalInfo] = useState({
+    education_level: "",
+    institution: "",
+    graduation_year: "",
+    field_of_study: "",
+    work_experience_years: "",
+    current_employer: "",
+    current_designation: "",
+    skills: "",
+    languages: "",
+    certifications: "",
+    hobbies: "",
+    emergency_contact_name: "",
+    emergency_contact_phone: "",
+    emergency_contact_relation: "",
   });
 
-  const [jobPrefs, setJobPrefs] = useState(_c.job_preferences || {
-    preferred_role: "", preferred_location: "", preferred_salary_min: "",
-    preferred_salary_max: "", employment_type: "", work_mode: "",
-    notice_period: "", open_to_relocation: "", industries: "",
-    company_size: "", key_skills: "", career_goals: "",
+  // FIX 6: Job Preferences
+  const [jobPrefs, setJobPrefs] = useState({
+    preferred_role: "",
+    preferred_location: "",
+    preferred_salary_min: "",
+    preferred_salary_max: "",
+    employment_type: "",
+    work_mode: "",
+    notice_period: "",
+    open_to_relocation: false,
+    industries: "",
+    company_size: "",
+    key_skills: "",
+    career_goals: "",
   });
 
   useEffect(() => {
+    const cached = JSON.parse(localStorage.getItem('upskillize_profile_cache') || '{}');
+    const hasCached = Object.keys(cached).length > 0;
     api.get("/student/profile/complete").then(r => {
       if (r.data.success) {
         const d = r.data.profile;
-        // Cache full profile in sessionStorage — instant on next tab switch
-        sessionStorage.setItem('upskillize_profile_full', JSON.stringify(d));
-        if (d.personal)        setPersonalInfo(p  => ({ ...p,  ...d.personal }));
-        if (d.address)         setAddress(d.address);
-        if (d.social)          setSocialLinks(d.social);
-        if (d.additional)      setAdditionalInfo(a => ({ ...a,  ...d.additional }));
-        if (d.job_preferences) setJobPrefs(p       => ({ ...p,  ...d.job_preferences }));
+        if (d.personal && !hasCached) setPersonalInfo(p => ({ ...p, ...d.personal }));
+        if (d.address)  setAddress(d.address);
+        if (d.social)   setSocialLinks(d.social);
+        if (d.additional) setAdditionalInfo(a => ({ ...a, ...d.additional }));
+        if (d.job_preferences) setJobPrefs(p => ({ ...p, ...d.job_preferences }));
         if (d.corporate_visible !== undefined) setCorporateVisible(d.corporate_visible);
-        if (d.resume_url)      setResume(rv => ({ ...rv, uploadedUrl: d.resume_url, uploadedName: d.resume_name }));
-        if (d.psycho_result)   { setPsychoResult(d.psycho_result); setPsychoDone(true); }
+        if (d.resume_url) setResume(r => ({ ...r, uploadedUrl: d.resume_url, uploadedName: d.resume_name }));
+        if (d.psycho_result) { setPsychoResult(d.psycho_result); setPsychoDone(true); }
       }
     }).catch(()=>{});
   }, []);
@@ -1543,6 +1563,41 @@ function ProfileManagement() {
     } catch { showMsg("error", "Enhancement failed. Please check your connection."); }
     setAiEnhancing(false);
   };
+
+  const AGENT_URL = "https://upskill25-ai-enhancer.hf.space";
+
+  const handleGenerateAIProfile = async () => {
+    setAiProfileGenerating(true);
+    setAiProfileError("");
+    setAiProfile(null);
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${AGENT_URL}/api/v1/profile/generate`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify({ force_regenerate: true }),
+      });
+      const data = await res.json();
+      if (res.ok && data.slug) {
+        const profileRes = await fetch(`${AGENT_URL}/api/v1/profile/public/${data.slug}`);
+        if (profileRes.ok) {
+          const html = await profileRes.text();
+          setAiProfile({ slug: data.slug, html, url: data.profile_url, time: data.generation_time });
+        } else {
+          setAiProfile({ slug: data.slug, html: null, url: data.profile_url, time: data.generation_time });
+        }
+      } else {
+        setAiProfileError(data.detail || data.message || "Failed to generate profile. Please try again.");
+      }
+    } catch (err) {
+      setAiProfileError("Could not connect to AI agent. Please try again later.");
+    }
+    setAiProfileGenerating(false);
+  };
+
 
   // FIX 3: Updated tabs order — Personal, Address, Additional Info, Resume, Psychometric, AI Enhancer, Corporate View, Job Preferences, Security
   const tabs = [
@@ -1633,8 +1688,7 @@ function ProfileManagement() {
                 const r = await api.put("/student/profile/personal", personalInfo);
                 if (r.data.success) {
                   showMsg("success","Personal information saved!");
-                  const _cur = (() => { try { return JSON.parse(sessionStorage.getItem('upskillize_profile_full') || '{}'); } catch { return {}; } })();
-                  sessionStorage.setItem('upskillize_profile_full', JSON.stringify({ ..._cur, personal: { ..._cur.personal, ...personalInfo } }));
+                  localStorage.setItem('upskillize_profile_cache', JSON.stringify(personalInfo));
                   if (updateUser) updateUser({ full_name:personalInfo.full_name, phone:personalInfo.phone, gender:personalInfo.gender, bio:personalInfo.bio, profile_photo:personalInfo.profile_photo||null });
                 }
               })} disabled={saving}><Save size={13} /> {saving?"Saving...":"Save Personal Info"}</button>
@@ -1655,14 +1709,7 @@ function ProfileManagement() {
                   </select>
                 </div>
               </div>
-              <button className="mba-btn-primary" onClick={save(async () => {
-                const r = await api.put("/student/profile/address", address);
-                if (r.data.success) {
-                  showMsg("success","Address saved!");
-                  const _cur = (() => { try { return JSON.parse(sessionStorage.getItem('upskillize_profile_full') || '{}'); } catch { return {}; } })();
-                  sessionStorage.setItem('upskillize_profile_full', JSON.stringify({ ..._cur, address }));
-                } else { showMsg("error","Failed to save address"); }
-              })} disabled={saving}><Save size={13} /> {saving?"Saving...":"Save Address"}</button>
+              <button className="mba-btn-primary" onClick={save(async () => { await api.put("/student/profile/address",address); showMsg("success","Address saved!"); })} disabled={saving}><Save size={13} /> {saving?"Saving...":"Save Address"}</button>
             </div>
           )}
 
@@ -1713,9 +1760,6 @@ function ProfileManagement() {
 
               <button className="mba-btn-primary" onClick={save(async () => {
                 await api.put("/student/profile/additional", additionalInfo);
-                // Update sessionStorage cache
-                const _cur = (() => { try { return JSON.parse(sessionStorage.getItem('upskillize_profile_full') || '{}'); } catch { return {}; } })();
-                sessionStorage.setItem('upskillize_profile_full', JSON.stringify({ ..._cur, additional: additionalInfo }));
                 showMsg("success","Additional information saved!");
               })} disabled={saving}><Save size={13} /> {saving?"Saving...":"Save Additional Info"}</button>
             </div>
@@ -1747,14 +1791,7 @@ function ProfileManagement() {
                     <input key={k} type="url" className="mba-input" value={socialLinks[k]} onChange={e=>setSocialLinks(s=>({...s,[k]:e.target.value}))} placeholder={`${l}: ${ph}`} />
                   ))}
                 </div>
-                <button className="mba-btn-primary" style={{ marginTop:12 }} onClick={save(async () => {
-                  const r = await api.put("/student/profile/social", socialLinks);
-                  if (r.data.success) {
-                    showMsg("success","Links saved!");
-                    const _cur = (() => { try { return JSON.parse(sessionStorage.getItem('upskillize_profile_full') || '{}'); } catch { return {}; } })();
-                    sessionStorage.setItem('upskillize_profile_full', JSON.stringify({ ..._cur, social: socialLinks }));
-                  } else { showMsg("error","Failed to save links"); }
-                })} disabled={saving}><Save size={13} /> Save Links</button>
+                <button className="mba-btn-primary" style={{ marginTop:12 }} onClick={save(async () => { await api.put("/student/profile/social",socialLinks); showMsg("success","Links saved!"); })} disabled={saving}><Save size={13} /> Save Links</button>
               </div>
             </div>
           )}
@@ -1762,26 +1799,84 @@ function ProfileManagement() {
           {/* PSYCHOMETRIC TAB */}
           {activeTab==="psychometric" && <PsychometricTest psychoDone={psychoDone} setPsychoDone={setPsychoDone} psychoResult={psychoResult} setPsychoResult={setPsychoResult} showMsg={showMsg} />}
 
-          {/* AI ENHANCER TAB */}
+          {/* AI ENHANCER TAB — ONE-CLICK PROFILE GENERATOR */}
           {activeTab==="ai_enhance" && (
-            <div style={{ maxWidth:560 }}>
-              <h3 style={{ fontSize:16,fontWeight:800,color:T.navy,marginBottom:4 }}>🤖 AI Profile Enhancer</h3>
-              <p style={{ fontSize:13,color:T.muted,marginBottom:20 }}>Let AI rewrite your bio to make it more professional and impactful for recruiters.</p>
-              <div style={{ marginBottom:14 }}>
-                <label className="mba-label">Your Current Bio</label>
-                <textarea className="mba-textarea" rows={5} value={personalInfo.bio} onChange={e=>setPersonalInfo(p=>({...p,bio:e.target.value}))} placeholder="Write a draft bio about yourself..." />
-              </div>
-              <button className="mba-btn-gold" onClick={handleAiEnhance} disabled={aiEnhancing} style={{ marginBottom:20 }}>
-                <Sparkles size={14} /> {aiEnhancing ? "Enhancing..." : "✨ Enhance with AI"}
-              </button>
-              {aiEnhancing && (<div style={{ display:"flex",alignItems:"center",gap:10,padding:14,background:T.bg,borderRadius:10,marginBottom:14 }}><div className="mba-spinner" style={{ width:18,height:18,borderWidth:2 }} /><p style={{ fontSize:13,color:T.muted }}>AI is crafting your professional bio...</p></div>)}
-              {enhancedBio && (
-                <div style={{ background:T.blueSoft,border:`1px solid #c0d0f0`,borderRadius:10,padding:18,marginBottom:14 }}>
-                  <div style={{ display:"flex",justifyContent:"space-between",marginBottom:10 }}>
-                    <p style={{ fontSize:12,fontWeight:700,color:T.navy,textTransform:"uppercase",letterSpacing:".06em" }}>✨ AI-Enhanced Bio</p>
-                    <button className="mba-btn-ghost" style={{ fontSize:12,padding:"4px 10px" }} onClick={() => setPersonalInfo(p=>({...p,bio:enhancedBio}))}>Use This</button>
+            <div>
+              {!aiProfile ? (
+                <div style={{ textAlign:"center",padding:"40px 20px" }}>
+                  <div style={{ width:80,height:80,borderRadius:"50%",background:"linear-gradient(135deg,#1A2744,#2a3f6f)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 20px",fontSize:36 }}>🚀</div>
+                  <h3 style={{ fontSize:20,fontWeight:800,color:T.navy,marginBottom:8 }}>Generate Your AI Profile</h3>
+                  <p style={{ fontSize:14,color:T.muted,maxWidth:480,margin:"0 auto 8px",lineHeight:1.6 }}>
+                    Our AI reads your courses, quiz scores, case studies, psychometric results, and all LMS activity — then creates a professional, recruiter-ready profile in seconds.
+                  </p>
+                  <div style={{ display:"flex",flexWrap:"wrap",justifyContent:"center",gap:8,margin:"16px 0 24px" }}>
+                    {["📚 Courses","📝 Quiz Scores","📋 Case Studies","🧠 Psychometric","📊 Performance","🏆 Certificates"].map(item => (
+                      <span key={item} style={{ fontSize:12,padding:"5px 12px",background:T.bg,border:`1px solid ${T.border}`,borderRadius:20,color:T.muted }}>{item}</span>
+                    ))}
                   </div>
-                  <p style={{ fontSize:14,color:T.navy,lineHeight:1.65 }}>{enhancedBio}</p>
+
+                  {aiProfileError && (
+                    <div style={{ background:"#fef2f2",border:"1px solid #fecaca",borderRadius:10,padding:"12px 16px",marginBottom:16,maxWidth:480,margin:"0 auto 16px" }}>
+                      <p style={{ fontSize:13,color:"#dc2626" }}>{aiProfileError}</p>
+                    </div>
+                  )}
+
+                  <button
+                    className="mba-btn-gold"
+                    onClick={handleGenerateAIProfile}
+                    disabled={aiProfileGenerating}
+                    style={{ fontSize:15,padding:"14px 32px",borderRadius:10 }}
+                  >
+                    <Sparkles size={16} />
+                    {aiProfileGenerating ? "Generating Profile..." : "✨ Generate My AI Profile"}
+                  </button>
+
+                  {aiProfileGenerating && (
+                    <div style={{ marginTop:20 }}>
+                      <div className="mba-spinner" style={{ width:24,height:24,borderWidth:3,margin:"0 auto 10px" }} />
+                      <p style={{ fontSize:13,color:T.muted }}>AI is analyzing your LMS data and building your profile...</p>
+                      <p style={{ fontSize:11,color:T.subtle,marginTop:4 }}>This takes 10-15 seconds</p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div>
+                  <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16,flexWrap:"wrap",gap:10 }}>
+                    <div>
+                      <h3 style={{ fontSize:16,fontWeight:800,color:T.navy,marginBottom:4 }}>✅ AI Profile Generated!</h3>
+                      {aiProfile.time && <p style={{ fontSize:12,color:T.subtle }}>Generated in {aiProfile.time}s</p>}
+                    </div>
+                    <div style={{ display:"flex",gap:8,flexWrap:"wrap" }}>
+                      <a href={aiProfile.url || `https://upskill25-ai-enhancer.hf.space/api/v1/profile/public/${aiProfile.slug}`} target="_blank" rel="noopener noreferrer" className="mba-btn-primary" style={{ fontSize:12,padding:"8px 16px",textDecoration:"none" }}>
+                        <Eye size={13} /> View Full Profile
+                      </a>
+                      <a href={`https://upskill25-ai-enhancer.hf.space/api/v1/profile/download/${aiProfile.slug}`} target="_blank" rel="noopener noreferrer" className="mba-btn-outline" style={{ fontSize:12,padding:"8px 16px",textDecoration:"none" }}>
+                        Download Profile
+                      </a>
+                      <button className="mba-btn-ghost" style={{ fontSize:12,padding:"8px 16px" }} onClick={() => { navigator.clipboard.writeText(aiProfile.url || `https://upskillize.com/profile/${aiProfile.slug}`); showMsg("success","Profile link copied!"); }}>
+                        📋 Copy Link
+                      </button>
+                      <button className="mba-btn-ghost" style={{ fontSize:12,padding:"8px 16px" }} onClick={() => { setAiProfile(null); handleGenerateAIProfile(); }}>
+                        🔄 Regenerate
+                      </button>
+                    </div>
+                  </div>
+
+                  {aiProfile.html ? (
+                    <div style={{ border:`1px solid ${T.border}`,borderRadius:12,overflow:"hidden",background:"#060912" }}>
+                      <iframe
+                        srcDoc={aiProfile.html}
+                        title="AI Profile Preview"
+                        style={{ width:"100%",height:700,border:"none" }}
+                        sandbox="allow-same-origin"
+                      />
+                    </div>
+                  ) : (
+                    <div style={{ textAlign:"center",padding:32,background:T.bg,borderRadius:12,border:`1px solid ${T.border}` }}>
+                      <p style={{ fontSize:14,color:T.navy,fontWeight:600,marginBottom:8 }}>Profile generated successfully!</p>
+                      <p style={{ fontSize:13,color:T.muted }}>Click "View Full Profile" to see your AI-generated professional profile.</p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1903,9 +1998,6 @@ function ProfileManagement() {
 
               <button className="mba-btn-primary" onClick={save(async () => {
                 await api.put("/student/profile/job-preferences", jobPrefs);
-                // Update sessionStorage cache
-                const _cur = (() => { try { return JSON.parse(sessionStorage.getItem('upskillize_profile_full') || '{}'); } catch { return {}; } })();
-                sessionStorage.setItem('upskillize_profile_full', JSON.stringify({ ..._cur, job_preferences: jobPrefs }));
                 showMsg("success","Job preferences saved!");
               })} disabled={saving}><Save size={13} /> {saving?"Saving...":"Save Job Preferences"}</button>
             </div>
@@ -2563,6 +2655,671 @@ function ClassesSchedule() {
   );
 }
 
+// ─── FIX 10: ASSESSMENTS (renamed from Quizzes) ──────────────────────────
+function StudentAssessments() {
+  const [enrollments,setEnrollments]=useState([]);
+  const [quizzesByCourse,setQuizzesByCourse]=useState({});
+  const [attempts,setAttempts]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [activeQuiz,setActiveQuiz]=useState(null);
+  const [answers,setAnswers]=useState({});
+  const [currentQ,setCurrentQ]=useState(0);
+  const [result,setResult]=useState(null);
+  const [submitting,setSubmitting]=useState(false);
+  const [timeLeft,setTimeLeft]=useState(null);
+  const [startTime,setStartTime]=useState(null);
+  const [activeTab,setActiveTab]=useState("available");
+ 
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const r = await api.get("/enrollments/my-enrollments");
+        const enr = r.data.enrollments||[];
+        setEnrollments(enr);
+        const res = await Promise.all(
+          enr.map(e =>
+            api.get(`/quizzes/course/${e.Course?.id}`)
+              .then(r=>({courseId:e.Course?.id,quizzes:r.data.quizzes||[]}))
+              .catch(()=>({courseId:e.Course?.id,quizzes:[]}))
+          )
+        );
+        const map = {};
+        res.forEach(r=>{ map[r.courseId]=r.quizzes; });
+        setQuizzesByCourse(map);
+        try {
+          const ar = await api.get("/quizzes/my-attempts");
+          setAttempts(ar.data.attempts||[]);
+        } catch { setAttempts([]); }
+      } catch {}
+      finally { setLoading(false); }
+    };
+    load();
+  }, []);
+ 
+  useEffect(() => {
+    if (!activeQuiz||result) return;
+    const iv = setInterval(() => setTimeLeft(p => {
+      if (p<=1) { clearInterval(iv); handleSubmit(true); return 0; }
+      return p-1;
+    }), 1000);
+    return () => clearInterval(iv);
+  }, [activeQuiz,result]);
+ 
+  const startQuiz = async (quiz) => {
+    try {
+      const r = await api.get(`/quizzes/${quiz.id}`);
+      setActiveQuiz(r.data.quiz);
+      setAnswers({});
+      setCurrentQ(0);
+      setResult(null);
+      setTimeLeft((r.data.quiz.time_limit_minutes||30)*60);
+      setStartTime(Date.now());
+    } catch { alert("Error loading assessment"); }
+  };
+ 
+  const handleSubmit = async (auto=false) => {
+    if (!auto&&!window.confirm("Submit assessment?")) return;
+    setSubmitting(true);
+    try {
+      const r = await api.post(`/quizzes/${activeQuiz.id}/submit`,{
+        answers,
+        time_taken_seconds: Math.round((Date.now()-startTime)/1000)
+      });
+      setResult(r.data.result);
+      try {
+        const ar = await api.get("/quizzes/my-attempts");
+        setAttempts(ar.data.attempts||[]);
+      } catch {}
+    } catch { alert("Error submitting"); }
+    finally { setSubmitting(false); }
+  };
+ 
+  const fmt = (s) => `${Math.floor(s/60).toString().padStart(2,"0")}:${(s%60).toString().padStart(2,"0")}`;
+  const fmtDur = (s) => {
+    if (!s) return "–";
+    const m = Math.floor(s/60);
+    return m>0 ? `${m}m ${s%60}s` : `${s}s`;
+  };
+ 
+  if (loading) return <Spinner />;
+ 
+  // ── Active quiz view ──
+  if (activeQuiz && !result) {
+    const questions = activeQuiz.QuizQuestions||[];
+    const q = questions[currentQ];
+    return (
+      <div style={{ maxWidth:600,margin:"0 auto" }}>
+        <div className="mba-card" style={{ padding:16,display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14 }}>
+          <div>
+            <div style={{ fontWeight:700,fontSize:15,color:T.navy }}>{activeQuiz.title}</div>
+            <div style={{ fontSize:12,color:T.subtle }}>Question {currentQ+1} of {questions.length}</div>
+          </div>
+          <div style={{ padding:"7px 14px",borderRadius:8,background:timeLeft<60?T.redSoft:T.bg,color:timeLeft<60?T.red:T.navy,fontWeight:800,fontSize:15,border:`1.5px solid ${timeLeft<60?"#f7c1c1":T.border}`,display:"flex",alignItems:"center",gap:5 }}>
+            <Timer size={13}/> {fmt(timeLeft)}
+          </div>
+        </div>
+        <div style={{ height:4,background:T.border,borderRadius:2,marginBottom:14,overflow:"hidden" }}>
+          <div style={{ height:"100%",width:`${((currentQ+1)/questions.length)*100}%`,background:T.navy,transition:"width .3s" }}/>
+        </div>
+        <div className="mba-card" style={{ padding:22,marginBottom:14 }}>
+          <p style={{ fontSize:15,fontWeight:700,color:T.navy,marginBottom:18 }}>{q?.question_text}</p>
+          <div style={{ display:"flex",flexDirection:"column",gap:8 }}>
+            {[{k:"a",l:q?.option_a},{k:"b",l:q?.option_b},{k:"c",l:q?.option_c},{k:"d",l:q?.option_d}].map(opt => (
+              <button key={opt.k} className={`mba-quiz-option ${answers[q?.id]===opt.k?"selected":""}`}
+                onClick={() => setAnswers(p=>({...p,[q.id]:opt.k}))}>
+                <span style={{ fontWeight:800,minWidth:18 }}>{opt.k.toUpperCase()}.</span> {opt.l}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div style={{ display:"flex",gap:8,justifyContent:"space-between" }}>
+          <button className="mba-btn-ghost" onClick={() => setCurrentQ(p=>p-1)} disabled={currentQ===0}>← Previous</button>
+          {currentQ < questions.length-1
+            ? <button className="mba-btn-primary" onClick={() => setCurrentQ(p=>p+1)}>Next →</button>
+            : <button className="mba-btn-primary" onClick={() => handleSubmit()} disabled={submitting}>
+                {submitting ? "Submitting..." : "Submit Assessment"}
+              </button>}
+        </div>
+      </div>
+    );
+  }
+ 
+  // ── Result view ──
+  if (result) return (
+    <div style={{ maxWidth:560,margin:"0 auto" }}>
+      <div className="mba-card" style={{ padding:28,textAlign:"center" }}>
+        <div style={{ width:72,height:72,borderRadius:"50%",background:result.passed?T.greenSoft:T.redSoft,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px" }}>
+          <Trophy size={32} style={{ color:result.passed?T.green:T.red }}/>
+        </div>
+        <h2 style={{ fontSize:20,fontWeight:800,color:T.navy,marginBottom:6 }}>
+          {result.passed ? "Assessment Passed" : "Below Passing Threshold"}
+        </h2>
+        <p style={{ fontSize:44,fontWeight:800,color:T.navy,margin:"10px 0" }}>{result.percentage}%</p>
+        <p style={{ fontSize:13,color:T.subtle,marginBottom:20 }}>
+          Score: {result.score}/{result.total_marks} · Pass: {result.pass_percentage}%
+        </p>
+        <div style={{ textAlign:"left",display:"flex",flexDirection:"column",gap:6,marginBottom:20 }}>
+          {result.result_details?.map((d,i) => (
+            <div key={i} style={{ display:"flex",gap:10,padding:11,borderRadius:8,background:d.is_correct?T.greenSoft:T.redSoft,alignItems:"flex-start" }}>
+              {d.is_correct
+                ? <CheckCircle size={14} style={{color:T.green,marginTop:1,flexShrink:0}}/>
+                : <XCircle    size={14} style={{color:T.red,  marginTop:1,flexShrink:0}}/>}
+              <div>
+                <p style={{ fontSize:13,fontWeight:600 }}>{d.question_text}</p>
+                {!d.is_correct && (
+                  <p style={{ fontSize:12,color:T.red,marginTop:2 }}>
+                    Your answer: {d.student_answer?.toUpperCase()||"Not answered"} · Correct: {d.correct_option?.toUpperCase()}
+                  </p>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+        <button className="mba-btn-outline" onClick={() => { setActiveQuiz(null); setResult(null); }}>
+          ← Back to Assessments
+        </button>
+      </div>
+    </div>
+  );
+ 
+  // ── Main list view ──
+  const allQuizzes = enrollments.flatMap(e =>
+    (quizzesByCourse[e.Course?.id]||[]).map(q => ({ ...q, courseName: e.Course?.course_name }))
+  );
+ 
+  return (
+    <div>
+      <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20 }}>
+        <h2 className="mba-section-title">My Assessments</h2>
+        <div className="mba-tabs">
+          {[["available","Available"],["history","Attempt History"]].map(([val,label]) => (
+            <button key={val} className={`mba-tab ${activeTab===val?"active":""}`} onClick={()=>setActiveTab(val)}>
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+ 
+      {activeTab==="available" && (
+        allQuizzes.length===0
+          ? <div className="mba-card mba-empty">
+              <ClipboardList size={36} style={{color:T.border,margin:"0 auto 8px"}}/>
+              <p>No assessments available yet</p>
+            </div>
+          : <div className="mba-grid-courses">
+              {allQuizzes.map(quiz => {
+                const myAttempts = attempts.filter(a=>a.quiz_id===quiz.id);
+                const best = myAttempts.length>0
+                  ? Math.max(...myAttempts.map(a=>(a.score/a.total_marks)*100))
+                  : null;
+                return (
+                  <div key={quiz.id} className="mba-course-card">
+                    <div style={{ height:2,background:T.navy }}/>
+                    <div style={{ padding:18 }}>
+                      <p style={{ fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",color:T.gold,marginBottom:5 }}>
+                        {quiz.courseName}
+                      </p>
+                      <h3 style={{ fontSize:15,fontWeight:700,color:T.navy,marginBottom:10 }}>{quiz.title}</h3>
+                      {quiz.description && (
+                        <p style={{ fontSize:13,color:T.muted,marginBottom:10,lineHeight:1.55,overflow:"hidden",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical" }}>
+                          {quiz.description}
+                        </p>
+                      )}
+                      <div style={{ display:"flex",gap:10,flexWrap:"wrap",fontSize:12,color:T.subtle,marginBottom:10 }}>
+                        <span><Timer size={12}/> {quiz.time_limit_minutes}m</span>
+                        <span><ClipboardList size={12}/> {quiz.question_count} Qs</span>
+                        <span><Target size={12}/> Pass: {quiz.pass_percentage}%</span>
+                      </div>
+                      {best!==null && (
+                        <div className={`mba-pill ${best>=quiz.pass_percentage?"mba-pill-pass":"mba-pill-fail"}`}
+                          style={{ display:"inline-flex",alignItems:"center",gap:4,marginBottom:10 }}>
+                          <Trophy size={10}/> Best: {Math.round(best)}% · {myAttempts.length} attempt{myAttempts.length>1?"s":""}
+                        </div>
+                      )}
+                      <button className="mba-btn-primary" onClick={() => startQuiz(quiz)} style={{ width:"100%",justifyContent:"center" }}>
+                        <PlayCircle size={13}/> {myAttempts.length>0 ? "Retake" : "Start"} Assessment
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+      )}
+ 
+      {activeTab==="history" && (
+        attempts.length===0
+          ? <div className="mba-card mba-empty">
+              <Trophy size={36} style={{color:T.border,margin:"0 auto 8px"}}/>
+              <p>No attempts yet</p>
+            </div>
+          : <div className="mba-card" style={{overflow:"hidden"}}>
+              <table style={{width:"100%",borderCollapse:"collapse"}}>
+                <thead style={{borderBottom:`1px solid ${T.border}`}}>
+                  <tr>
+                    {["Assessment","Course","Score","Time","Status","Date"].map(h => (
+                      <th key={h} style={{padding:"11px 14px",textAlign:"left",fontSize:12,color:T.subtle,fontWeight:700}}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {attempts.map((a,i) => {
+                    const pct = a.total_marks>0 ? Math.round((a.score/a.total_marks)*100) : 0;
+                    return (
+                      <tr key={i} style={{borderBottom:`1px solid ${T.border}`}}>
+                        <td style={{padding:"11px 14px",fontWeight:600,fontSize:14}}>{a.Quiz?.title||"–"}</td>
+                        <td style={{padding:"11px 14px",fontSize:13,color:T.muted}}>{a.Quiz?.Course?.course_name||"–"}</td>
+                        <td style={{padding:"11px 14px"}}>
+                          <div style={{display:"flex",alignItems:"center",gap:6}}>
+                            <div style={{width:56,height:4,background:T.border,borderRadius:2,overflow:"hidden"}}>
+                              <div style={{height:"100%",width:`${pct}%`,background:a.passed?T.green:T.red,borderRadius:2}}/>
+                            </div>
+                            <span style={{fontWeight:700,fontSize:13}}>{pct}%</span>
+                          </div>
+                        </td>
+                        <td style={{padding:"11px 14px",fontSize:13,color:T.muted}}>{fmtDur(a.time_taken_seconds)}</td>
+                        <td style={{padding:"11px 14px"}}>
+                          <span className={`mba-pill ${a.passed?"mba-pill-pass":"mba-pill-fail"}`}>
+                            {a.passed?"Passed":"Failed"}
+                          </span>
+                        </td>
+                        <td style={{padding:"11px 14px",fontSize:12,color:T.subtle}}>
+                          {a.submitted_at
+                            ? new Date(a.submitted_at).toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"})
+                            : "–"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+      )}
+    </div>
+  );
+}
+// ─── FIX 9: ASSIGNMENTS with AI Review ───────────────────────────────────
+function StudentAssignments() {
+  const [assignments,setAssignments]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [filter,setFilter]=useState("pending");
+  const [selected,setSelected]=useState(null);
+  const [showSubmit,setShowSubmit]=useState(false);
+  const [showDetails,setShowDetails]=useState(false);
+  const [submitting,setSubmitting]=useState(false);
+  const [submitForm,setSubmitForm]=useState({notes:"",file:null});
+  const [successMsg,setSuccessMsg]=useState("");
+  // FIX 9: AI Review state
+  const [aiRevResult,setAiRevResult]=useState(null);
+  const [aiRevLoading,setAiRevLoading]=useState(false);
+  const [showAiRev,setShowAiRev]=useState(false);
+ 
+  useEffect(() => {
+    api.get("/student/assignments")
+      .then(r=>{ if(r.data.success) setAssignments(r.data.assignments||[]); })
+      .catch(()=>{})
+      .finally(()=>setLoading(false));
+  },[]);
+ 
+  // FIX 9: Call Anthropic API for AI Review of submitted assignment
+  const handleAiRev = async (assignment) => {
+    setAiRevLoading(true);
+    setAiRevResult(null);
+    setShowAiRev(true);
+    try {
+      const prompt = `You are an expert MBA faculty reviewer. A student has submitted the following assignment.
+ 
+Assignment Title: ${assignment.title}
+Course: ${assignment.course_name}
+Description / Requirements: ${assignment.description}
+Student's Submission Notes: ${submitForm.notes || assignment.submission_notes || "(No notes provided)"}
+Total Marks: ${assignment.total_marks}
+Due Date: ${assignment.due_date}
+ 
+Please provide a detailed AI review with:
+1. **Strengths** (2-3 bullet points)
+2. **Areas for Improvement** (2-3 bullet points)  
+3. **Suggested Score** (out of ${assignment.total_marks})
+4. **Overall Feedback** (2-3 sentences)
+5. **Key Recommendations** (1-2 actionable tips)
+ 
+Keep your response structured, constructive, and encouraging. Be specific to the assignment context.`;
+ 
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 1000,
+          messages: [{ role: "user", content: prompt }],
+        }),
+      });
+      const data = await response.json();
+      const text = data.content?.map(c => c.text || "").join("\n") || "Could not generate review.";
+      setAiRevResult(text);
+    } catch {
+      setAiRevResult("AI Review is temporarily unavailable. Please try again later.");
+    }
+    setAiRevLoading(false);
+  };
+ 
+  const handleSubmitAssignment = async () => {
+    if (!submitForm.file && !submitForm.notes.trim()) { alert("Please add a file or notes."); return; }
+    setSubmitting(true);
+    try {
+      const fd = new FormData();
+      fd.append("notes", submitForm.notes);
+      if (submitForm.file) fd.append("file", submitForm.file);
+      const r = await api.post(`/student/assignments/${selected.id}/submit`, fd, { headers:{"Content-Type":"multipart/form-data"} });
+      if (r.data.success) {
+        setAssignments(p => p.map(a => a.id===selected.id ? {...a,status:"submitted",submitted_at:new Date().toISOString()} : a));
+        setShowSubmit(false);
+        setSubmitForm({notes:"",file:null});
+        setSuccessMsg("Assignment submitted successfully!");
+        setTimeout(()=>setSuccessMsg(""),4000);
+      }
+    } catch(e) { alert(e.response?.data?.message||"Submission failed."); }
+    finally { setSubmitting(false); }
+  };
+ 
+  const getBadge = (status,dueDate) => {
+    if (new Date(dueDate)<new Date()&&status==="pending") return {label:"Overdue",cls:"mba-pill-fail"};
+    if (status==="graded")    return {label:"Graded",   cls:"mba-pill-navy"};
+    if (status==="submitted") return {label:"Submitted",cls:"mba-pill-sub"};
+    return {label:"Pending",cls:"mba-pill-warn"};
+  };
+ 
+  const getDaysLeft = (dueDate) => {
+    const d = Math.ceil((new Date(dueDate)-new Date())/86400000);
+    if (d<0)  return {text:`${Math.abs(d)}d overdue`,color:T.red};
+    if (d===0) return {text:"Due today",color:T.gold};
+    if (d<=3)  return {text:`${d}d left`,color:T.gold};
+    return {text:`${d}d left`,color:T.green};
+  };
+ 
+  const getMaxMarks = (a) => a.max_marks || (a.rubric?.categories?.length>0 ? a.rubric.categories.reduce((s,c)=>s+(parseInt(c.points)||0),0) : a.total_marks);
+ 
+  const counts = {
+    pending:   assignments.filter(a=>a.status==="pending"&&new Date(a.due_date)>=new Date()).length,
+    submitted: assignments.filter(a=>a.status==="submitted").length,
+    graded:    assignments.filter(a=>a.status==="graded").length,
+    overdue:   assignments.filter(a=>a.status==="pending"&&new Date(a.due_date)<new Date()).length,
+  };
+ 
+  const filtered = assignments.filter(a => {
+    if (filter==="all")     return true;
+    if (filter==="overdue") return new Date(a.due_date)<new Date()&&a.status==="pending";
+    return a.status===filter;
+  });
+ 
+  if (loading) return <Spinner />;
+ 
+  return (
+    <div>
+      <h2 className="mba-section-title" style={{marginBottom:20}}>My Assignments</h2>
+ 
+      {successMsg && (
+        <div className="mba-alert-success" style={{marginBottom:14}}>
+          <CheckCircle size={13}/> {successMsg}
+        </div>
+      )}
+ 
+      {/* Stats */}
+      <div className="mba-grid-4" style={{marginBottom:16}}>
+        {[
+          {label:"Pending",  count:counts.pending,   accent:"mba-metric-gold"},
+          {label:"Submitted",count:counts.submitted, accent:"mba-metric-blue"},
+          {label:"Graded",   count:counts.graded,    accent:"mba-metric-green"},
+          {label:"Overdue",  count:counts.overdue,   accent:"mba-metric-red"},
+        ].map(m => (
+          <div key={m.label} className={`mba-metric ${m.accent}`}>
+            <div className="mba-metric-label">{m.label}</div>
+            <div className="mba-metric-value">{m.count}</div>
+          </div>
+        ))}
+      </div>
+ 
+      {/* Filter tabs */}
+      <div className="mba-tabs" style={{marginBottom:16}}>
+        {["all","pending","submitted","graded","overdue"].map(f => (
+          <button key={f} className={`mba-tab ${filter===f?"active":""}`} onClick={()=>setFilter(f)} style={{textTransform:"capitalize"}}>
+            {f}{f!=="all"&&counts[f]!=null?` (${counts[f]})`:""}</button>
+        ))}
+      </div>
+ 
+      {filtered.length===0 ? (
+        <div className="mba-card mba-empty">
+          <ClipboardList size={36} style={{color:T.border,margin:"0 auto 8px"}}/>
+          <p>No {filter} assignments</p>
+        </div>
+      ) : filtered.map(a => {
+        const badge   = getBadge(a.status,a.due_date);
+        const dl      = getDaysLeft(a.due_date);
+        const maxM    = getMaxMarks(a);
+        const scoreP  = maxM>0&&a.grade!=null ? Math.round((a.grade/maxM)*100) : null;
+        return (
+          <div key={a.id} className="mba-card" style={{marginBottom:10,padding:18}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:6}}>
+                  <span className="mba-pill mba-pill-navy">{a.course_name}</span>
+                  <span className={`mba-pill ${badge.cls}`}>{badge.label}</span>
+                </div>
+                <h3 style={{fontSize:14,fontWeight:700,color:T.navy,textTransform:"uppercase",letterSpacing:".03em"}}>{a.title}</h3>
+                <p style={{fontSize:13,color:T.muted,marginTop:4,lineHeight:1.55,overflow:"hidden",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}}>{a.description}</p>
+              </div>
+              {a.status==="graded"&&scoreP!==null && (
+                <div style={{width:60,height:60,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:800,flexShrink:0,border:"3px solid",marginLeft:14,
+                  borderColor:scoreP>=80?T.green:scoreP>=60?T.gold:T.red,
+                  color:scoreP>=80?T.green:scoreP>=60?T.gold:T.red,
+                  background:scoreP>=80?T.greenSoft:scoreP>=60?"#fdf8ed":T.redSoft}}>
+                  {scoreP}%
+                </div>
+              )}
+            </div>
+ 
+            <div style={{display:"flex",flexWrap:"wrap",gap:14,fontSize:12,color:T.muted,marginBottom:12}}>
+              <span style={{display:"flex",alignItems:"center",gap:4}}><Calendar size={12}/> Due: {new Date(a.due_date).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}</span>
+              <span style={{display:"flex",alignItems:"center",gap:4,fontWeight:700,color:dl.color}}><Clock size={12}/> {dl.text}</span>
+              <span style={{display:"flex",alignItems:"center",gap:4}}><Star size={12}/> {a.total_marks} marks</span>
+            </div>
+ 
+            {/* Faculty feedback */}
+            {a.status==="graded"&&a.feedback && (
+              <div style={{background:T.bg,borderLeft:`3px solid ${T.navy}`,padding:"9px 13px",borderRadius:"0 4px 4px 0",marginBottom:10}}>
+                <p style={{fontSize:11,textTransform:"uppercase",letterSpacing:".06em",color:T.subtle,marginBottom:3}}>Faculty Feedback</p>
+                <p style={{fontSize:13,color:T.text}}>{a.feedback}</p>
+              </div>
+            )}
+ 
+            {a.status==="submitted"&&a.submitted_at && (
+              <div className="mba-alert-success" style={{marginBottom:10}}>
+                <CheckCircle size={12}/> Submitted on {new Date(a.submitted_at).toLocaleString("en-IN")}
+              </div>
+            )}
+ 
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              <button className="mba-btn-ghost" onClick={()=>{ setSelected(a); setShowDetails(true); }}>
+                <Eye size={13}/> View Details
+              </button>
+ 
+              {a.status==="pending" && (
+                <button className="mba-btn-primary" onClick={()=>{ setSelected(a); setShowSubmit(true); }}>
+                  <Upload size={13}/> Submit
+                </button>
+              )}
+ 
+              {/* FIX 9: AI Review button — shown for pending/submitted assignments */}
+              {(a.status==="pending"||a.status==="submitted") && (
+                <button className="mba-btn-gold" onClick={()=>{ setSelected(a); handleAiRev(a); }}
+                  style={{fontSize:13,padding:"8px 14px"}}>
+                  <Bot size={13}/> AI Review
+                </button>
+              )}
+ 
+              {a.status==="submitted" && (
+                <span className="mba-pill mba-pill-pass" style={{display:"inline-flex",alignItems:"center",gap:4,padding:"7px 12px"}}>
+                  <CheckCircle size={11}/> Submitted
+                </span>
+              )}
+            </div>
+          </div>
+        );
+      })}
+ 
+      {/* FIX 9: AI Review Modal */}
+      {showAiRev && selected && (
+        <div className="mba-modal-bg">
+          <div className="mba-modal" style={{maxWidth:600}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+              <div>
+                <h3 style={{fontSize:18,fontWeight:800,color:T.navy}}>🤖 AI Assignment Review</h3>
+                <p style={{fontSize:13,color:T.muted,marginTop:2}}>{selected.title}</p>
+              </div>
+              <button onClick={()=>{ setShowAiRev(false); setAiRevResult(null); }}
+                style={{background:"none",border:"none",cursor:"pointer",color:T.muted}}><X size={18}/></button>
+            </div>
+ 
+            {aiRevLoading ? (
+              <div style={{textAlign:"center",padding:"32px 20px"}}>
+                <div style={{width:56,height:56,borderRadius:"50%",background:"linear-gradient(135deg,#eef2fb,#fdf8ed)",border:`2px solid ${T.gold}`,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px",animation:"mba-spin 2s linear infinite"}}>
+                  <Bot size={24} style={{color:T.navy}}/>
+                </div>
+                <p style={{fontSize:14,fontWeight:700,color:T.navy,marginBottom:4}}>Analysing your assignment…</p>
+                <p style={{fontSize:13,color:T.muted}}>Claude AI is reviewing your submission and generating personalised feedback</p>
+              </div>
+            ) : aiRevResult ? (
+              <div>
+                <div className="mba-ai-rev" style={{marginBottom:16}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
+                    <div style={{width:32,height:32,borderRadius:"50%",background:T.navy,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                      <Bot size={15} style={{color:"#fff"}}/>
+                    </div>
+                    <div>
+                      <p style={{fontSize:13,fontWeight:700,color:T.navy}}>AI Review Complete</p>
+                      <p style={{fontSize:11,color:T.subtle}}>Powered by Claude · For reference only</p>
+                    </div>
+                  </div>
+                  {/* Render markdown-style text */}
+                  <div style={{fontSize:14,color:T.text,lineHeight:1.75,whiteSpace:"pre-wrap"}}>
+                    {aiRevResult.split("\n").map((line, i) => {
+                      if (line.startsWith("**") && line.endsWith("**")) {
+                        return <p key={i} style={{fontWeight:800,color:T.navy,marginTop:12,marginBottom:4}}>{line.replace(/\*\*/g,"")}</p>;
+                      }
+                      if (line.startsWith("- ") || line.startsWith("• ")) {
+                        return <p key={i} style={{paddingLeft:16,color:T.text,marginBottom:3,display:"flex",gap:6}}><span style={{color:T.gold,fontWeight:700,flexShrink:0}}>•</span>{line.slice(2)}</p>;
+                      }
+                      if (line.match(/^\d+\./)) {
+                        return <p key={i} style={{paddingLeft:4,color:T.text,marginBottom:3,fontWeight:600}}>{line}</p>;
+                      }
+                      return line ? <p key={i} style={{marginBottom:3,color:T.text}}>{line}</p> : <br key={i}/>;
+                    })}
+                  </div>
+                </div>
+                <div className="mba-alert-info" style={{marginBottom:16}}>
+                  <AlertCircle size={13}/> This AI review is for self-improvement only. Official grading is done by your faculty.
+                </div>
+                <div style={{display:"flex",gap:8}}>
+                  <button className="mba-btn-ghost" onClick={()=>{ setShowAiRev(false); setAiRevResult(null); }}>Close</button>
+                  <button className="mba-btn-gold" onClick={()=>handleAiRev(selected)} style={{fontSize:13}}>
+                    <Bot size={13}/> Re-analyse
+                  </button>
+                  {selected.status==="pending" && (
+                    <button className="mba-btn-primary" style={{flex:1,justifyContent:"center"}}
+                      onClick={()=>{ setShowAiRev(false); setAiRevResult(null); setShowSubmit(true); }}>
+                      <Upload size={13}/> Submit Assignment
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      )}
+ 
+      {/* Details Modal */}
+      {showDetails && selected && (()=>{
+        const mM = getMaxMarks(selected);
+        return (
+          <div className="mba-modal-bg">
+            <div className="mba-modal" style={{maxWidth:560}}>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:20}}>
+                <h3 style={{fontSize:18,fontWeight:800,color:T.navy}}>Assignment Details</h3>
+                <button onClick={()=>setShowDetails(false)} style={{background:"none",border:"none",cursor:"pointer",color:T.muted}}><X size={18}/></button>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:14}}>
+                {[["Course",selected.course_name],["Title",selected.title]].map(([l,v])=>(
+                  <div key={l}><p style={{fontSize:11,textTransform:"uppercase",letterSpacing:".06em",color:T.subtle,marginBottom:3}}>{l}</p><p style={{fontSize:14,fontWeight:700,color:T.text}}>{v}</p></div>
+                ))}
+                <div>
+                  <p style={{fontSize:11,textTransform:"uppercase",letterSpacing:".06em",color:T.subtle,marginBottom:3}}>Description</p>
+                  <p style={{fontSize:14,color:T.text,background:T.bg,padding:"11px 13px",borderRadius:8,lineHeight:1.6}}>{selected.description}</p>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                  <div style={{background:T.bg,padding:"11px 13px",borderRadius:8}}>
+                    <p style={{fontSize:11,color:T.subtle,marginBottom:3}}>Due Date</p>
+                    <p style={{fontSize:14,fontWeight:600}}>{new Date(selected.due_date).toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</p>
+                  </div>
+                  <div style={{background:T.bg,padding:"11px 13px",borderRadius:8}}>
+                    <p style={{fontSize:11,color:T.subtle,marginBottom:3}}>Total Marks</p>
+                    <p style={{fontSize:14,fontWeight:600}}>{selected.total_marks}</p>
+                  </div>
+                </div>
+                {selected.status==="graded" && (
+                  <div style={{background:T.bg,border:`1px solid ${T.border}`,borderRadius:8,padding:"13px 15px"}}>
+                    <p style={{fontSize:11,textTransform:"uppercase",letterSpacing:".06em",color:T.subtle,marginBottom:6}}>Grade & Feedback</p>
+                    {selected.grade!=null
+                      ? <p style={{fontSize:26,fontWeight:800,color:T.navy,marginBottom:6}}>{selected.grade}/{mM} <span style={{fontSize:15}}>({Math.round(selected.grade/mM*100)}%)</span></p>
+                      : <p style={{fontSize:14,color:T.subtle}}>Grade not yet recorded</p>}
+                    {selected.feedback && <p style={{fontSize:13,color:T.text}}>{selected.feedback}</p>}
+                  </div>
+                )}
+              </div>
+              <button className="mba-btn-ghost" onClick={()=>setShowDetails(false)} style={{width:"100%",justifyContent:"center",marginTop:18}}>Close</button>
+            </div>
+          </div>
+        );
+      })()}
+ 
+      {/* Submit Modal */}
+      {showSubmit && selected && (
+        <div className="mba-modal-bg">
+          <div className="mba-modal" style={{maxWidth:480}}>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:18}}>
+              <h3 style={{fontSize:18,fontWeight:800,color:T.navy}}>Submit Assignment</h3>
+              <button onClick={()=>setShowSubmit(false)} style={{background:"none",border:"none",cursor:"pointer",color:T.muted}}><X size={18}/></button>
+            </div>
+            <div className="mba-alert-info" style={{marginBottom:14}}>
+              <FileText size={12}/> <strong>{selected.title}</strong> — Due: {new Date(selected.due_date).toLocaleDateString()}
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:14}}>
+              <div>
+                <label className="mba-label">Upload File</label>
+                <div style={{border:`1.5px dashed ${T.border}`,borderRadius:8,padding:20,textAlign:"center"}}>
+                  <Upload size={24} style={{color:T.subtle,margin:"0 auto 8px"}}/>
+                  <p style={{fontSize:13,color:T.muted,marginBottom:8}}>Upload your assignment file (PDF, DOC, ZIP)</p>
+                  <input type="file" id="assign-file" onChange={e=>setSubmitForm(f=>({...f,file:e.target.files[0]}))} style={{display:"none"}} accept=".pdf,.doc,.docx,.zip,.txt,.ppt,.pptx"/>
+                  <label htmlFor="assign-file" className="mba-btn-primary" style={{cursor:"pointer",display:"inline-flex"}}>Choose File</label>
+                  {submitForm.file && <p style={{fontSize:13,color:T.green,marginTop:8,fontWeight:600}}>✓ {submitForm.file.name}</p>}
+                </div>
+              </div>
+              <div>
+                <label className="mba-label">Notes / Comments <span style={{fontSize:11,color:T.subtle,textTransform:"none",letterSpacing:0}}>(optional)</span></label>
+                <textarea className="mba-textarea" rows={4} value={submitForm.notes} onChange={e=>setSubmitForm(f=>({...f,notes:e.target.value}))} placeholder="Add any notes for your faculty..."/>
+              </div>
+            </div>
+            <div style={{display:"flex",gap:8,marginTop:18}}>
+              <button className="mba-btn-primary" onClick={handleSubmitAssignment} disabled={submitting} style={{flex:1,justifyContent:"center"}}>
+                {submitting?"Submitting...":<><Upload size={13}/> Submit Assignment</>}
+              </button>
+              <button className="mba-btn-ghost" onClick={()=>setShowSubmit(false)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+ 
 // ─── FIX 7 & 8: COURSE MATERIALS (Module/Topic accordion + Transcript) ───
 function CourseMaterials() {
   const { courseId } = useParams();
@@ -3073,204 +3830,6 @@ function SystemSettings() {
           )}
         </div>
       </div>
-    </div>
-  );
-}
-
-// ─── STUDENT ASSESSMENTS (Quiz/MCQ) — stays inside Dashboard ─────────────
-function StudentAssessments() {
-  const [quizzes, setQuizzes] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [activeQuiz, setActiveQuiz] = useState(null);
-  const [answers, setAnswers] = useState({});
-  const [submitted, setSubmitted] = useState(false);
-  const [result, setResult] = useState(null);
-  const [attempts, setAttempts] = useState([]);
-  const [tab, setTab] = useState("available");
-
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const [ar, qr] = await Promise.allSettled([
-          api.get("/quizzes/available"),
-          api.get("/quizzes/my-attempts"),
-        ]);
-        if (ar.status==="fulfilled" && ar.value.data.success)
-          setQuizzes(ar.value.data.quizzes || []);
-        if (qr.status==="fulfilled" && qr.value.data.success)
-          setAttempts(qr.value.data.attempts || []);
-      } catch {}
-      setLoading(false);
-    };
-    load();
-  }, []);
-
-  const startQuiz = (quiz) => {
-    setActiveQuiz(quiz);
-    setAnswers({});
-    setSubmitted(false);
-    setResult(null);
-  };
-
-  const submitQuiz = async () => {
-    if (!activeQuiz) return;
-    try {
-      const r = await api.post(`/quizzes/${activeQuiz.id}/submit`, { answers });
-      if (r.data.success) { setResult(r.data); setSubmitted(true); }
-    } catch {
-      const questions = activeQuiz.questions || [];
-      let correct = 0;
-      questions.forEach((q, i) => {
-        if (answers[i] === q.correct_answer || answers[i] === q.correctAnswer) correct++;
-      });
-      const score = questions.length > 0 ? Math.round((correct / questions.length) * 100) : 0;
-      setResult({ score, correct, total: questions.length });
-      setSubmitted(true);
-    }
-  };
-
-  if (loading) return <Spinner />;
-
-  // ── Quiz attempt in progress ──
-  if (activeQuiz && !submitted) {
-    const questions = activeQuiz.questions || [];
-    const answered = Object.keys(answers).length;
-    return (
-      <div style={{ maxWidth:720 }}>
-        <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16 }}>
-          <div>
-            <h2 className="mba-section-title">{activeQuiz.title}</h2>
-            <p className="mba-section-sub">{answered}/{questions.length} answered</p>
-          </div>
-          <button className="mba-btn-ghost" onClick={() => setActiveQuiz(null)}>✕ Exit</button>
-        </div>
-        <div className="mba-bar-track" style={{ marginBottom:20 }}>
-          <div className="mba-bar-fill" style={{ width:`${questions.length>0?(answered/questions.length)*100:0}%`,background:T.navy }} />
-        </div>
-        {questions.map((q, qi) => (
-          <div key={qi} className="mba-card" style={{ marginBottom:12,padding:20 }}>
-            <p style={{ fontSize:14,fontWeight:700,color:T.navy,marginBottom:12 }}>
-              Q{qi+1}. {q.question || q.text}
-            </p>
-            <div style={{ display:"flex",flexDirection:"column",gap:8 }}>
-              {(q.options || q.choices || []).map((opt, oi) => (
-                <button key={oi}
-                  className={`mba-quiz-option ${answers[qi]===oi?"selected":""}`}
-                  onClick={() => setAnswers(a => ({...a,[qi]:oi}))}>
-                  <span style={{ width:22,height:22,borderRadius:"50%",border:`2px solid ${answers[qi]===oi?T.navy:T.border}`,background:answers[qi]===oi?T.navy:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0 }}>
-                    {answers[qi]===oi && <div style={{ width:8,height:8,borderRadius:"50%",background:"#fff" }}/>}
-                  </span>
-                  <span style={{ fontSize:13 }}>{typeof opt==="object"?opt.text:opt}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        ))}
-        <div style={{ display:"flex",gap:8,marginTop:8 }}>
-          <button className="mba-btn-ghost" onClick={() => setActiveQuiz(null)}>Cancel</button>
-          <button className="mba-btn-primary" style={{ flex:1,justifyContent:"center" }}
-            disabled={answered < questions.length} onClick={submitQuiz}>
-            <CheckCircle size={13}/> Submit Assessment
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Result view ──
-  if (submitted && result) {
-    const score = result.score ?? 0;
-    return (
-      <div style={{ maxWidth:520 }}>
-        <h2 className="mba-section-title" style={{ marginBottom:20 }}>Assessment Complete!</h2>
-        <div className="mba-card" style={{ padding:32,textAlign:"center",marginBottom:16 }}>
-          <div style={{ width:90,height:90,borderRadius:"50%",background:score>=75?T.greenSoft:score>=50?T.goldSoft:T.redSoft,border:`3px solid ${score>=75?T.green:score>=50?T.gold:T.red}`,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px" }}>
-            <span style={{ fontSize:26,fontWeight:800,color:score>=75?T.green:score>=50?T.gold:T.red }}>{score}%</span>
-          </div>
-          <h3 style={{ fontSize:18,fontWeight:800,color:T.navy,marginBottom:6 }}>
-            {score>=75?"Excellent! 🎉":score>=50?"Good effort! 👍":"Keep practising! 💪"}
-          </h3>
-          {result.correct!=null && (
-            <p style={{ fontSize:13,color:T.muted }}>{result.correct} of {result.total} correct</p>
-          )}
-        </div>
-        <div style={{ display:"flex",gap:8 }}>
-          <button className="mba-btn-ghost" onClick={() => { setActiveQuiz(null); setSubmitted(false); }}>
-            ← Back to Assessments
-          </button>
-          <button className="mba-btn-primary" style={{ flex:1,justifyContent:"center" }}
-            onClick={() => startQuiz(activeQuiz)}>
-            <RefreshCw size={13}/> Retake
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Main list view ──
-  return (
-    <div>
-      <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20 }}>
-        <div>
-          <h2 className="mba-section-title">Assessments</h2>
-          <p className="mba-section-sub">Online quizzes and MCQ tests</p>
-        </div>
-        <div className="mba-tabs">
-          {[["available","Available"],["attempts","My Attempts"]].map(([v,l]) => (
-            <button key={v} className={`mba-tab ${tab===v?"active":""}`} onClick={()=>setTab(v)}>{l}</button>
-          ))}
-        </div>
-      </div>
-
-      {tab==="available" && (
-        quizzes.length===0
-          ? <div className="mba-card mba-empty"><ClipboardList size={36} style={{color:T.border,margin:"0 auto 8px"}}/><p>No assessments available yet</p></div>
-          : <div style={{ display:"flex",flexDirection:"column",gap:12 }}>
-              {quizzes.map(q => (
-                <div key={q.id} className="mba-card" style={{ padding:18 }}>
-                  <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10 }}>
-                    <div>
-                      <h3 style={{ fontSize:15,fontWeight:700,color:T.navy,marginBottom:4 }}>{q.title}</h3>
-                      <p style={{ fontSize:13,color:T.muted }}>{q.course_name||q.course}</p>
-                    </div>
-                    <span className="mba-pill mba-pill-navy" style={{ fontSize:11 }}>
-                      {q.questions?.length||q.question_count||0} Qs
-                    </span>
-                  </div>
-                  <div style={{ display:"flex",gap:14,fontSize:12,color:T.subtle,marginBottom:14 }}>
-                    <span style={{ display:"flex",alignItems:"center",gap:3 }}><Timer size={11}/> {q.duration_minutes||15} min</span>
-                    <span style={{ display:"flex",alignItems:"center",gap:3 }}><Award size={11}/> Pass: {q.passing_score||60}%</span>
-                  </div>
-                  <button className="mba-btn-primary" onClick={() => startQuiz(q)}>
-                    <PlayCircle size={13}/> Start Assessment
-                  </button>
-                </div>
-              ))}
-            </div>
-      )}
-
-      {tab==="attempts" && (
-        attempts.length===0
-          ? <div className="mba-card mba-empty"><Trophy size={36} style={{color:T.border,margin:"0 auto 8px"}}/><p>No attempts yet</p></div>
-          : <div style={{ display:"flex",flexDirection:"column",gap:10 }}>
-              {attempts.map((a,i) => (
-                <div key={i} className="mba-card" style={{ padding:16,display:"flex",alignItems:"center",gap:14 }}>
-                  <div style={{ width:52,height:52,borderRadius:"50%",background:a.score>=75?T.greenSoft:a.score>=50?T.goldSoft:T.redSoft,border:`2px solid ${a.score>=75?T.green:a.score>=50?T.gold:T.red}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0 }}>
-                    <span style={{ fontSize:14,fontWeight:800,color:a.score>=75?T.green:a.score>=50?T.gold:T.red }}>{a.score}%</span>
-                  </div>
-                  <div style={{ flex:1 }}>
-                    <p style={{ fontSize:14,fontWeight:700,color:T.navy }}>{a.quiz_title||a.title}</p>
-                    <p style={{ fontSize:12,color:T.subtle }}>
-                      {a.created_at ? new Date(a.created_at).toLocaleDateString("en-IN") : ""}
-                    </p>
-                  </div>
-                  <span className={`mba-pill ${a.score>=60?"mba-pill-pass":"mba-pill-fail"}`}>
-                    {a.score>=60?"Passed":"Failed"}
-                  </span>
-                </div>
-              ))}
-            </div>
-      )}
     </div>
   );
 }
