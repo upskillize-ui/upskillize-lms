@@ -1455,13 +1455,13 @@ function ProfileManagement() {
   const [profileCompletion, setProfileCompletion] = useState(0);
   const cached = JSON.parse(localStorage.getItem('upskillize_profile_cache') || '{}');
   const [personalInfo, setPersonalInfo] = useState({
-    full_name: cached.full_name || user?.full_name || "",
-    email: cached.email || user?.email || "",
-    phone: cached.phone || "",
-    date_of_birth: cached.date_of_birth || "",
-    gender: cached.gender || "",
-    profile_photo: cached.profile_photo || null,
-    bio: cached.bio || ""
+    full_name: user?.full_name || "",
+    email:     user?.email     || "",
+    phone:     "",
+    date_of_birth: "",
+    gender:    "",
+    profile_photo: null,
+    bio:       ""
   });
   const [address, setAddress] = useState({ street:"",city:"",state:"",country:"",postal_code:"" });
   const [security, setSecurity] = useState({ current_password:"",new_password:"",confirm_password:"" });
@@ -1509,22 +1509,26 @@ function ProfileManagement() {
   });
 
   useEffect(() => {
-    const cached = JSON.parse(localStorage.getItem('upskillize_profile_cache') || '{}');
-    const hasCached = Object.keys(cached).length > 0;
-    api.get("/student/profile/complete").then(r => {
-      if (r.data.success) {
-        const d = r.data.profile;
-        if (d.personal && !hasCached) setPersonalInfo(p => ({ ...p, ...d.personal }));
-        if (d.address)  setAddress(d.address);
-        if (d.social)   setSocialLinks(d.social);
-        if (d.additional) setAdditionalInfo(a => ({ ...a, ...d.additional }));
-        if (d.job_preferences) setJobPrefs(p => ({ ...p, ...d.job_preferences }));
-        if (d.corporate_visible !== undefined) setCorporateVisible(d.corporate_visible);
-        if (d.resume_url) setResume(r => ({ ...r, uploadedUrl: d.resume_url, uploadedName: d.resume_name }));
-        if (d.psycho_result) { setPsychoResult(d.psycho_result); setPsychoDone(true); }
+  api.get("/student/profile/complete").then(r => {
+    if (r.data.success) {
+      const d = r.data.profile;
+
+      // Always load from backend — source of truth
+      if (d.personal) {
+        setPersonalInfo(p => ({ ...p, ...d.personal }));
+        // Update cache with latest from server
+        localStorage.setItem('upskillize_profile_cache', JSON.stringify(d.personal));
       }
-    }).catch(()=>{});
-  }, []);
+      if (d.address)  setAddress(d.address);
+      if (d.social)   setSocialLinks(d.social);
+      if (d.additional) setAdditionalInfo(a => ({ ...a, ...d.additional }));
+      if (d.job_preferences) setJobPrefs(p => ({ ...p, ...d.job_preferences }));
+      if (d.corporate_visible !== undefined) setCorporateVisible(d.corporate_visible);
+      if (d.resume_url) setResume(rv => ({ ...rv, uploadedUrl: d.resume_url, uploadedName: d.resume_name }));
+      if (d.psycho_result) { setPsychoResult(d.psycho_result); setPsychoDone(true); }
+    }
+  }).catch(()=>{});
+}, []);
 
   useEffect(() => {
     const fields = [personalInfo.full_name,personalInfo.phone,personalInfo.date_of_birth,personalInfo.gender,personalInfo.bio,address.city,address.state,address.country,socialLinks.linkedin,resume.uploadedUrl,additionalInfo.skills,jobPrefs.preferred_role];
