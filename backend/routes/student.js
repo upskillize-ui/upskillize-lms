@@ -11,6 +11,89 @@ const fs     = require('fs');
 const studentOnly = [authMiddleware, rbac(['student', 'admin'])];
 
 // ============================================================
+// ONE-TIME MIGRATION — GET /api/student/migrate-profile-columns
+// Hit this URL once to add all missing profile columns to Aiven DB
+// Safe to run multiple times — skips existing columns
+// ============================================================
+router.get('/migrate-profile-columns', async (req, res) => {
+  const { sequelize } = require('../config/database');
+  const results = [];
+  const columns = [
+    'education_level VARCHAR(100)',
+    'institution VARCHAR(255)',
+    'graduation_year VARCHAR(10)',
+    'field_of_study VARCHAR(255)',
+    'work_experience_years VARCHAR(50)',
+    'current_employer VARCHAR(255)',
+    'current_designation VARCHAR(255)',
+    'skills TEXT',
+    'languages VARCHAR(255)',
+    'certifications TEXT',
+    'hobbies VARCHAR(255)',
+    'emergency_contact_name VARCHAR(255)',
+    'emergency_contact_phone VARCHAR(50)',
+    'emergency_contact_relation VARCHAR(100)',
+    'preferred_role VARCHAR(255)',
+    'preferred_location VARCHAR(255)',
+    'preferred_salary_min VARCHAR(50)',
+    'preferred_salary_max VARCHAR(50)',
+    'employment_type VARCHAR(100)',
+    'work_mode VARCHAR(100)',
+    'notice_period VARCHAR(100)',
+    'open_to_relocation VARCHAR(20)',
+    'industries VARCHAR(255)',
+    'company_size VARCHAR(100)',
+    'key_skills TEXT',
+    'career_goals TEXT',
+    'corporate_visible BOOLEAN DEFAULT FALSE',
+    'resume_url VARCHAR(500)',
+    'resume_name VARCHAR(255)',
+    'psycho_result TEXT',
+    'linkedin VARCHAR(255)',
+    'github VARCHAR(255)',
+    'twitter VARCHAR(255)',
+    'portfolio VARCHAR(255)',
+    'street VARCHAR(255)',
+    'city VARCHAR(100)',
+    'state VARCHAR(100)',
+    'country VARCHAR(100)',
+    'postal_code VARCHAR(20)',
+    'bio TEXT',
+    'date_of_birth DATE',
+    'gender VARCHAR(20)',
+    'profile_photo TEXT',
+    'language VARCHAR(10) DEFAULT "en"',
+    'timezone VARCHAR(50) DEFAULT "Asia/Kolkata"',
+    'email_notifications BOOLEAN DEFAULT TRUE',
+    'sms_notifications BOOLEAN DEFAULT FALSE',
+    'theme VARCHAR(20) DEFAULT "light"',
+    'two_factor_enabled BOOLEAN DEFAULT FALSE',
+    'testgen_active BOOLEAN DEFAULT FALSE',
+    'testgen_plan VARCHAR(50)',
+  ];
+
+  for (const col of columns) {
+    const name = col.split(' ')[0];
+    try {
+      await sequelize.query(`ALTER TABLE users ADD COLUMN ${col}`);
+      results.push({ column: name, status: 'added' });
+    } catch (e) {
+      if (e.original?.errno === 1060 || e.parent?.errno === 1060) {
+        results.push({ column: name, status: 'already_exists' });
+      } else {
+        results.push({ column: name, status: 'error', message: e.message });
+      }
+    }
+  }
+
+  const added = results.filter(r => r.status === 'added').length;
+  const existing = results.filter(r => r.status === 'already_exists').length;
+  const errors = results.filter(r => r.status === 'error');
+
+  return res.json({ success: true, added, existing, errors, results });
+});
+
+// ============================================================
 // DASHBOARD STATS
 // GET /api/student/dashboard/stats
 // ============================================================
@@ -235,19 +318,13 @@ router.get('/gamification', ...studentOnly, async (req, res) => {
 // ============================================================
 router.get('/profile/complete', ...studentOnly, async (req, res) => {
   try {
-    const { sequelize } = require('../config/database');
+    const user = await User.findByPk(req.user.id, {
+      attributes: { exclude: ['password_hash'] }
+    });
 
-    // Use raw SQL — bypasses Sequelize model cache, returns ALL columns including new ones
-    const [rows] = await sequelize.query(
-      `SELECT * FROM users WHERE id = ? LIMIT 1`,
-      { replacements: [req.user.id] }
-    );
-
-    if (!rows.length) {
+    if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
-
-    const user = rows[0];
 
     let psycho_result = null;
     try { if (user.psycho_result) psycho_result = JSON.parse(user.psycho_result); } catch {}
@@ -906,7 +983,7 @@ router.put('/profile/additional', ...studentOnly, async (req, res) => {
 
     const { sequelize } = require('../config/database');
 
-    // Use raw SQL to bypass Sequelize model cache — works in production
+    // Raw SQL — bypasses Sequelize model cache, works in production
     await sequelize.query(
       `UPDATE users SET
         education_level = ?,
@@ -966,7 +1043,7 @@ router.put('/profile/job-preferences', ...studentOnly, async (req, res) => {
 
     const { sequelize } = require('../config/database');
 
-    // Use raw SQL to bypass Sequelize model cache — works in production
+    // Raw SQL — bypasses Sequelize model cache, works in production
     await sequelize.query(
       `UPDATE users SET
         preferred_role = ?,
