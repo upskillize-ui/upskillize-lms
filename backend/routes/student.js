@@ -11,6 +11,36 @@ const fs     = require('fs');
 const studentOnly = [authMiddleware, rbac(['student', 'admin'])];
 
 // ============================================================
+// ONE-TIME FIX — GET /api/student/fix-three-columns
+// Adds language, timezone, theme with correct SQL syntax
+// DELETE THIS ROUTE after running once
+// ============================================================
+router.get('/fix-three-columns', async (req, res) => {
+  const { sequelize } = require('../config/database');
+  const results = [];
+  const fixes = [
+    { col: 'language', sql: "ALTER TABLE users ADD COLUMN language VARCHAR(10) DEFAULT 'en'" },
+    { col: 'timezone', sql: "ALTER TABLE users ADD COLUMN timezone VARCHAR(50) DEFAULT 'Asia/Kolkata'" },
+    { col: 'theme',    sql: "ALTER TABLE users ADD COLUMN theme VARCHAR(20) DEFAULT 'light'" },
+  ];
+  for (const { col, sql } of fixes) {
+    try {
+      await sequelize.query(sql);
+      results.push({ column: col, status: 'added' });
+    } catch (e) {
+      if (e.original?.errno === 1060 || e.parent?.errno === 1060) {
+        results.push({ column: col, status: 'already_exists' });
+      } else {
+        results.push({ column: col, status: 'error', message: e.message });
+      }
+    }
+  }
+  return res.json({ success: true, results });
+});
+
+
+
+// ============================================================
 // ONE-TIME MIGRATION — GET /api/student/migrate-profile-columns
 // Hit this URL once to add all missing profile columns to Aiven DB
 // Safe to run multiple times — skips existing columns
