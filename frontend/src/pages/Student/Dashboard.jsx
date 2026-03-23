@@ -1429,7 +1429,6 @@ function DragRankOptions({ options, ranks, onChange }) {
         <GripVertical size={13}/> Drag to reorder: <strong>Top = Most Likely → Bottom = Least Likely</strong>
       </p>
       {order.map((optIdx, pos) => {
-        const letter = ["A","B","C","D"][optIdx];
         const rank = pos + 1;
         const rankColors = ["#2d6a2d","#1a2744","#b8960b","#c0392b"];
         return (
@@ -1444,7 +1443,6 @@ function DragRankOptions({ options, ranks, onChange }) {
           >
             <GripVertical size={16} style={{ color:T.subtle,flexShrink:0 }} />
             <div style={{ width:28,height:28,borderRadius:"50%",background:rankColors[rank-1],display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:800,fontSize:13,flexShrink:0 }}>{rank}</div>
-            <span style={{ fontWeight:800,color:T.navy,flexShrink:0,width:20 }}>{letter}.</span>
             <p style={{ flex:1,fontSize:13,color:T.text,lineHeight:1.55 }}>{options[optIdx]}</p>
           </div>
         );
