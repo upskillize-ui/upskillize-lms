@@ -1487,7 +1487,7 @@ function ProfileManagement() {
   });
   const [corporateVisible, setCorporateVisible] = useState(() => {
     try { const c = JSON.parse(sessionStorage.getItem('upskillize_profile_full')||'{}'); return c.corporate_visible ?? false; }
-    catch { return false; }
+    catch { return true; }
   });
   const [aiEnhancing, setAiEnhancing] = useState(false);
   const [enhancedBio, setEnhancedBio] = useState("");

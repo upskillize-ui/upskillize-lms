@@ -75,7 +75,7 @@ router.get('/migrate-profile-columns', async (req, res) => {
     'company_size VARCHAR(100)',
     'key_skills TEXT',
     'career_goals TEXT',
-    'corporate_visible BOOLEAN DEFAULT FALSE',
+    'corporate_visible BOOLEAN DEFAULT TRUE',
     'resume_url VARCHAR(500)',
     'resume_name VARCHAR(255)',
     'psycho_result TEXT',
@@ -428,7 +428,7 @@ router.get('/profile/complete', ...studentOnly, async (req, res) => {
         },
         resume_url:        user.resume_url        || null,
         resume_name:       user.resume_name       || null,
-        corporate_visible: user.corporate_visible ?? false,
+        corporate_visible: user.corporate_visible ?? true,
         psycho_result,
         preferences: {
           language:            user.language            || 'en',
