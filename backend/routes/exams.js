@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { Exam, Question, Result, Course } = require('../models');
 const authMiddleware = require('../middleware/auth');
-const rbac = require('../middleware/rbac');
+const rbac = require('../middleware/rbac'); 
 
 router.post('/', authMiddleware, rbac(['faculty', 'admin']), async (req, res) => {
   try {

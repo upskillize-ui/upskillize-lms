@@ -32,7 +32,7 @@ const {
   Notification,
 } = require('../models');
 const authMiddleware = require('../middleware/auth');
-const sequelize = db.sequelize;
+const sequelize = db.sequelize; // ← ADD THIS
 
 // ─────────────────────────────────────────────────────────────
 // MULTER — profile photo
@@ -172,7 +172,6 @@ let _profileColumnsMigrated = false;
 async function autoMigrateProfileColumns() {
   if (_profileColumnsMigrated) return;
   try {
-    const { sequelize } = require('../config/database');
     const columns = [
       // personal
       'date_of_birth DATE',
@@ -253,7 +252,6 @@ autoMigrateProfileColumns();
 // ═════════════════════════════════════════════════════════════
 router.get('/profile', authMiddleware, async (req, res) => {
   try {
-    const { sequelize } = require('../config/database');
     const user = await rawFetchUser(req.user.id, sequelize);
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 

@@ -7,6 +7,8 @@ const rbac = require('../middleware/rbac');
 const multer = require('multer');
 const path   = require('path');
 const fs     = require('fs');
+const db = require('../models');
+const sequelize = db.sequelize; 
 
 const studentOnly = [authMiddleware, rbac(['student', 'admin'])];
 
@@ -16,7 +18,6 @@ const studentOnly = [authMiddleware, rbac(['student', 'admin'])];
 // DELETE THIS ROUTE after running once
 // ============================================================
 router.get('/fix-three-columns', async (req, res) => {
-  const { sequelize } = require('../config/database');
   const results = [];
   const fixes = [
     { col: 'language', sql: "ALTER TABLE users ADD COLUMN language VARCHAR(10) DEFAULT 'en'" },
@@ -501,7 +502,6 @@ router.put('/profile/address', ...studentOnly, async (req, res) => {
 
     // ✅ FIX: Raw SQL — street, city, state, country, postal_code are
     // migrated columns not in the Sequelize model. User.update() skips them.
-    const { sequelize } = require('../config/database');
     const allAddr = { street, city, state, country, postal_code };
     const setClauses   = [];
     const replacements = [];
