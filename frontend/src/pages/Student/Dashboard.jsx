@@ -26,7 +26,9 @@ import {
   MapPin as LocationIcon, Laptop, ChevronUp, FileVideo,
   AlignLeft, Folder, ChevronRight as CR, Bot, Loader,
 } from "lucide-react";
-
+const db = require('../models');
+const sequelize = db.sequelize; 
+const BASE_URL = 'https://upskillize-lms-backend.onrender.com';
 // ─── Design Tokens ───────────────────────────────────────────────────────────
 const T = {
   navy:         "#1a2744",
@@ -1669,7 +1671,9 @@ function ProfileManagement() {
                 <div style={{ flexShrink:0 }}>
                   <div style={{ position:"relative" }}>
                     <div style={{ width:96,height:96,borderRadius:"50%",border:`1px solid ${T.border}`,background:T.bg,overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center" }}>
-                      {personalInfo.profile_photo ? <img src={personalInfo.profile_photo} alt="Profile" style={{ width:"100%",height:"100%",objectFit:"cover" }}/> : <GenderAvatar gender={personalInfo?.gender||user?.gender} size={96} />}
+                      {personalInfo.profile_photo 
+                        ? <img src={personalInfo.profile_photo.startsWith('http') ? personalInfo.profile_photo : `${BASE_URL}${personalInfo.profile_photo}`} alt="Profile" style={{ width:"100%",height:"100%",objectFit:"cover" }} onError={(e)=>{e.target.style.display='none';}}/>
+                        : <GenderAvatar gender={personalInfo?.gender||user?.gender} size={96} />}
                     </div>
                     <label style={{ position:"absolute",bottom:0,right:0,background:T.white,border:`1px solid ${T.border}`,padding:5,borderRadius:"50%",cursor:"pointer" }}>
                       <Camera size={13} style={{ color:T.navy,display:"block" }} />
@@ -3816,9 +3820,9 @@ export default function StudentDashboard() {
  
         <div className="mba-sidebar-footer">
           <div style={{ display:"flex",alignItems:"center",gap:8 }}>
-            {user?.profile_photo
-              ? <img src={user.profile_photo} alt="" style={{ width:34,height:34,borderRadius:"50%",objectFit:"cover",flexShrink:0 }}/>
-              : <GenderAvatar gender={user?.gender} size={34}/>}
+           {user?.profile_photo
+  ? <img src={user.profile_photo.startsWith('http') ? user.profile_photo : `${BASE_URL}${user.profile_photo}`} alt="" style={{ width:34,height:34,borderRadius:"50%",objectFit:"cover",flexShrink:0 }} onError={(e)=>{e.target.style.display='none';}}/>
+  : <GenderAvatar gender={user?.gender} size={34}/>}
             <div>
               <div style={{ fontSize:13,color:"rgba(255,255,255,.8)",fontWeight:600 }}>{user?.full_name?.split(" ")[0]||"Student"}</div>
               <div style={{ fontSize:11,color:"rgba(255,255,255,.35)" }}>{isPurchased?"Premium":"Free Plan"}</div>
@@ -3942,8 +3946,8 @@ export default function StudentDashboard() {
               <button onClick={() => { closeAll(); setUserMenuOpen(v=>!v); }}
                 style={{ display:"flex",alignItems:"center",gap:8,padding:"5px 10px 5px 5px",borderRadius:10,border:`1.5px solid ${T.border}`,background:T.white,cursor:"pointer",transition:"all .18s",boxShadow:"0 1px 4px rgba(26,39,68,.06)" }}>
                 {user?.profile_photo
-                  ? <img src={user.profile_photo} alt="" style={{ width:34,height:34,borderRadius:"50%",objectFit:"cover",flexShrink:0 }}/>
-                  : <GenderAvatar gender={user?.gender} size={34}/>}
+  ? <img src={user.profile_photo.startsWith('http') ? user.profile_photo : `${BASE_URL}${user.profile_photo}`} alt="" style={{ width:34,height:34,borderRadius:"50%",objectFit:"cover",flexShrink:0 }} onError={(e)=>{e.target.style.display='none';}}/>
+  : <GenderAvatar gender={user?.gender} size={34}/>}
                 <div style={{ textAlign:"left" }}>
                   <div style={{ fontSize:13,fontWeight:700,color:T.text,lineHeight:1.3 }}>{user?.full_name?.split(" ")[0]||"Student"}</div>
                   <div style={{ fontSize:11,color:T.subtle,lineHeight:1.3 }}>{isPurchased?"Premium":"Free Plan"}</div>
