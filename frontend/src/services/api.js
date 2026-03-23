@@ -66,17 +66,26 @@ api.interceptors.response.use(
 
       switch (status) {
         case 401:
-          console.error("🔒 Unauthorized - token expired or invalid");
-          localStorage.removeItem("token");
-          localStorage.removeItem("user");
-          // Only redirect if not already on login/register page
+          console.error("🔒 Unauthorized:", data?.message);
+          // Only clear token and redirect if it was actually expired/invalid
+          // NOT on every 401 (e.g. wrong password on login should not redirect)
           if (
-            window.location.pathname !== "/login" &&
-            window.location.pathname !== "/register"
+            data?.expired === true ||
+            data?.message === "Session expired. Please log in again." ||
+            data?.message === "Invalid authentication token" ||
+            data?.message === "No authentication token provided"
           ) {
+            localStorage.removeItem("token");
+            localStorage.removeItem("user");
+            sessionStorage.removeItem("upskillize_profile_full");
+            if (
+              window.location.pathname !== "/login" &&
+              window.location.pathname !== "/register"
+            ) {
             window.location.href = "/login";
           }
-          break;
+         }
+        break;
 
         case 403:
           console.error("🚫 Forbidden - Insufficient permissions");
