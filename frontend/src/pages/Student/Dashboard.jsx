@@ -1384,13 +1384,27 @@ function DragRankOptions({ options, ranks, onChange }) {
   const [overIdx, setOverIdx] = useState(null);
 
   // Build ordered list from ranks: rank[idx] = rank number (1-4)
-  // We maintain a display order array separate from rank values
-  const [order, setOrder] = useState(() => options.map((_, i) => i));
+  // If saved ranks exist (going back), restore the visual order from them
+  const [order, setOrder] = useState(() => {
+    if (Object.keys(ranks).length === 4) {
+      // Reconstruct order array from saved ranks: sort option indices by their rank
+      return Object.entries(ranks)
+        .sort((a, b) => a[1] - b[1])
+        .map(([idx]) => parseInt(idx));
+    }
+    return options.map((_, i) => i);
+  });
 
+  // Auto-initialize ranks on mount so allRanked becomes true immediately
+  // (items are pre-ordered 1-4 by default; user drags to change)
   useEffect(() => {
-    // When ranks reset (new question), reset order
-    if (Object.keys(ranks).length === 0) setOrder(options.map((_, i) => i));
-  }, [options.length]);
+    if (Object.keys(ranks).length === 0) {
+      const initialRanks = {};
+      options.forEach((_, i) => { initialRanks[i] = i + 1; });
+      onChange(initialRanks);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleDragStart = (e, idx) => { setDragIdx(idx); e.dataTransfer.effectAllowed = "move"; };
   const handleDragOver  = (e, idx) => { e.preventDefault(); setOverIdx(idx); };
@@ -1998,6 +2012,9 @@ function PsychometricTest({ psychoDone, setPsychoDone, psychoResult, setPsychoRe
   const [currentQ, setCurrentQ] = useState(0);
   const [answers, setAnswers] = useState({});
   const [computing, setComputing] = useState(false);
+  const [hasSavedProgress, setHasSavedProgress] = useState(() => {
+    try { return !!localStorage.getItem("psycho_progress"); } catch { return false; }
+  });
 
   const QUESTIONS = [
     { id:1, title:"The Monday Pile-Up", dimension:"Execution", scenario:"You arrive Monday with 3 urgent tasks: a report due by noon, a client call in 30 minutes, and a team member needing help. You have time for only two.", options:["Triage immediately — estimate impact, handle top two, message the third with a timeline.","Start with the report — hardest deadline and you work best alone.","Jump on the call first, ask for agenda, use it to reprioritise everything.","Help your team member first — people over paperwork, always."] },
@@ -2062,6 +2079,7 @@ function PsychometricTest({ psychoDone, setPsychoDone, psychoResult, setPsychoRe
     const result = { type: dominant, icon: profile.icon, desc: profile.desc, topDimensions: topDims, scores: dimScores, dominant };
     setPsychoResult(result); setPsychoDone(true); setStep("result");
     try { await api.post("/student/profile/psychometric", { result }); } catch {}
+    try { localStorage.removeItem("psycho_progress"); } catch {}
     setComputing(false);
   };
 
@@ -2110,6 +2128,16 @@ function PsychometricTest({ psychoDone, setPsychoDone, psychoResult, setPsychoRe
               ))}
             </div>
             <button className="mba-btn-primary" onClick={() => setStep("test")}><Brain size={14} /> Start Psychometric Test</button>
+            {hasSavedProgress && (
+              <button className="mba-btn-outline" style={{ marginLeft:8 }} onClick={() => {
+                try {
+                  const saved = JSON.parse(localStorage.getItem("psycho_progress") || "{}");
+                  if (saved.answers) setAnswers(saved.answers);
+                  if (saved.currentQ >= 0) setCurrentQ(saved.currentQ);
+                  setStep("test");
+                } catch {}
+              }}>&#9654; Resume Saved Progress</button>
+            )}
           </div>
         )}
       </div>
@@ -2134,16 +2162,29 @@ function PsychometricTest({ psychoDone, setPsychoDone, psychoResult, setPsychoRe
           <p style={{ fontSize:14,color:T.navy,lineHeight:1.7 }}>{q.scenario}</p>
         </div>
         <DragRankOptions
+          key={currentQ}
           options={q.options}
           ranks={currentRanks}
           onChange={(newRanks) => setAnswers(a => ({ ...a, [q.id]: newRanks }))}
         />
-        {allRanked && <div className="mba-alert-success" style={{ marginTop:10,marginBottom:10 }}>✓ All 4 options ranked — ready to proceed!</div>}
-        <div style={{ display:"flex",gap:8,marginTop:12 }}>
-          <button className="mba-btn-ghost" onClick={() => setCurrentQ(p=>p-1)} disabled={currentQ===0}>← Back</button>
+        {allRanked && <div className="mba-alert-success" style={{ marginTop:10,marginBottom:10 }}>&#10003; All 4 options ranked &mdash; drag to reorder, then proceed!</div>}
+        <div style={{ display:"flex",gap:8,marginTop:12,flexWrap:"wrap",alignItems:"center" }}>
+          <button className="mba-btn-ghost" onClick={() => setCurrentQ(p=>p-1)} disabled={currentQ===0}>&#8592; Back</button>
           {currentQ < QUESTIONS.length-1
-            ? <button className="mba-btn-primary" disabled={!allRanked} onClick={() => setCurrentQ(p=>p+1)}>Next →</button>
-            : <button className="mba-btn-primary" disabled={!allRanked || computing} onClick={computeResult}>{computing?"Computing...":"See Results 🎯"}</button>}
+            ? <button className="mba-btn-primary" disabled={!allRanked} onClick={() => setCurrentQ(p=>p+1)}>Next &#8594;</button>
+            : <button className="mba-btn-primary" disabled={!allRanked || computing} onClick={computeResult}>{computing?"Computing...":"See Results \uD83C\uDFAF"}</button>}
+          <button
+            className="mba-btn-ghost"
+            style={{ marginLeft:"auto",display:"flex",alignItems:"center",gap:5 }}
+            onClick={() => {
+              try {
+                localStorage.setItem("psycho_progress", JSON.stringify({ answers, currentQ }));
+                showMsg && showMsg("success","Progress saved! You can resume anytime.");
+              } catch(err) {}
+            }}
+          >
+            <Save size={13}/> Save Progress
+          </button>
         </div>
       </div>
     );
