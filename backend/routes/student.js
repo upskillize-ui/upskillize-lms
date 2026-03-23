@@ -621,6 +621,38 @@ router.put('/profile/corporate-visibility', ...studentOnly, async (req, res) => 
 });
 
 // ============================================================
+// PROFILE — PHOTO UPLOAD (multipart — Cloudinary)
+// POST /api/student/profile/photo
+// ============================================================
+const cloudinary = (() => { try { const c = require('cloudinary').v2; c.config({ cloud_name: process.env.CLOUDINARY_CLOUD_NAME, api_key: process.env.CLOUDINARY_API_KEY, api_secret: process.env.CLOUDINARY_API_SECRET }); return c; } catch { return null; } })();
+const { CloudinaryStorage: CS } = (() => { try { return require('multer-storage-cloudinary'); } catch { return { CloudinaryStorage: null }; } })();
+
+const photoUploadStudent = (() => {
+  if (cloudinary && CS) {
+    const storage = new CS({ cloudinary, params: { folder: 'upskillize/student-profiles', allowed_formats: ['jpg','jpeg','png','webp'], transformation: [{ width:400, height:400, crop:'fill', gravity:'face' }] } });
+    return multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
+  }
+  // Fallback: disk storage
+  const storage = multer.diskStorage({
+    destination: (req, file, cb) => { const d = path.join(__dirname,'..','uploads','profiles','students'); require('fs').mkdirSync(d,{recursive:true}); cb(null,d); },
+    filename: (req, file, cb) => cb(null, `photo-${req.user?.id||'u'}-${Date.now()}${path.extname(file.originalname)}`),
+  });
+  return multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
+})();
+
+router.post('/profile/photo', ...studentOnly, photoUploadStudent.single('profile_photo'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded' });
+    const photo_url = req.file.path || `/uploads/profiles/students/${req.file.filename}`;
+    await sequelize.query('UPDATE users SET profile_photo = ? WHERE id = ?', { replacements: [photo_url, req.user.id] });
+    return res.json({ success: true, photo_url });
+  } catch (error) {
+    console.error('Student photo upload error:', error);
+    res.status(500).json({ success: false, message: error.message || 'Upload failed' });
+  }
+});
+
+// ============================================================
 // PROFILE — RESUME UPLOAD
 // POST /api/student/profile/resume
 // ============================================================
