@@ -30,7 +30,7 @@ import {
   Users as UsersIcon, DollarSign, Laptop, FileVideo,
   ChevronRight as CR, MessageCircle, BookMarked,
 } from "lucide-react";
-
+const BASE_URL = 'https://upskillize-lms-backend.onrender.com';
 // ─── Toast Hook ────────────────────────────────────────────────────────────
 function useToast() {
   const [toasts, setToasts] = useState([]);
@@ -1978,8 +1978,15 @@ function FacultyProfile() {
           <div style={{ position:"relative",flexShrink:0 }}>
             <div style={{ width:80,height:80,borderRadius:"50%",border:"3px solid rgba(184,150,11,.55)",overflow:"hidden",background:T.navyLight,display:"flex",alignItems:"center",justifyContent:"center" }}>
               {personalInfo.profile_photo
-                ? <img src={personalInfo.profile_photo} alt="Profile" style={{ width:"100%",height:"100%",objectFit:"cover" }}/>
-                : <span style={{ fontSize:30,fontWeight:800,color:"#fff" }}>{(personalInfo.full_name||user?.full_name||"F").charAt(0).toUpperCase()}</span>}
+  ? <img
+      src={personalInfo.profile_photo.startsWith('http')
+  ? personalInfo.profile_photo
+  : `${BASE_URL}${personalInfo.profile_photo}`}
+      alt="Profile"
+      style={{ width:"100%",height:"100%",objectFit:"cover" }}
+      onError={(e)=>{ e.target.style.display='none'; }}
+    />
+  : <span style={{ fontSize:30,fontWeight:800,color:"#fff" }}>{(personalInfo.full_name||user?.full_name||"F").charAt(0).toUpperCase()}</span>}
               {uploading && <div style={{ position:"absolute",inset:0,background:"rgba(26,39,68,.6)",display:"flex",alignItems:"center",justifyContent:"center",borderRadius:"50%" }}><Loader size={20} style={{ color:"#fff",animation:"fac-spin .7s linear infinite" }}/></div>}
             </div>
             <label htmlFor="fac-photo-upload" style={{ position:"absolute",bottom:2,right:2,width:26,height:26,background:"#fff",border:`2px solid ${T.border}`,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",cursor:uploading?"not-allowed":"pointer",boxShadow:"0 2px 6px rgba(0,0,0,.12)" }}>
@@ -3707,7 +3714,14 @@ export default function FacultyDashboard() {
         <div className="fac-sidebar-footer">
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             {user?.profile_photo
-              ? <img src={user.profile_photo} alt="" style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+  ? <img
+      src={user.profile_photo.startsWith('http')
+  ? user.profile_photo
+  : `${BASE_URL}${user.profile_photo}`}
+      alt=""
+      style={{ width:32,height:32,borderRadius:"50%",objectFit:"cover",flexShrink:0 }}
+      onError={(e)=>{ e.target.style.display='none'; }}
+    />
               : <Avatar name={user?.full_name} size={32} />}
             <div>
               <div style={{ fontSize: 13, color: "rgba(255,255,255,.8)", fontWeight: 600 }}>{user?.full_name?.split(" ")[0] || "Faculty"}</div>

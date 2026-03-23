@@ -7,6 +7,7 @@ const cookieParser = require("cookie-parser");
 require("dotenv").config();
 const facultyRoutes = require("./routes/facultyProfile");
 const passport = require("passport");
+const path = require('path');
 
 const { sequelize, testConnection } = require("./config/database");
 const app = express();
@@ -98,6 +99,8 @@ const authLimiter = rateLimit({
 app.use("/api/", limiter);
 app.use("/api/auth/login", authLimiter);
 app.use("/api/auth/register", authLimiter);
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use("/api/", limiter);
 
 // ── Routes ───────────────────────────────────────────────────────────────────
 app.use("/api/auth", require("./routes/auth"));
