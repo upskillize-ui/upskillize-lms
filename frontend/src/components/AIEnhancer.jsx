@@ -210,7 +210,7 @@ export default function AIEnhancer({ showMsg }) {
             srcDoc={aiProfile.html}
             title="AI Profile Preview"
             style={{ width: "100%", height: 700, border: "none" }}
-            sandbox="allow-same-origin"
+            sandbox="allow-same-origin allow-scripts"
           />
         </div>
       ) : (
