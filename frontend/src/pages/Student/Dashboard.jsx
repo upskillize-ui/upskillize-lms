@@ -1429,8 +1429,9 @@ function DragRankOptions({ options, ranks, onChange }) {
         <GripVertical size={13}/> Drag to reorder: <strong>Top = Most Likely → Bottom = Least Likely</strong>
       </p>
       {order.map((optIdx, pos) => {
-        const rank = pos + 1;
+        const fixedNum = optIdx + 1;                                          // stays with the item always
         const rankColors = ["#2d6a2d","#1a2744","#b8960b","#c0392b"];
+        const posColor   = rankColors[pos];                                   // changes by current position
         return (
           <div
             key={optIdx}
@@ -1442,7 +1443,7 @@ function DragRankOptions({ options, ranks, onChange }) {
             className={`mba-drag-item ${dragIdx===pos?"dragging":""} ${overIdx===pos&&dragIdx!==pos?"drag-over":""}`}
           >
             <GripVertical size={16} style={{ color:T.subtle,flexShrink:0 }} />
-            <div style={{ width:28,height:28,borderRadius:"50%",background:rankColors[rank-1],display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:800,fontSize:13,flexShrink:0,transition:"background .25s" }}>{rank}</div>
+            <div style={{ width:28,height:28,borderRadius:"50%",background:posColor,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:800,fontSize:13,flexShrink:0,transition:"background .3s ease" }}>{fixedNum}</div>
             <p style={{ flex:1,fontSize:13,color:T.text,lineHeight:1.55 }}>{options[optIdx]}</p>
           </div>
         );
