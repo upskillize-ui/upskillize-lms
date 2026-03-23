@@ -1570,10 +1570,27 @@ function ProfileManagement() {
   const showMsg = (type, text) => { setMessage({ type,text }); setTimeout(() => setMessage({ type:"",text:"" }), 3000); };
   const save = (fn) => async () => { setSaving(true); try { await fn(); } catch (e) { showMsg("error", e.response?.data?.message||"Error saving"); } finally { setSaving(false); } };
 
-  const handleImageUpload = (e) => {
+  const handleImageUpload = async (e) => {
     const file = e.target.files[0]; if (!file) return;
     if (file.size > 5*1024*1024) { showMsg("error","Image must be under 5MB"); return; }
-    const reader = new FileReader(); reader.onloadend = () => setPersonalInfo(p => ({ ...p,profile_photo:reader.result })); reader.readAsDataURL(file);
+    // Show preview immediately using base64
+    const reader = new FileReader();
+    reader.onloadend = () => setPersonalInfo(p => ({ ...p, profile_photo: reader.result }));
+    reader.readAsDataURL(file);
+    // Upload to server separately so it doesn't bloat the personal info save
+    try {
+      const fd = new FormData();
+      fd.append("profile_photo", file);
+      const r = await api.post("/student/profile/photo", fd, { headers: { "Content-Type": "multipart/form-data" } });
+      if (r.data.success && r.data.photo_url) {
+        const url = r.data.photo_url.startsWith('http') ? r.data.photo_url : `${BASE_URL}${r.data.photo_url}`;
+        setPersonalInfo(p => ({ ...p, profile_photo: url }));
+        if (updateUser) updateUser({ profile_photo: url });
+        showMsg("success", "Photo uploaded!");
+      }
+    } catch {
+      // Keep base64 preview — will save on next personal info save
+    }
   };
 
   const handleResumeUpload = async (e) => {
@@ -1670,7 +1687,7 @@ function ProfileManagement() {
                   <div style={{ position:"relative" }}>
                     <div style={{ width:96,height:96,borderRadius:"50%",border:`1px solid ${T.border}`,background:T.bg,overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center" }}>
                       {personalInfo.profile_photo 
-                        ? <img src={personalInfo.profile_photo.startsWith('http') ? personalInfo.profile_photo : `${BASE_URL}${personalInfo.profile_photo}`} alt="Profile" style={{ width:"100%",height:"100%",objectFit:"cover" }} onError={(e)=>{e.target.style.display='none';}}/>
+                        ? <img src={personalInfo.profile_photo.startsWith('http') || personalInfo.profile_photo.startsWith('data:') ? personalInfo.profile_photo : `${BASE_URL}${personalInfo.profile_photo}`} alt="Profile" style={{ width:"100%",height:"100%",objectFit:"cover" }} onError={(e)=>{e.target.style.display='none';}}/>
                         : <GenderAvatar gender={personalInfo?.gender||user?.gender} size={96} />}
                     </div>
                     <label style={{ position:"absolute",bottom:0,right:0,background:T.white,border:`1px solid ${T.border}`,padding:5,borderRadius:"50%",cursor:"pointer" }}>
@@ -1703,7 +1720,10 @@ function ProfileManagement() {
                 </div>
               </div>
               <button className="mba-btn-primary" onClick={save(async () => {
-                const r = await api.put("/student/profile/personal", personalInfo);
+                // Strip base64 photo from personal save — photo is uploaded separately
+                const { profile_photo, ...personalToSave } = personalInfo;
+                const photoToSend = profile_photo && !profile_photo.startsWith('data:') ? profile_photo : undefined;
+                const r = await api.put("/student/profile/personal", { ...personalToSave, ...(photoToSend ? { profile_photo: photoToSend } : {}) });
                 if (r.data.success) {
                   showMsg("success","Personal information saved!");
                   localStorage.setItem('upskillize_profile_cache', JSON.stringify(personalInfo));
@@ -3819,7 +3839,7 @@ export default function StudentDashboard() {
         <div className="mba-sidebar-footer">
           <div style={{ display:"flex",alignItems:"center",gap:8 }}>
            {user?.profile_photo
-  ? <img src={user.profile_photo.startsWith('http') ? user.profile_photo : `${BASE_URL}${user.profile_photo}`} alt="" style={{ width:34,height:34,borderRadius:"50%",objectFit:"cover",flexShrink:0 }} onError={(e)=>{e.target.style.display='none';}}/>
+  ? <img src={user.profile_photo.startsWith('http') || user.profile_photo.startsWith('data:') ? user.profile_photo : `${BASE_URL}${user.profile_photo}`} alt="" style={{ width:34,height:34,borderRadius:"50%",objectFit:"cover",flexShrink:0 }} onError={(e)=>{e.target.style.display='none';}}/>
   : <GenderAvatar gender={user?.gender} size={34}/>}
             <div>
               <div style={{ fontSize:13,color:"rgba(255,255,255,.8)",fontWeight:600 }}>{user?.full_name?.split(" ")[0]||"Student"}</div>
@@ -3944,7 +3964,7 @@ export default function StudentDashboard() {
               <button onClick={() => { closeAll(); setUserMenuOpen(v=>!v); }}
                 style={{ display:"flex",alignItems:"center",gap:8,padding:"5px 10px 5px 5px",borderRadius:10,border:`1.5px solid ${T.border}`,background:T.white,cursor:"pointer",transition:"all .18s",boxShadow:"0 1px 4px rgba(26,39,68,.06)" }}>
                 {user?.profile_photo
-  ? <img src={user.profile_photo.startsWith('http') ? user.profile_photo : `${BASE_URL}${user.profile_photo}`} alt="" style={{ width:34,height:34,borderRadius:"50%",objectFit:"cover",flexShrink:0 }} onError={(e)=>{e.target.style.display='none';}}/>
+  ? <img src={user.profile_photo.startsWith('http') || user.profile_photo.startsWith('data:') ? user.profile_photo : `${BASE_URL}${user.profile_photo}`} alt="" style={{ width:34,height:34,borderRadius:"50%",objectFit:"cover",flexShrink:0 }} onError={(e)=>{e.target.style.display='none';}}/>
   : <GenderAvatar gender={user?.gender} size={34}/>}
                 <div style={{ textAlign:"left" }}>
                   <div style={{ fontSize:13,fontWeight:700,color:T.text,lineHeight:1.3 }}>{user?.full_name?.split(" ")[0]||"Student"}</div>
