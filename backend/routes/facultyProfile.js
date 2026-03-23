@@ -32,6 +32,7 @@ const {
   Notification,
 } = require('../models');
 const authMiddleware = require('../middleware/auth');
+const sequelize = db.sequelize;
 
 // ─────────────────────────────────────────────────────────────
 // MULTER — profile photo

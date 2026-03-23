@@ -144,7 +144,7 @@ const startServer = async () => {
     await testConnection();
 
     if (process.env.NODE_ENV !== "production") {
-      await sequelize.sync({ alter: true });
+      sequelize.sync({ alter: { drop: false } })
       console.log("✅ Database synced (dev mode)");
     } else {
       console.log("✅ Database connected (production — skipping sync)");
