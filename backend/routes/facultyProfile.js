@@ -37,28 +37,51 @@ const sequelize = db.sequelize; // ← ADD THIS
 // ─────────────────────────────────────────────────────────────
 // MULTER — profile photo
 // ─────────────────────────────────────────────────────────────
-const cloudinary = require('cloudinary').v2;
-const { CloudinaryStorage } = require('multer-storage-cloudinary');
+// ── Photo upload: Cloudinary if env vars set, disk fallback otherwise ──
+const cloudinary = (() => {
+  try {
+    const c = require('cloudinary').v2;
+    c.config({
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      api_key:    process.env.CLOUDINARY_API_KEY,
+      api_secret: process.env.CLOUDINARY_API_SECRET,
+    });
+    return c;
+  } catch { return null; }
+})();
 
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key:    process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
+const { CloudinaryStorage } = (() => {
+  try { return require('multer-storage-cloudinary'); }
+  catch { return { CloudinaryStorage: null }; }
+})();
 
-const storage = new CloudinaryStorage({
-  cloudinary,
-  params: {
-    folder:         'upskillize/faculty-profiles',
-    allowed_formats: ['jpg','jpeg','png','gif','webp'],
-    transformation: [{ width:400, height:400, crop:'fill', gravity:'face' }],
-  },
-});
-
-const upload = multer({
-  storage,
-  limits: { fileSize: 5 * 1024 * 1024 },
-});
+const upload = (() => {
+  if (cloudinary && CloudinaryStorage && process.env.CLOUDINARY_CLOUD_NAME) {
+    const storage = new CloudinaryStorage({
+      cloudinary,
+      params: {
+        folder:          'upskillize/faculty-profiles',
+        allowed_formats: ['jpg','jpeg','png','gif','webp'],
+        transformation:  [{ width:400, height:400, crop:'fill', gravity:'face' }],
+      },
+    });
+    console.log('[facultyProfile] ✅ Cloudinary storage active');
+    return multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
+  }
+  // Fallback: disk storage for local dev or if Cloudinary not configured
+  console.log('[facultyProfile] ⚠️  Cloudinary not configured — using disk storage');
+  const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+      const dir = path.join(__dirname, '..', 'uploads', 'profiles', 'faculty');
+      fs.mkdirSync(dir, { recursive: true });
+      cb(null, dir);
+    },
+    filename: (req, file, cb) => {
+      cb(null, `profile-${Date.now()}-${Math.round(Math.random()*1e9)}${path.extname(file.originalname)}`);
+    },
+  });
+  return multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
+})();
 
 // ─────────────────────────────────────────────────────────────
 // MULTER — content upload
@@ -327,8 +350,10 @@ router.get('/profile', authMiddleware, async (req, res) => {
 router.post('/profile/photo', authMiddleware, upload.single('profile_photo'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded' });
-    
-    const photo_url = req.file.path;
+    const { sequelize } = require('../config/database');
+    // Cloudinary returns full https URL in req.file.path
+    // Disk storage returns just the filename in req.file.filename
+    const photo_url = req.file.path || `/uploads/profiles/faculty/${req.file.filename}`;
     await rawUpdate('users', { profile_photo: photo_url }, 'id = ?', [req.user.id], sequelize);
     res.json({ success: true, photo_url }); // Dashboard reads r.data.photo_url
   } catch (error) {
@@ -345,7 +370,7 @@ router.put('/profile/personal', authMiddleware, async (req, res) => {
     const { full_name, phone_number, date_of_birth, gender, bio } = req.body;
     if (!full_name?.trim()) return res.status(400).json({ success: false, message: 'Full name is required' });
 
-    
+    const { sequelize } = require('../config/database');
     await rawUpdate('users', {
       full_name:     full_name.trim(),
       phone:         phone_number?.trim() || null,
@@ -373,7 +398,7 @@ router.put('/profile/professional', authMiddleware, async (req, res) => {
       experience_years, joining_date, employee_id,
     } = req.body;
 
-    
+    const { sequelize } = require('../config/database');
 
     // ✅ FIX #3: findOrCreate — previously used findOne().
     // If no faculty row existed (new user), updates silently did nothing.
@@ -420,7 +445,7 @@ router.put('/profile/contact', authMiddleware, async (req, res) => {
       emergency_contact_name, emergency_contact_phone,
     } = req.body;
 
-    
+    const { sequelize } = require('../config/database');
     await rawUpdate('users', {
       address_line1, address_line2, city, state, country, postal_code,
       emergency_contact_name, emergency_contact_phone,
@@ -443,7 +468,7 @@ router.put('/profile/additional', authMiddleware, async (req, res) => {
       certifications, languages_known, skills, achievements, publications,
     } = req.body;
 
-    
+    const { sequelize } = require('../config/database');
     await rawUpdate('users', {
       edu_degree, edu_institution, edu_year, edu_grade,
       certifications, languages_known, skills, achievements, publications,
@@ -462,7 +487,7 @@ router.put('/profile/additional', authMiddleware, async (req, res) => {
 router.put('/profile/social', authMiddleware, async (req, res) => {
   try {
     const { linkedin, github, twitter, website } = req.body;
-    
+    const { sequelize } = require('../config/database');
     await rawUpdate('users', {
       linkedin: linkedin || null,
       github:   github   || null,
@@ -487,7 +512,7 @@ router.put('/profile/bank', authMiddleware, async (req, res) => {
       ifsc_code, branch_name, account_type, pan_number, uan_number,
     } = req.body;
 
-    
+    const { sequelize } = require('../config/database');
     await rawUpdate('users', {
       account_holder_name, bank_name, account_number,
       ifsc_code, branch_name,
@@ -508,7 +533,7 @@ router.put('/profile/bank', authMiddleware, async (req, res) => {
 // server start, but you can hit this URL to force a re-run.
 // ═════════════════════════════════════════════════════════════
 router.get('/migrate-profile-columns', async (req, res) => {
-  
+  const { sequelize } = require('../config/database');
   const columns = [
     'date_of_birth DATE', 'gender VARCHAR(20)', 'bio TEXT',
     'profile_photo VARCHAR(500)', 'phone VARCHAR(50)',
@@ -736,7 +761,7 @@ router.get('/students', authMiddleware, async (req, res) => {
 // ═════════════════════════════════════════════════════════════
 router.get('/content', authMiddleware, async (req, res) => {
   try {
-    
+    const { sequelize } = require('../config/database');
     const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
     if (!faculty) return res.json({ success: true, content: [] });
     await ensureContentTable(sequelize);
@@ -766,7 +791,7 @@ router.post('/content/upload', authMiddleware, (req, res, next) => {
   });
 }, async (req, res) => {
   try {
-    
+    const { sequelize } = require('../config/database');
     const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
     if (!faculty) return res.status(404).json({ success: false, message: 'Faculty not found' });
     await ensureContentTable(sequelize);
@@ -793,7 +818,7 @@ router.post('/content/upload', authMiddleware, (req, res, next) => {
 // ═════════════════════════════════════════════════════════════
 router.put('/content/:id', authMiddleware, async (req, res) => {
   try {
-    
+    const { sequelize } = require('../config/database');
     const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
     if (!faculty) return res.status(404).json({ success: false, message: 'Faculty not found' });
 
@@ -816,7 +841,7 @@ router.put('/content/:id', authMiddleware, async (req, res) => {
 // ═════════════════════════════════════════════════════════════
 router.delete('/content/:id', authMiddleware, async (req, res) => {
   try {
-    
+    const { sequelize } = require('../config/database');
     const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
     if (!faculty) return res.status(404).json({ success: false, message: 'Faculty not found' });
 
@@ -842,7 +867,7 @@ router.delete('/content/:id', authMiddleware, async (req, res) => {
 // ═════════════════════════════════════════════════════════════
 router.get('/announcements', authMiddleware, async (req, res) => {
   try {
-    
+    const { sequelize } = require('../config/database');
     await sequelize.query(`
       CREATE TABLE IF NOT EXISTS announcements (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -870,7 +895,7 @@ router.get('/announcements', authMiddleware, async (req, res) => {
 
 router.post('/announcements', authMiddleware, async (req, res) => {
   try {
-    
+    const { sequelize } = require('../config/database');
     const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
     if (!faculty) return res.status(404).json({ success: false, message: 'Faculty not found' });
 
@@ -890,7 +915,7 @@ router.post('/announcements', authMiddleware, async (req, res) => {
 
 router.delete('/announcements/:id', authMiddleware, async (req, res) => {
   try {
-    
+    const { sequelize } = require('../config/database');
     const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
     if (!faculty) return res.status(404).json({ success: false, message: 'Faculty not found' });
     await sequelize.query('DELETE FROM announcements WHERE id=? AND faculty_id=?', { replacements: [req.params.id, faculty.id] });
@@ -913,7 +938,7 @@ router.get('/messages', authMiddleware, async (req, res) => {
 // ═════════════════════════════════════════════════════════════
 router.get('/assignments', authMiddleware, async (req, res) => {
   try {
-    
+    const { sequelize } = require('../config/database');
     const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
     if (!faculty) return res.json({ success: true, assignments: [] });
 
@@ -947,7 +972,7 @@ router.get('/assignments', authMiddleware, async (req, res) => {
 
 router.post('/assignments', authMiddleware, async (req, res) => {
   try {
-    
+    const { sequelize } = require('../config/database');
     const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
     if (!faculty) return res.status(404).json({ success: false, message: 'Faculty not found' });
 
@@ -968,7 +993,7 @@ router.post('/assignments', authMiddleware, async (req, res) => {
 
 router.get('/assignments/:id/submissions', authMiddleware, async (req, res) => {
   try {
-    
+    const { sequelize } = require('../config/database');
     const [submissions] = await sequelize.query(
       `SELECT s.*,u.full_name AS student_name FROM assignment_submissions s
        LEFT JOIN students st ON st.id=s.student_id LEFT JOIN users u ON u.id=st.user_id
@@ -983,7 +1008,7 @@ router.get('/assignments/:id/submissions', authMiddleware, async (req, res) => {
 
 router.post('/assignments/:id/grade', authMiddleware, async (req, res) => {
   try {
-    
+    const { sequelize } = require('../config/database');
     const { submission_id, grade, feedback } = req.body;
     await sequelize.query(
       `UPDATE assignment_submissions SET grade=?,feedback=?,status='graded' WHERE id=?`,
@@ -997,7 +1022,7 @@ router.post('/assignments/:id/grade', authMiddleware, async (req, res) => {
 
 router.delete('/assignments/:id', [authMiddleware, rbac(['faculty', 'admin'])], async (req, res) => {
   try {
-    
+    const { sequelize } = require('../config/database');
     const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
     await sequelize.query(
       `UPDATE assignments SET status='deleted' WHERE id=? AND faculty_id=?`,
@@ -1034,7 +1059,7 @@ router.get('/notifications', authMiddleware, async (req, res) => {
 // ═════════════════════════════════════════════════════════════
 router.get('/settings', authMiddleware, async (req, res) => {
   try {
-    
+    const { sequelize } = require('../config/database');
     // rawFetchUser — language, timezone, email_notifications, sms_notifications, theme
     // are migrated columns NOT in the Sequelize User model; findByPk() silently ignores them.
     const user = await rawFetchUser(req.user.id, sequelize);
@@ -1052,7 +1077,7 @@ router.get('/settings', authMiddleware, async (req, res) => {
 router.put('/settings/general', authMiddleware, async (req, res) => {
   try {
     const { language, timezone } = req.body;
-    
+    const { sequelize } = require('../config/database');
     await rawUpdate('users', { language, timezone }, 'id = ?', [req.user.id], sequelize);
     res.json({ success: true, message: 'Settings updated' });
   } catch (error) { res.status(500).json({ success: false, message: 'Error updating settings' }); }
@@ -1061,7 +1086,7 @@ router.put('/settings/general', authMiddleware, async (req, res) => {
 router.put('/settings/notifications', authMiddleware, async (req, res) => {
   try {
     const { emailNotifications, smsNotifications } = req.body;
-    
+    const { sequelize } = require('../config/database');
     await rawUpdate('users', { email_notifications: emailNotifications, sms_notifications: smsNotifications }, 'id = ?', [req.user.id], sequelize);
     res.json({ success: true, message: 'Notification settings updated' });
   } catch (error) { res.status(500).json({ success: false, message: 'Error updating settings' }); }
@@ -1133,7 +1158,7 @@ router.get('/analytics', authMiddleware, async (req, res) => {
 // ═════════════════════════════════════════════════════════════
 router.get('/live-classes', authMiddleware, async (req, res) => {
   try {
-    
+    const { sequelize } = require('../config/database');
     const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
     if (!faculty) return res.json({ success: true, classes: [] });
 
@@ -1164,7 +1189,7 @@ router.get('/live-classes', authMiddleware, async (req, res) => {
 
 router.post('/live-classes', authMiddleware, async (req, res) => {
   try {
-    
+    const { sequelize } = require('../config/database');
     const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
     if (!faculty) return res.status(404).json({ success: false, message: 'Faculty not found' });
 
@@ -1188,7 +1213,7 @@ router.post('/live-classes', authMiddleware, async (req, res) => {
 // ═════════════════════════════════════════════════════════════
 router.get('/batches', authMiddleware, async (req, res) => {
   try {
-    
+    const { sequelize } = require('../config/database');
     const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
     if (!faculty) return res.json({ success: true, batches: [] });
 
@@ -1219,7 +1244,7 @@ router.get('/batches', authMiddleware, async (req, res) => {
 
 router.post('/batches', authMiddleware, async (req, res) => {
   try {
-    
+    const { sequelize } = require('../config/database');
     const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
     if (!faculty) return res.status(404).json({ success: false, message: 'Faculty not found' });
 
@@ -1240,7 +1265,7 @@ router.post('/batches', authMiddleware, async (req, res) => {
 
 router.delete('/batches/:id', authMiddleware, async (req, res) => {
   try {
-    
+    const { sequelize } = require('../config/database');
     const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
     await sequelize.query('DELETE FROM batches WHERE id=? AND faculty_id=?', { replacements: [req.params.id, faculty?.id] });
     res.json({ success: true, message: 'Batch deleted' });
@@ -1251,7 +1276,7 @@ router.delete('/batches/:id', authMiddleware, async (req, res) => {
 
 router.get('/batches/:id/students', authMiddleware, async (req, res) => {
   try {
-    
+    const { sequelize } = require('../config/database');
     const [batch] = await sequelize.query('SELECT * FROM batches WHERE id=? LIMIT 1', { replacements: [req.params.id] });
     if (!batch.length) return res.status(404).json({ success: false, message: 'Batch not found' });
 
@@ -1273,7 +1298,7 @@ router.get('/batches/:id/students', authMiddleware, async (req, res) => {
 // ═════════════════════════════════════════════════════════════
 router.get('/doubts', authMiddleware, async (req, res) => {
   try {
-    
+    const { sequelize } = require('../config/database');
     const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
     if (!faculty) return res.json({ success: true, doubts: [] });
 
@@ -1308,7 +1333,7 @@ router.get('/doubts', authMiddleware, async (req, res) => {
 
 router.post('/doubts/:id/reply', authMiddleware, async (req, res) => {
   try {
-    
+    const { sequelize } = require('../config/database');
     const { answer } = req.body;
     await sequelize.query(
       `UPDATE doubts SET answer=?,status='answered',answered_at=NOW() WHERE id=?`,
@@ -1325,7 +1350,7 @@ router.post('/doubts/:id/reply', authMiddleware, async (req, res) => {
 // ═════════════════════════════════════════════════════════════
 router.get('/course-content/:courseId', authMiddleware, async (req, res) => {
   try {
-    
+    const { sequelize } = require('../config/database');
     await ensureContentTable(sequelize);
     const [content] = await sequelize.query(
       `SELECT * FROM faculty_content WHERE course_id=? AND status='published' ORDER BY display_order ASC,created_at ASC`,
@@ -1343,7 +1368,7 @@ router.get('/course-content/:courseId', authMiddleware, async (req, res) => {
 // ═════════════════════════════════════════════════════════════
 router.get('/corporate/profiles', authMiddleware, async (req, res) => {
   try {
-    
+    const { sequelize } = require('../config/database');
     const [profiles] = await sequelize.query(
       `SELECT id,full_name,email,phone,profile_photo,skills,bio,linkedin,github,portfolio,current_designation,current_employer
        FROM users WHERE role='student' AND corporate_visible=TRUE`,
@@ -1361,7 +1386,7 @@ router.get('/corporate/profiles', authMiddleware, async (req, res) => {
 // ═════════════════════════════════════════════════════════════
 router.get('/student/course-content/:courseId', authMiddleware, async (req, res) => {
   try {
-    
+    const { sequelize } = require('../config/database');
     await ensureContentTable(sequelize);
     const [content] = await sequelize.query(`
       SELECT fc.id,fc.title,fc.description,fc.type,fc.file_path,
