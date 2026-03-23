@@ -37,24 +37,27 @@ const sequelize = db.sequelize;
 // ─────────────────────────────────────────────────────────────
 // MULTER — profile photo
 // ─────────────────────────────────────────────────────────────
-const storage = multer.diskStorage({
-  destination(req, file, cb) {
-    const dir = 'uploads/profiles/faculty';
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename(req, file, cb) {
-    cb(null, 'profile-' + Date.now() + '-' + Math.round(Math.random() * 1e9) + path.extname(file.originalname));
+const cloudinary = require('cloudinary').v2;
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key:    process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+const storage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder:         'upskillize/faculty-profiles',
+    allowed_formats: ['jpg','jpeg','png','gif','webp'],
+    transformation: [{ width:400, height:400, crop:'fill', gravity:'face' }],
   },
 });
+
 const upload = multer({
   storage,
   limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter(req, file, cb) {
-    const ok = /jpeg|jpg|png|gif|webp/;
-    if (ok.test(path.extname(file.originalname).toLowerCase()) && ok.test(file.mimetype)) return cb(null, true);
-    cb(new Error('Only image files are allowed!'));
-  },
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -327,7 +330,7 @@ router.post('/profile/photo', authMiddleware, upload.single('profile_photo'), as
   try {
     if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded' });
     const { sequelize } = require('../config/database');
-    const photo_url = `/uploads/profiles/faculty/${req.file.filename}`;
+    const photo_url = req.file.path;
     await rawUpdate('users', { profile_photo: photo_url }, 'id = ?', [req.user.id], sequelize);
     res.json({ success: true, photo_url }); // Dashboard reads r.data.photo_url
   } catch (error) {

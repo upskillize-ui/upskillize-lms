@@ -26,9 +26,7 @@ import {
   MapPin as LocationIcon, Laptop, ChevronUp, FileVideo,
   AlignLeft, Folder, ChevronRight as CR, Bot, Loader,
 } from "lucide-react";
-const db = require('../models');
-const sequelize = db.sequelize; 
-const BASE_URL = 'https://upskillize-lms-backend.onrender.com';
+const BASE_URL = (import.meta.env.VITE_API_URL || 'https://upskillize-lms-backend.onrender.com/api').replace('/api', '');
 // ─── Design Tokens ───────────────────────────────────────────────────────────
 const T = {
   navy:         "#1a2744",

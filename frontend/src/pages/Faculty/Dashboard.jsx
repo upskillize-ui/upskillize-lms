@@ -30,7 +30,7 @@ import {
   Users as UsersIcon, DollarSign, Laptop, FileVideo,
   ChevronRight as CR, MessageCircle, BookMarked,
 } from "lucide-react";
-const BASE_URL = 'https://upskillize-lms-backend.onrender.com';
+const BASE_URL = (import.meta.env.VITE_API_URL || 'https://upskillize-lms-backend.onrender.com/api').replace('/api', '');
 // ─── Toast Hook ────────────────────────────────────────────────────────────
 function useToast() {
   const [toasts, setToasts] = useState([]);
@@ -1978,14 +1978,7 @@ function FacultyProfile() {
           <div style={{ position:"relative",flexShrink:0 }}>
             <div style={{ width:80,height:80,borderRadius:"50%",border:"3px solid rgba(184,150,11,.55)",overflow:"hidden",background:T.navyLight,display:"flex",alignItems:"center",justifyContent:"center" }}>
               {personalInfo.profile_photo
-  ? <img
-      src={personalInfo.profile_photo.startsWith('http')
-  ? personalInfo.profile_photo
-  : `${BASE_URL}${personalInfo.profile_photo}`}
-      alt="Profile"
-      style={{ width:"100%",height:"100%",objectFit:"cover" }}
-      onError={(e)=>{ e.target.style.display='none'; }}
-    />
+  ? <img src={personalInfo.profile_photo} alt="Profile" style={{ width:"100%",height:"100%",objectFit:"cover" }}/>
   : <span style={{ fontSize:30,fontWeight:800,color:"#fff" }}>{(personalInfo.full_name||user?.full_name||"F").charAt(0).toUpperCase()}</span>}
               {uploading && <div style={{ position:"absolute",inset:0,background:"rgba(26,39,68,.6)",display:"flex",alignItems:"center",justifyContent:"center",borderRadius:"50%" }}><Loader size={20} style={{ color:"#fff",animation:"fac-spin .7s linear infinite" }}/></div>}
             </div>
