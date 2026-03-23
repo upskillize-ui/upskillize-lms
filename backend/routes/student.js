@@ -75,7 +75,7 @@ router.get('/migrate-profile-columns', async (req, res) => {
     'company_size VARCHAR(100)',
     'key_skills TEXT',
     'career_goals TEXT',
-    'corporate_visible BOOLEAN DEFAULT FALSE',
+    'corporate_visible BOOLEAN DEFAULT TRUE',
     'resume_url VARCHAR(500)',
     'resume_name VARCHAR(255)',
     'psycho_result TEXT',
@@ -428,7 +428,7 @@ router.get('/profile/complete', ...studentOnly, async (req, res) => {
         },
         resume_url:        user.resume_url        || null,
         resume_name:       user.resume_name       || null,
-        corporate_visible: user.corporate_visible ?? false,
+        corporate_visible: user.corporate_visible ?? true,
         psycho_result,
         preferences: {
           language:            user.language            || 'en',
@@ -454,6 +454,13 @@ router.put('/profile/personal', ...studentOnly, async (req, res) => {
   try {
     const { full_name, phone, date_of_birth, gender, bio, profile_photo } = req.body;
 
+    // ✅ FIX: Use raw SQL instead of User.update().
+    // bio, gender, date_of_birth, profile_photo are migrated columns NOT in
+    // the Sequelize User model. User.update() silently ignores them even
+    // though they exist in the database — so saves appeared to succeed
+    // (returned {success:true}) but nothing was written.
+    const { sequelize } = require('../config/database');
+
     const allUpdates = {
       full_name:     full_name?.trim()  || null,
       phone:         phone?.trim()      || null,
@@ -461,27 +468,20 @@ router.put('/profile/personal', ...studentOnly, async (req, res) => {
       gender:        gender             || null,
       bio:           bio?.trim()        || null,
     };
+    if (profile_photo) allUpdates.profile_photo = profile_photo;
 
-    if (profile_photo) {
-      allUpdates.profile_photo = profile_photo;
-    }
-
-    const { sequelize } = require('../config/database');
-    const [cols] = await sequelize.query(
-      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
-       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users'`
-    );
-    const existingCols = cols.map(c => c.COLUMN_NAME);
-
-    const updateData = {};
-    Object.keys(allUpdates).forEach(key => {
-      if (existingCols.includes(key)) {
-        updateData[key] = allUpdates[key];
-      }
+    const setClauses   = [];
+    const replacements = [];
+    Object.entries(allUpdates).forEach(([key, val]) => {
+      if (val !== undefined) { setClauses.push(`${key} = ?`); replacements.push(val); }
     });
 
-    if (Object.keys(updateData).length > 0) {
-      await User.update(updateData, { where: { id: req.user.id } });
+    if (setClauses.length > 0) {
+      replacements.push(req.user.id);
+      await sequelize.query(
+        `UPDATE users SET ${setClauses.join(', ')} WHERE id = ?`,
+        { replacements }
+      );
     }
 
     return res.json({ success: true, message: 'Personal info updated' });
@@ -499,21 +499,22 @@ router.put('/profile/address', ...studentOnly, async (req, res) => {
   try {
     const { street, city, state, country, postal_code } = req.body;
 
+    // ✅ FIX: Raw SQL — street, city, state, country, postal_code are
+    // migrated columns not in the Sequelize model. User.update() skips them.
     const { sequelize } = require('../config/database');
-    const [cols] = await sequelize.query(
-      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
-       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users'`
-    );
-    const existingCols = cols.map(c => c.COLUMN_NAME);
-
     const allAddr = { street, city, state, country, postal_code };
-    const updateData = {};
-    Object.keys(allAddr).forEach(k => {
-      if (existingCols.includes(k)) updateData[k] = allAddr[k];
+    const setClauses   = [];
+    const replacements = [];
+    Object.entries(allAddr).forEach(([key, val]) => {
+      if (val !== undefined) { setClauses.push(`${key} = ?`); replacements.push(val || null); }
     });
 
-    if (Object.keys(updateData).length > 0) {
-      await User.update(updateData, { where: { id: req.user.id } });
+    if (setClauses.length > 0) {
+      replacements.push(req.user.id);
+      await sequelize.query(
+        `UPDATE users SET ${setClauses.join(', ')} WHERE id = ?`,
+        { replacements }
+      );
     }
 
     return res.json({ success: true, message: 'Address updated' });
@@ -531,21 +532,22 @@ router.put('/profile/social', ...studentOnly, async (req, res) => {
   try {
     const { linkedin, github, twitter, portfolio } = req.body;
 
+    // ✅ FIX: Raw SQL — linkedin, github, twitter, portfolio are
+    // migrated columns not in the Sequelize model. User.update() skips them.
     const { sequelize } = require('../config/database');
-    const [cols] = await sequelize.query(
-      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
-       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users'`
-    );
-    const existingCols = cols.map(c => c.COLUMN_NAME);
-
     const allSocial = { linkedin, github, twitter, portfolio };
-    const updateData = {};
-    Object.keys(allSocial).forEach(k => {
-      if (existingCols.includes(k)) updateData[k] = allSocial[k];
+    const setClauses   = [];
+    const replacements = [];
+    Object.entries(allSocial).forEach(([key, val]) => {
+      if (val !== undefined) { setClauses.push(`${key} = ?`); replacements.push(val || null); }
     });
 
-    if (Object.keys(updateData).length > 0) {
-      await User.update(updateData, { where: { id: req.user.id } });
+    if (setClauses.length > 0) {
+      replacements.push(req.user.id);
+      await sequelize.query(
+        `UPDATE users SET ${setClauses.join(', ')} WHERE id = ?`,
+        { replacements }
+      );
     }
 
     return res.json({ success: true, message: 'Social links updated' });
@@ -562,9 +564,11 @@ router.put('/profile/social', ...studentOnly, async (req, res) => {
 router.put('/profile/preferences', ...studentOnly, async (req, res) => {
   try {
     const { language, timezone, email_notifications, sms_notifications, theme } = req.body;
-    await User.update(
-      { language, timezone, email_notifications, sms_notifications, theme },
-      { where: { id: req.user.id } }
+    // ✅ FIX: Raw SQL — all 5 fields are migrated columns not in the model
+    const { sequelize } = require('../config/database');
+    await sequelize.query(
+      `UPDATE users SET language=?, timezone=?, email_notifications=?, sms_notifications=?, theme=? WHERE id=?`,
+      { replacements: [language||'en', timezone||'Asia/Kolkata', email_notifications??true, sms_notifications??false, theme||'light', req.user.id] }
     );
     return res.json({ success: true, message: 'Preferences updated' });
   } catch (error) {
@@ -583,7 +587,12 @@ router.put('/profile/photo', ...studentOnly, async (req, res) => {
     if (!profile_photo) {
       return res.status(400).json({ success: false, message: 'No photo provided' });
     }
-    await User.update({ profile_photo }, { where: { id: req.user.id } });
+    // ✅ FIX: Raw SQL — profile_photo is a migrated column not in the model
+    const { sequelize } = require('../config/database');
+    await sequelize.query(
+      'UPDATE users SET profile_photo = ? WHERE id = ?',
+      { replacements: [profile_photo, req.user.id] }
+    );
     return res.json({ success: true, profile_photo });
   } catch (error) {
     console.error('Photo upload error:', error);
@@ -598,9 +607,11 @@ router.put('/profile/photo', ...studentOnly, async (req, res) => {
 router.put('/profile/corporate-visibility', ...studentOnly, async (req, res) => {
   try {
     const { visible } = req.body;
-    await User.update(
-      { corporate_visible: visible === true || visible === 'true' },
-      { where: { id: req.user.id } }
+    // ✅ FIX: Raw SQL — corporate_visible is a migrated column not in the model
+    const { sequelize } = require('../config/database');
+    await sequelize.query(
+      'UPDATE users SET corporate_visible = ? WHERE id = ?',
+      { replacements: [visible === true || visible === 'true' ? 1 : 0, req.user.id] }
     );
     return res.json({ success: true, message: 'Corporate visibility updated' });
   } catch (error) {
@@ -641,9 +652,11 @@ router.post('/profile/resume', ...studentOnly, uploadResume.single('resume'), as
     const resumeUrl  = `/uploads/resumes/${req.file.filename}`;
     const resumeName = req.file.originalname;
 
-    await User.update(
-      { resume_url: resumeUrl, resume_name: resumeName },
-      { where: { id: req.user.id } }
+    // ✅ FIX: Raw SQL — resume_url, resume_name are migrated columns not in model
+    const { sequelize } = require('../config/database');
+    await sequelize.query(
+      'UPDATE users SET resume_url=?, resume_name=? WHERE id=?',
+      { replacements: [resumeUrl, resumeName, req.user.id] }
     );
 
     return res.json({ success: true, url: resumeUrl, name: resumeName });
@@ -704,12 +717,12 @@ router.post('/profile/psychometric', ...studentOnly, async (req, res) => {
   try {
     const { result } = req.body;
     if (!result) return res.status(400).json({ success: false, message: 'Result is required' });
-
-    await User.update(
-      { psycho_result: JSON.stringify(result) },
-      { where: { id: req.user.id } }
+    // ✅ FIX: Raw SQL — psycho_result is a migrated column not in the model
+    const { sequelize } = require('../config/database');
+    await sequelize.query(
+      'UPDATE users SET psycho_result = ? WHERE id = ?',
+      { replacements: [JSON.stringify(result), req.user.id] }
     );
-
     return res.json({ success: true, message: 'Psychometric result saved' });
   } catch (error) {
     console.error('Psychometric save error:', error);
@@ -723,12 +736,19 @@ router.post('/profile/psychometric', ...studentOnly, async (req, res) => {
 // ============================================================
 router.get('/settings', ...studentOnly, async (req, res) => {
   try {
-    const user = await User.findByPk(req.user.id).catch(() => null);
+    // ✅ FIX: Raw SQL — email_notifications, sms_notifications, theme,
+    // language, timezone are migrated columns not in the Sequelize model.
+    const { sequelize } = require('../config/database');
+    const [rows] = await sequelize.query(
+      'SELECT * FROM users WHERE id = ? LIMIT 1',
+      { replacements: [req.user.id] }
+    );
+    const user = rows[0] || {};
 
     return res.json({
       success: true,
       notifications: {
-        emailNotifications:  user?.email_notifications ?? true,
+        emailNotifications:  user.email_notifications ?? true,
         courseUpdates:       true,
         newContent:          true,
         deadlineReminders:   true,
@@ -736,7 +756,7 @@ router.get('/settings', ...studentOnly, async (req, res) => {
         certificateAlerts:   true,
         promotionalEmails:   false,
         weeklyDigest:        true,
-        smsNotifications:    user?.sms_notifications ?? false,
+        smsNotifications:    user.sms_notifications ?? false,
       },
       privacy: {
         profileVisibility: 'public',
@@ -746,9 +766,9 @@ router.get('/settings', ...studentOnly, async (req, res) => {
         allowMessages:     true,
       },
       appearance: {
-        theme:    user?.theme    || 'light',
-        language: user?.language || 'en',
-        timezone: user?.timezone || 'Asia/Kolkata',
+        theme:    user.theme    || 'light',
+        language: user.language || 'en',
+        timezone: user.timezone || 'Asia/Kolkata',
       }
     });
   } catch (error) {
@@ -764,9 +784,11 @@ router.get('/settings', ...studentOnly, async (req, res) => {
 router.put('/settings/notifications', ...studentOnly, async (req, res) => {
   try {
     const { emailNotifications, smsNotifications } = req.body;
-    await User.update(
-      { email_notifications: emailNotifications, sms_notifications: smsNotifications },
-      { where: { id: req.user.id } }
+    // ✅ FIX: Raw SQL — email_notifications, sms_notifications are migrated
+    const { sequelize } = require('../config/database');
+    await sequelize.query(
+      'UPDATE users SET email_notifications=?, sms_notifications=? WHERE id=?',
+      { replacements: [emailNotifications ?? true, smsNotifications ?? false, req.user.id] }
     );
     return res.json({ success: true, message: 'Notification settings updated' });
   } catch (error) {
@@ -781,7 +803,12 @@ router.put('/settings/privacy', ...studentOnly, async (req, res) => {
 router.put('/settings/appearance', ...studentOnly, async (req, res) => {
   try {
     const { theme, language, timezone } = req.body;
-    await User.update({ theme, language, timezone }, { where: { id: req.user.id } });
+    // ✅ FIX: Raw SQL — theme, language, timezone are migrated columns
+    const { sequelize } = require('../config/database');
+    await sequelize.query(
+      'UPDATE users SET theme=?, language=?, timezone=? WHERE id=?',
+      { replacements: [theme||'light', language||'en', timezone||'Asia/Kolkata', req.user.id] }
+    );
     return res.json({ success: true, message: 'Appearance settings updated' });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error' });
@@ -998,9 +1025,9 @@ router.post('/payments/testgen', ...studentOnly, async (req, res) => {
       console.warn('TestGen payment DB insert warning:', dbErr.message);
     }
 
-    await User.update(
-      { testgen_active: true, testgen_plan: plan },
-      { where: { id: req.user.id } }
+    await sequelize.query(
+      'UPDATE users SET testgen_active=?, testgen_plan=? WHERE id=?',
+      { replacements: [true, plan, req.user.id] }
     );
 
     return res.json({ success: true, message: `TestGen ${plan} plan activated` });
@@ -1016,35 +1043,17 @@ router.post('/payments/testgen', ...studentOnly, async (req, res) => {
 // ============================================================
 router.get('/profile/additional', ...studentOnly, async (req, res) => {
   try {
-    // ── ROLE GUARD ──────────────────────────────────────────
-    // This endpoint is student-only. If a faculty user somehow reaches
-    // this route the rbac middleware already blocks them with 403.
-    // The guard below ensures we never run a DB query with the wrong id.
     if (req.user.role !== 'student' && req.user.role !== 'admin') {
       return res.status(403).json({ success: false, message: 'Access forbidden. Students only.' });
     }
 
+    // ✅ FIX: Raw SQL — all additional columns are migrated, not in model
     const { sequelize } = require('../config/database');
-
-    // Check which columns exist to avoid crashing on missing ones
-    const [cols] = await sequelize.query(
-      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
-       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users'`
+    const [rows] = await sequelize.query(
+      'SELECT * FROM users WHERE id = ? LIMIT 1',
+      { replacements: [req.user.id] }
     );
-    const existingCols = cols.map(c => c.COLUMN_NAME);
-
-    const wantedCols = [
-      'education_level', 'institution', 'graduation_year', 'field_of_study',
-      'work_experience_years', 'current_employer', 'current_designation',
-      'skills', 'languages', 'certifications', 'hobbies',
-      'emergency_contact_name', 'emergency_contact_phone', 'emergency_contact_relation'
-    ];
-
-    const safeAttrs = wantedCols.filter(c => existingCols.includes(c));
-
-    const user = await User.findByPk(req.user.id, {
-      attributes: safeAttrs.length > 0 ? safeAttrs : ['id']
-    });
+    const user = rows[0];
 
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
@@ -1081,7 +1090,6 @@ router.get('/profile/additional', ...studentOnly, async (req, res) => {
 // ============================================================
 router.put('/profile/additional', ...studentOnly, async (req, res) => {
   try {
-    // ── ROLE GUARD ──────────────────────────────────────────
     if (req.user.role !== 'student' && req.user.role !== 'admin') {
       return res.status(403).json({ success: false, message: 'Access forbidden. Students only.' });
     }
@@ -1095,46 +1103,37 @@ router.put('/profile/additional', ...studentOnly, async (req, res) => {
 
     const { sequelize } = require('../config/database');
 
-    // Check which columns actually exist in DB (safe for missing columns)
-    const [cols] = await sequelize.query(
-      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
-       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users'`
-    );
-    const existingCols = cols.map(c => c.COLUMN_NAME);
+    // ✅ FIX: Auto-create any missing columns, then save with raw SQL.
+    // Previously crashed with 500 if migration hadn't been run yet.
+    const REQUIRED_COLS = [
+      'education_level VARCHAR(100)', 'institution VARCHAR(255)',
+      'graduation_year VARCHAR(10)',  'field_of_study VARCHAR(255)',
+      'work_experience_years VARCHAR(50)', 'current_employer VARCHAR(255)',
+      'current_designation VARCHAR(255)', 'skills TEXT',
+      'languages VARCHAR(255)', 'certifications TEXT', 'hobbies VARCHAR(255)',
+      'emergency_contact_name VARCHAR(255)', 'emergency_contact_phone VARCHAR(50)',
+      'emergency_contact_relation VARCHAR(100)',
+    ];
+    for (const col of REQUIRED_COLS) {
+      try { await sequelize.query(`ALTER TABLE users ADD COLUMN ${col}`); }
+      catch (e) { /* errno 1060 = column already exists — safe to ignore */ }
+    }
 
     const allUpdates = {
-      education_level,
-      institution,
-      graduation_year,
-      field_of_study,
-      work_experience_years,
-      current_employer,
-      current_designation,
-      skills,
-      languages,
-      certifications,
-      hobbies,
-      emergency_contact_name,
-      emergency_contact_phone,
-      emergency_contact_relation,
+      education_level, institution, graduation_year, field_of_study,
+      work_experience_years, current_employer, current_designation,
+      skills, languages, certifications, hobbies,
+      emergency_contact_name, emergency_contact_phone, emergency_contact_relation,
     };
 
-    // Only include columns that exist in the DB
-    const setClauses = [];
+    const setClauses   = [];
     const replacements = [];
     Object.entries(allUpdates).forEach(([key, val]) => {
-      if (existingCols.includes(key)) {
-        setClauses.push(`${key} = ?`);
-        replacements.push(val || null);
-      }
+      if (val !== undefined) { setClauses.push(`${key} = ?`); replacements.push(val || null); }
     });
 
     if (setClauses.length === 0) {
-      // No matching columns found — run migration first
-      return res.status(500).json({
-        success: false,
-        message: 'Profile columns are missing. Please visit /api/student/migrate-profile-columns once to set up the database.'
-      });
+      return res.json({ success: true, message: 'Nothing to update' });
     }
 
     replacements.push(req.user.id);

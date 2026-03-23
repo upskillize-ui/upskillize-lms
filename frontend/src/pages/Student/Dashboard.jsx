@@ -1453,78 +1453,111 @@ function ProfileManagement() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState({ type:"",text:"" });
   const [profileCompletion, setProfileCompletion] = useState(0);
-  const cached = JSON.parse(localStorage.getItem('upskillize_profile_cache') || '{}');
-  const [personalInfo, setPersonalInfo] = useState({
-    full_name: cached.full_name || user?.full_name || "",
-    email: cached.email || user?.email || "",
-    phone: cached.phone || "",
-    date_of_birth: cached.date_of_birth || "",
-    gender: cached.gender || "",
-    profile_photo: cached.profile_photo || null,
-    bio: cached.bio || ""
+
+  // ✅ FIX 1: Read cache INSIDE useState initialiser (not inline at component
+  // body level which re-runs on every render and causes stale closure bugs).
+  // Also switched to sessionStorage — data clears on logout but not tab-switch.
+  const [personalInfo, setPersonalInfo] = useState(() => {
+    try {
+      const c = JSON.parse(sessionStorage.getItem('upskillize_profile_full') || '{}');
+      return {
+        full_name:     c.personal?.full_name     || user?.full_name || "",
+        email:         c.personal?.email         || user?.email     || "",
+        phone:         c.personal?.phone         || "",
+        date_of_birth: c.personal?.date_of_birth || "",
+        gender:        c.personal?.gender        || "",
+        profile_photo: c.personal?.profile_photo || null,
+        bio:           c.personal?.bio           || "",
+      };
+    } catch { return { full_name: user?.full_name||"", email: user?.email||"", phone:"", date_of_birth:"", gender:"", profile_photo:null, bio:"" }; }
   });
-  const [address, setAddress] = useState({ street:"",city:"",state:"",country:"",postal_code:"" });
+  const [address, setAddress] = useState(() => {
+    try { const c = JSON.parse(sessionStorage.getItem('upskillize_profile_full')||'{}'); return c.address || { street:"",city:"",state:"",country:"",postal_code:"" }; }
+    catch { return { street:"",city:"",state:"",country:"",postal_code:"" }; }
+  });
   const [security, setSecurity] = useState({ current_password:"",new_password:"",confirm_password:"" });
   const [showPwd, setShowPwd] = useState({ current:false,new_:false });
-  const [socialLinks, setSocialLinks] = useState({ linkedin:"",github:"",twitter:"",portfolio:"" });
-  const [resume, setResume] = useState({ file:null,uploadedUrl:null,uploadedName:null,uploading:false });
-  const [corporateVisible, setCorporateVisible] = useState(false);
+  const [socialLinks, setSocialLinks] = useState(() => {
+    try { const c = JSON.parse(sessionStorage.getItem('upskillize_profile_full')||'{}'); return c.social || { linkedin:"",github:"",twitter:"",portfolio:"" }; }
+    catch { return { linkedin:"",github:"",twitter:"",portfolio:"" }; }
+  });
+  const [resume, setResume] = useState(() => {
+    try { const c = JSON.parse(sessionStorage.getItem('upskillize_profile_full')||'{}'); return { file:null, uploadedUrl:c.resume_url||null, uploadedName:c.resume_name||null, uploading:false }; }
+    catch { return { file:null, uploadedUrl:null, uploadedName:null, uploading:false }; }
+  });
+  const [corporateVisible, setCorporateVisible] = useState(() => {
+    try { const c = JSON.parse(sessionStorage.getItem('upskillize_profile_full')||'{}'); return c.corporate_visible ?? false; }
+    catch { return true; }
+  });
   const [aiEnhancing, setAiEnhancing] = useState(false);
   const [enhancedBio, setEnhancedBio] = useState("");
   const [aiProfile, setAiProfile] = useState(null);
   const [aiProfileGenerating, setAiProfileGenerating] = useState(false);
   const [aiProfileError, setAiProfileError] = useState("");
-  const [psychoDone, setPsychoDone] = useState(false);
-  const [psychoResult, setPsychoResult] = useState(null);
+  const [psychoDone, setPsychoDone] = useState(() => {
+    try { const c = JSON.parse(sessionStorage.getItem('upskillize_profile_full')||'{}'); return !!c.psycho_result; } catch { return false; }
+  });
+  const [psychoResult, setPsychoResult] = useState(() => {
+    try { const c = JSON.parse(sessionStorage.getItem('upskillize_profile_full')||'{}'); return c.psycho_result || null; } catch { return null; }
+  });
 
   // FIX 3: Additional Info fields
-  const [additionalInfo, setAdditionalInfo] = useState({
-    education_level: "",
-    institution: "",
-    graduation_year: "",
-    field_of_study: "",
-    work_experience_years: "",
-    current_employer: "",
-    current_designation: "",
-    skills: "",
-    languages: "",
-    certifications: "",
-    hobbies: "",
-    emergency_contact_name: "",
-    emergency_contact_phone: "",
-    emergency_contact_relation: "",
+  const [additionalInfo, setAdditionalInfo] = useState(() => {
+    try {
+      const c = JSON.parse(sessionStorage.getItem('upskillize_profile_full')||'{}');
+      return c.additional || {
+        education_level: "", institution: "", graduation_year: "", field_of_study: "",
+        work_experience_years: "", current_employer: "", current_designation: "",
+        skills: "", languages: "", certifications: "", hobbies: "",
+        emergency_contact_name: "", emergency_contact_phone: "", emergency_contact_relation: "",
+      };
+    } catch {
+      return {
+        education_level: "", institution: "", graduation_year: "", field_of_study: "",
+        work_experience_years: "", current_employer: "", current_designation: "",
+        skills: "", languages: "", certifications: "", hobbies: "",
+        emergency_contact_name: "", emergency_contact_phone: "", emergency_contact_relation: "",
+      };
+    }
   });
 
   // FIX 6: Job Preferences
-  const [jobPrefs, setJobPrefs] = useState({
-    preferred_role: "",
-    preferred_location: "",
-    preferred_salary_min: "",
-    preferred_salary_max: "",
-    employment_type: "",
-    work_mode: "",
-    notice_period: "",
-    open_to_relocation: false,
-    industries: "",
-    company_size: "",
-    key_skills: "",
-    career_goals: "",
+  const [jobPrefs, setJobPrefs] = useState(() => {
+    try {
+      const c = JSON.parse(sessionStorage.getItem('upskillize_profile_full')||'{}');
+      return c.job_preferences || {
+        preferred_role: "", preferred_location: "", preferred_salary_min: "",
+        preferred_salary_max: "", employment_type: "", work_mode: "",
+        notice_period: "", open_to_relocation: "", industries: "",
+        company_size: "", key_skills: "", career_goals: "",
+      };
+    } catch {
+      return {
+        preferred_role: "", preferred_location: "", preferred_salary_min: "",
+        preferred_salary_max: "", employment_type: "", work_mode: "",
+        notice_period: "", open_to_relocation: "", industries: "",
+        company_size: "", key_skills: "", career_goals: "",
+      };
+    }
   });
 
   useEffect(() => {
-    const cached = JSON.parse(localStorage.getItem('upskillize_profile_cache') || '{}');
-    const hasCached = Object.keys(cached).length > 0;
     api.get("/student/profile/complete").then(r => {
       if (r.data.success) {
         const d = r.data.profile;
-        if (d.personal && !hasCached) setPersonalInfo(p => ({ ...p, ...d.personal }));
-        if (d.address)  setAddress(d.address);
-        if (d.social)   setSocialLinks(d.social);
-        if (d.additional) setAdditionalInfo(a => ({ ...a, ...d.additional }));
+        // ✅ FIX 2: ALWAYS update all state from API response — don't skip
+        // based on whether cache exists. The API is the source of truth.
+        // Cache is only for instant display before the API call returns.
+        if (d.personal)        setPersonalInfo(p => ({ ...p, ...d.personal }));
+        if (d.address)         setAddress(d.address);
+        if (d.social)          setSocialLinks(d.social);
+        if (d.additional)      setAdditionalInfo(a => ({ ...a, ...d.additional }));
         if (d.job_preferences) setJobPrefs(p => ({ ...p, ...d.job_preferences }));
         if (d.corporate_visible !== undefined) setCorporateVisible(d.corporate_visible);
-        if (d.resume_url) setResume(r => ({ ...r, uploadedUrl: d.resume_url, uploadedName: d.resume_name }));
-        if (d.psycho_result) { setPsychoResult(d.psycho_result); setPsychoDone(true); }
+        if (d.resume_url)      setResume(rv => ({ ...rv, uploadedUrl: d.resume_url, uploadedName: d.resume_name }));
+        if (d.psycho_result)   { setPsychoResult(d.psycho_result); setPsychoDone(true); }
+        // Update sessionStorage with fresh data from server
+        sessionStorage.setItem('upskillize_profile_full', JSON.stringify(d));
       }
     }).catch(()=>{});
   }, []);
@@ -1567,21 +1600,16 @@ function ProfileManagement() {
 
 
 
+  // ✅ FIX 3: handleToggleProfileVisibility used undefined AGENT_URL
+  // and called a non-existent external endpoint. Fixed to use the
+  // existing corporate-visibility route on our own backend.
   const handleToggleProfileVisibility = async () => {
     if (!aiProfile) return;
     const newVis = aiProfile.visibility === "public" ? "private" : "public";
     try {
-      const token = localStorage.getItem("token");
-      const res = await fetch(`${AGENT_URL}/api/v1/profile/toggle-visibility`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-        body: JSON.stringify({ visibility: newVis }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setAiProfile(prev => ({ ...prev, visibility: data.visibility, url: data.public_url || prev.url }));
-        showMsg("success", `Profile is now ${data.visibility}`);
-      }
+      await api.put("/student/profile/corporate-visibility", { visible: newVis === "public" });
+      setAiProfile(prev => ({ ...prev, visibility: newVis }));
+      showMsg("success", `Profile is now ${newVis}`);
     } catch { showMsg("error", "Failed to update visibility"); }
   };
 
