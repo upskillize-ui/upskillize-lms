@@ -47,7 +47,7 @@ router.get('/fix-three-columns', async (req, res) => {
 // Safe to run multiple times — skips existing columns
 // ============================================================
 router.get('/migrate-profile-columns', async (req, res) => {
-  const { sequelize } = require('../config/database');
+  
   const results = [];
   const columns = [
     'education_level VARCHAR(100)',
@@ -355,7 +355,7 @@ router.get('/profile/complete', ...studentOnly, async (req, res) => {
     // were added later via raw SQL migrations and are NOT in the model definition,
     // so findByPk() silently ignores them — causing the profile to appear blank
     // after saving. Raw SQL returns ALL actual columns from the database.
-    const { sequelize } = require('../config/database');
+    
     const [rows] = await sequelize.query(
       'SELECT * FROM users WHERE id = ? LIMIT 1',
       { replacements: [req.user.id] }
@@ -460,7 +460,7 @@ router.put('/profile/personal', ...studentOnly, async (req, res) => {
     // the Sequelize User model. User.update() silently ignores them even
     // though they exist in the database — so saves appeared to succeed
     // (returned {success:true}) but nothing was written.
-    const { sequelize } = require('../config/database');
+    
 
     const allUpdates = {
       full_name:     full_name?.trim()  || null,
@@ -534,7 +534,7 @@ router.put('/profile/social', ...studentOnly, async (req, res) => {
 
     // ✅ FIX: Raw SQL — linkedin, github, twitter, portfolio are
     // migrated columns not in the Sequelize model. User.update() skips them.
-    const { sequelize } = require('../config/database');
+    
     const allSocial = { linkedin, github, twitter, portfolio };
     const setClauses   = [];
     const replacements = [];
@@ -565,7 +565,7 @@ router.put('/profile/preferences', ...studentOnly, async (req, res) => {
   try {
     const { language, timezone, email_notifications, sms_notifications, theme } = req.body;
     // ✅ FIX: Raw SQL — all 5 fields are migrated columns not in the model
-    const { sequelize } = require('../config/database');
+    
     await sequelize.query(
       `UPDATE users SET language=?, timezone=?, email_notifications=?, sms_notifications=?, theme=? WHERE id=?`,
       { replacements: [language||'en', timezone||'Asia/Kolkata', email_notifications??true, sms_notifications??false, theme||'light', req.user.id] }
@@ -588,7 +588,7 @@ router.put('/profile/photo', ...studentOnly, async (req, res) => {
       return res.status(400).json({ success: false, message: 'No photo provided' });
     }
     // ✅ FIX: Raw SQL — profile_photo is a migrated column not in the model
-    const { sequelize } = require('../config/database');
+    
     await sequelize.query(
       'UPDATE users SET profile_photo = ? WHERE id = ?',
       { replacements: [profile_photo, req.user.id] }
@@ -608,7 +608,7 @@ router.put('/profile/corporate-visibility', ...studentOnly, async (req, res) => 
   try {
     const { visible } = req.body;
     // ✅ FIX: Raw SQL — corporate_visible is a migrated column not in the model
-    const { sequelize } = require('../config/database');
+    
     await sequelize.query(
       'UPDATE users SET corporate_visible = ? WHERE id = ?',
       { replacements: [visible === true || visible === 'true' ? 1 : 0, req.user.id] }
@@ -653,7 +653,7 @@ router.post('/profile/resume', ...studentOnly, uploadResume.single('resume'), as
     const resumeName = req.file.originalname;
 
     // ✅ FIX: Raw SQL — resume_url, resume_name are migrated columns not in model
-    const { sequelize } = require('../config/database');
+    
     await sequelize.query(
       'UPDATE users SET resume_url=?, resume_name=? WHERE id=?',
       { replacements: [resumeUrl, resumeName, req.user.id] }
@@ -718,7 +718,7 @@ router.post('/profile/psychometric', ...studentOnly, async (req, res) => {
     const { result } = req.body;
     if (!result) return res.status(400).json({ success: false, message: 'Result is required' });
     // ✅ FIX: Raw SQL — psycho_result is a migrated column not in the model
-    const { sequelize } = require('../config/database');
+    
     await sequelize.query(
       'UPDATE users SET psycho_result = ? WHERE id = ?',
       { replacements: [JSON.stringify(result), req.user.id] }
@@ -738,7 +738,7 @@ router.get('/settings', ...studentOnly, async (req, res) => {
   try {
     // ✅ FIX: Raw SQL — email_notifications, sms_notifications, theme,
     // language, timezone are migrated columns not in the Sequelize model.
-    const { sequelize } = require('../config/database');
+    
     const [rows] = await sequelize.query(
       'SELECT * FROM users WHERE id = ? LIMIT 1',
       { replacements: [req.user.id] }
@@ -785,7 +785,7 @@ router.put('/settings/notifications', ...studentOnly, async (req, res) => {
   try {
     const { emailNotifications, smsNotifications } = req.body;
     // ✅ FIX: Raw SQL — email_notifications, sms_notifications are migrated
-    const { sequelize } = require('../config/database');
+    
     await sequelize.query(
       'UPDATE users SET email_notifications=?, sms_notifications=? WHERE id=?',
       { replacements: [emailNotifications ?? true, smsNotifications ?? false, req.user.id] }
@@ -804,7 +804,7 @@ router.put('/settings/appearance', ...studentOnly, async (req, res) => {
   try {
     const { theme, language, timezone } = req.body;
     // ✅ FIX: Raw SQL — theme, language, timezone are migrated columns
-    const { sequelize } = require('../config/database');
+    
     await sequelize.query(
       'UPDATE users SET theme=?, language=?, timezone=? WHERE id=?',
       { replacements: [theme||'light', language||'en', timezone||'Asia/Kolkata', req.user.id] }
@@ -886,7 +886,7 @@ router.get('/certificates/:id/download', ...studentOnly, async (req, res) => {
 // ============================================================
 router.get('/assignments', ...studentOnly, async (req, res) => {
   try {
-    const { sequelize } = require('../config/database');
+    
     const studentRecord = await Student.findOne({ where: { user_id: req.user.id } });
     if (!studentRecord) return res.json({ success: true, assignments: [] });
 
@@ -971,7 +971,7 @@ router.get('/assignments', ...studentOnly, async (req, res) => {
 // ============================================================
 router.post('/assignments/:id/submit', ...studentOnly, async (req, res) => {
   try {
-    const { sequelize } = require('../config/database');
+    
     const studentRecord = await Student.findOne({ where: { user_id: req.user.id } });
     if (!studentRecord) return res.status(403).json({ success: false, message: 'Student not found' });
 
@@ -1015,7 +1015,7 @@ router.post('/payments/testgen', ...studentOnly, async (req, res) => {
     const amount = plan === 'annual' ? 3999 : 499;
 
     try {
-      const { sequelize } = require('../config/database');
+      
       await sequelize.query(
         `INSERT INTO payments (user_id, plan_type, amount, status, transaction_id, created_at, updated_at)
          VALUES (?, ?, ?, 'success', ?, NOW(), NOW())`,
@@ -1048,7 +1048,7 @@ router.get('/profile/additional', ...studentOnly, async (req, res) => {
     }
 
     // ✅ FIX: Raw SQL — all additional columns are migrated, not in model
-    const { sequelize } = require('../config/database');
+    
     const [rows] = await sequelize.query(
       'SELECT * FROM users WHERE id = ? LIMIT 1',
       { replacements: [req.user.id] }
@@ -1101,7 +1101,7 @@ router.put('/profile/additional', ...studentOnly, async (req, res) => {
       emergency_contact_name, emergency_contact_phone, emergency_contact_relation
     } = req.body;
 
-    const { sequelize } = require('../config/database');
+    
 
     // ✅ FIX: Auto-create any missing columns, then save with raw SQL.
     // Previously crashed with 500 if migration hadn't been run yet.
@@ -1161,7 +1161,7 @@ router.put('/profile/job-preferences', ...studentOnly, async (req, res) => {
       industries, company_size, key_skills, career_goals
     } = req.body;
 
-    const { sequelize } = require('../config/database');
+    
 
     // Raw SQL — bypasses Sequelize model cache, works in production
     await sequelize.query(
