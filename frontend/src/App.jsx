@@ -98,14 +98,6 @@ function AppRoutes() {
       />
 
       <Route
-        path="/student/attendance"
-        element={
-          <PrivateRoute allowedRoles={["student"]}>
-            <StudentAttendance />
-          </PrivateRoute>
-        }
-      />
-      <Route
         path="/student/*"
         element={
           <PrivateRoute allowedRoles={["student"]}>
@@ -116,14 +108,6 @@ function AppRoutes() {
 
       {/* Protected Routes - Faculty */}
       <Route
-        path="/faculty/attendance"
-        element={
-          <PrivateRoute allowedRoles={["faculty"]}>
-            <FacultyAttendance />
-          </PrivateRoute>
-        }
-      />
-      <Route
         path="/faculty/*"
         element={
           <PrivateRoute allowedRoles={["faculty"]}>
@@ -133,14 +117,6 @@ function AppRoutes() {
       />
 
       {/* Protected Routes - Admin */}
-      <Route
-        path="/admin/attendance"
-        element={
-          <PrivateRoute allowedRoles={["admin"]}>
-            <AdminAttendance />
-          </PrivateRoute>
-        }
-      />
       <Route
         path="/admin/*"
         element={
