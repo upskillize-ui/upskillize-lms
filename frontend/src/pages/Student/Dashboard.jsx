@@ -4,7 +4,7 @@ import {
 } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import api from "../../services/api";
-import CoursePlayer from "./CoursePlayer";import StudentAttendance from "./StudentAttendance";import StudentAttendance from "./StudentAttendance";
+import CoursePlayer from "./CoursePlayer";import StudentAttendance from "./StudentAttendance";
 import TestGen from "./TestGen";
 import BrowseCourses from "../../pages/BrowseCourses";
 import AiRevPanel from "../../components/AiRevPanel";
