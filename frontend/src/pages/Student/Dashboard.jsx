@@ -4,7 +4,7 @@ import {
 } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import api from "../../services/api";
-import CoursePlayer from "./CoursePlayer";
+import CoursePlayer from "./CoursePlayer";import StudentAttendance from "./StudentAttendance";import StudentAttendance from "./StudentAttendance";
 import BrowseCourses from "../../pages/BrowseCourses";
 import AiRevPanel from "../../components/AiRevPanel";
 import AIEnhancer from "../../components/AIEnhancer";
@@ -4061,7 +4061,7 @@ export default function StudentDashboard() {
               {/* FIX 15: Doubts — separate */}
               <Route path="/doubts"                     element={<StudentDoubts />} />
  
-              <Route path="/classes"                    element={<ClassesSchedule />} />
+              <Route path="/classes"                    element={<ClassesSchedule />} />              <Route path="/attendance"                 element={<StudentAttendance />} />              <Route path="/attendance"                 element={<StudentAttendance />} />
  
               {/* Career */}
               <Route path="/jobs"                       element={<JobsModule />} />

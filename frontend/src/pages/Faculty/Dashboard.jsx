@@ -7,6 +7,7 @@
 //   Discussion Forum, Doubts, Notifications, Profile, Settings
 // ============================================================
 
+import FacultyAttendance from "./FacultyAttendance";
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
   Routes, Route, Link, useLocation, useNavigate, useParams,
@@ -3825,6 +3826,7 @@ export default function FacultyDashboard() {
               <Route path="/assessments"             element={<FacultyAssessments />} />
               <Route path="/assessments/new"         element={<FacultyAssessments />} />
               <Route path="/classes"                 element={<FacultyClasses />} />
+              <Route path="/attendance"              element={<FacultyAttendance />} />
               <Route path="/classes/new"             element={<FacultyClasses />} />
               {/* AI Tools */}
               <Route path="/ai-review"               element={<FacultyAIReview />} />
