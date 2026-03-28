@@ -7,6 +7,8 @@ import {
   useLocation,
   useNavigate,
 } from "react-router-dom";
+import NudgeAgent from "./NudgeAgent";
+import AdminAttendance from "./AdminAttendance";
 import { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
 import api from "../../services/api";
@@ -2533,6 +2535,8 @@ export default function AdminDashboard() {
               <Route path="/course-approval" element={<CourseApproval />} />
               <Route path="/payments" element={<Payments />} />
               <Route path="/analytics" element={<Analytics />} />
+              <Route path="/nudge-agent" element={<NudgeAgent />} />
+              <Route path="/attendance" element={<AdminAttendance />} />
               <Route path="/testGen" element={<BrainDrillMonitor />} />
               <Route
                 path="/content-moderation"
