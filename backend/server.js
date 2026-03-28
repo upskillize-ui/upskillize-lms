@@ -116,6 +116,7 @@ app.use("/api/forum", require("./routes/forum"));
 // ── BrainDrill AI Agent routes ───────────────────────────────────────────────
 app.use("/api/testgen", require("./routes/testgen"));
 app.use("/api/test-sessions", require("./routes/testSessionRoutes"));
+app.use("/api/attendance", require("./routes/attendance"));
 app.use(nudgeRouter);
 app.set('nudge', nudge);
 
