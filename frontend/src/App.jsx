@@ -8,6 +8,9 @@ import TestGen from "./pages/Student/TestGen";
 import CaseStudyReview from "./pages/Student/CaseStudyReview";
 import FacultyDashboard from "./pages/Faculty/Dashboard";
 import AdminDashboard from "./pages/Admin/Dashboard";
+import StudentAttendance from "./pages/Student/StudentAttendance";
+import FacultyAttendance from "./pages/Faculty/FacultyAttendance";
+import AdminAttendance from "./pages/Admin/AdminAttendance";
 
 
 import BrowseCourses from "./pages/BrowseCourses";
@@ -105,6 +108,14 @@ function AppRoutes() {
       />
 
       <Route
+        path="/student/attendance"
+        element={
+          <PrivateRoute allowedRoles={["student"]}>
+            <StudentAttendance />
+          </PrivateRoute>
+        }
+      />
+      <Route
         path="/student/*"
         element={
           <PrivateRoute allowedRoles={["student"]}>
@@ -115,6 +126,14 @@ function AppRoutes() {
 
       {/* Protected Routes - Faculty */}
       <Route
+        path="/faculty/attendance"
+        element={
+          <PrivateRoute allowedRoles={["faculty"]}>
+            <FacultyAttendance />
+          </PrivateRoute>
+        }
+      />
+      <Route
         path="/faculty/*"
         element={
           <PrivateRoute allowedRoles={["faculty"]}>
@@ -124,6 +143,14 @@ function AppRoutes() {
       />
 
       {/* Protected Routes - Admin */}
+      <Route
+        path="/admin/attendance"
+        element={
+          <PrivateRoute allowedRoles={["admin"]}>
+            <AdminAttendance />
+          </PrivateRoute>
+        }
+      />
       <Route
         path="/admin/*"
         element={
