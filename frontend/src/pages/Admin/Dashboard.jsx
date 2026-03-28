@@ -242,7 +242,7 @@ function Overview() {
               sub: "Moderate",
             },
             {
-              to: "/admin/reports",
+              to: "/admin/attendance",              icon: Activity,              label: "Attendance",              sub: "Student activity",            },            {              to: "/admin/reports",
               icon: FileText,
               label: "Reports",
               sub: "Generate",

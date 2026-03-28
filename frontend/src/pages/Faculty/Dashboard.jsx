@@ -3614,7 +3614,7 @@ export default function FacultyDashboard() {
         { path: "/faculty/students",     label: "Students",          icon: Users,        keywords: ["student", "enrolled", "progress", "learner"] },
         { path: "/faculty/assignments",  label: "Assignments",       icon: FilePen,      keywords: ["assignment", "grade", "submit", "homework"] },
         { path: "/faculty/assessments",  label: "Assessments",       icon: ClipboardList,keywords: ["quiz", "test", "mcq", "assessment", "exam"] },
-        { path: "/faculty/classes",      label: "Live Classes",      icon: CalendarDays, keywords: ["live", "zoom", "schedule", "class", "session"] },
+        { path: "/faculty/classes",      label: "Live Classes",      icon: CalendarDays, keywords: ["live", "zoom", "schedule", "class", "session"] },        { path: "/faculty/attendance",   label: "Attendance",         icon: ClipboardList, keywords: ["attendance", "watch", "activity", "track"] },
       ],
     },
     {

@@ -3778,7 +3778,7 @@ export default function StudentDashboard() {
         { path:"/student/browse",           label:"Browse Courses",  icon:ShoppingBag,   keywords:["explore","buy","new courses"] },
         { path:"/student/assignments",      label:"Assignments",     icon:FilePen,       keywords:["homework","submit","upload"] },
         { path:"/student/assessments",      label:"Assessments",     icon:ClipboardList, keywords:["quiz","test","exam","mcq"] }, // FIX 10
-        { path:"/student/classes",          label:"Class Schedule",  icon:CalendarDays,  keywords:["live","zoom","session","timetable"] },
+        { path:"/student/classes",          label:"Class Schedule",  icon:CalendarDays,  keywords:["live","zoom","session","timetable"] },        { path:"/student/attendance",       label:"Attendance",      icon:Activity,      keywords:["attendance","watch","activity","track"] },
         { path:"/student/discussion-forum", label:"Discussion Forum",icon:MessageSquare, keywords:["discuss","topic","forum","post"] },
         { path:"/student/doubts",           label:"My Doubts",       icon:HelpCircle,    keywords:["doubt","question","ask","help"] }, // FIX 15
       ],
