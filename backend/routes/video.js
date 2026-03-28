@@ -32,6 +32,11 @@ router.post('/track', authMiddleware, rbac(['student']), async (req, res) => {
     }
 
     res.json({ success: true, history });
+
+    // Nudge AI: track recording watch progress
+    const nudge = req.app.get('nudge');
+    if (nudge && percentage >= 20) nudge.recordingWatched(String(req.user.roleDataId),    String(lesson_id), Math.floor(percentage)).catch(() => {});
+
   } catch (error) {
     res.status(500).json({ success: false, message: 'Error tracking video' });
   }

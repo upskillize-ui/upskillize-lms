@@ -198,6 +198,10 @@ router.post('/:id/submit', authMiddleware, rbac(['student']), async (req, res) =
       submitted_at: new Date()
     });
 
+    // Nudge AI: track quiz score
+    const nudge = req.app.get('nudge');
+    if (nudge) nudge.quizScored(String(student.id), String(quiz.course_id || ''), quiz.title || 'Quiz', percentage, null, '', '').catch(() => {});
+
     res.json({
       success: true,
       message: passed ? '🎉 You passed!' : 'Quiz submitted. Better luck next time!',

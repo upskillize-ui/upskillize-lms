@@ -6,6 +6,7 @@ const rateLimit = require("express-rate-limit");
 const cookieParser = require("cookie-parser");
 require("dotenv").config();
 const facultyRoutes = require("./routes/facultyProfile");
+const { nudgeRouter, nudge } = require('./nudge_integration');
 const passport = require("passport");
 const path = require('path');
 
@@ -115,6 +116,8 @@ app.use("/api/forum", require("./routes/forum"));
 // ── BrainDrill AI Agent routes ───────────────────────────────────────────────
 app.use("/api/testgen", require("./routes/testgen"));
 app.use("/api/test-sessions", require("./routes/testSessionRoutes"));
+app.use(nudgeRouter);
+app.set('nudge', nudge);
 
 // ── 404 handler ──────────────────────────────────────────────────────────────
 app.use((req, res) => {

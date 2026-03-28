@@ -1029,6 +1029,9 @@ router.post('/assignments/:id/submit', ...studentOnly, async (req, res) => {
         { replacements: [assignmentId, studentRecord.id, notes || null, file_name || null] }
       );
     }
+    // Nudge AI: track assignment submission
+    const nudge = req.app.get('nudge');
+    if (nudge) nudge.assignmentSubmitted(String(assignmentId), String(studentRecord.id)).catch(() => {});
 
     res.json({ success: true, message: 'Assignment submitted successfully' });
   } catch (e) {

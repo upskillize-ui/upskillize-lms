@@ -984,6 +984,19 @@ router.post('/assignments', authMiddleware, async (req, res) => {
        VALUES (?,?,?,?,?,?,?,'active',NOW(),NOW())`,
       { replacements: [title, description || null, course_id || null, faculty.id, due_date || null, total_marks || 100, rubric ? JSON.stringify(rubric) : null] },
     );
+
+    // Nudge AI: register new assignment for tracking
+    const nudge = req.app.get('nudge');
+    if (nudge && course_id) {
+      const { Enrollment } = require('../models');
+      const enrollments = await Enrollment.findAll({ where: { course_id }, attributes: ['student_id'] });
+      const studentIds = enrollments.map(e => String(e.student_id));
+      if (studentIds.length > 0) {
+        nudge.assignmentUploaded(String(Date.now()), String(course_id), title, due_date || new Date(Date.now() + 7*24*60*60*1000).toISOString(), studentIds).catch(() => {});
+      }
+    }
+
+
     res.json({ success: true, message: 'Assignment created' });
   } catch (e) {
     console.error('POST /faculty/assignments error:', e);
