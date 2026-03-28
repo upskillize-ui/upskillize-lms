@@ -3907,7 +3907,7 @@ export default function StudentDashboard() {
           <div style={{ display:"flex",alignItems:"center",gap:8,flexShrink:0 }}>
             {/* FIX 1: Working Global Search */}
             <GlobalSearch allNavItems={allNavItems} />
-              <button className="mba-btn-primary" onClick={() => window.open(`https://upskill25-myagent.hf.space/testgen?student_id=${user?.id}&course_id=1`, '_blank')} style={{ fontSize:12,padding:"6px 12px" }}>
+              <button className="mba-btn-primary" onClick={() => navigate(`https://upskill25-myagent.hf.space/testgen?student_id=${user?.id}&course_id=1`, '_blank')} style={{ fontSize:12,padding:"6px 12px" }}>
                 <Zap size={12}/> TestGen
               </button>
  

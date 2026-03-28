@@ -1909,7 +1909,25 @@ export default function TestGen() {
     setLoading(true);
     setError(null);
     try {
-      const response = await api.post("/testgen/generate", config);
+
+// NEW (calls agent directly):
+const response = await fetch("https://upskill25-myagent.hf.space/api/generate-test", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    topic: config.topic,
+    num_questions: config.numQuestions,
+    duration_minutes: config.durationMinutes,
+    difficulty: config.difficulty,
+    question_types: config.questionTypes,
+    student_id: String(user?.id || "anonymous"),
+    course_id: config.courseId,
+    lecture_id: config.lectureId,
+  }),
+});
+const data = await response.json();
+if (!response.ok) throw new Error(data.detail || "Failed");
+setTestData({ success: true, ...data });
       if (response.data.success) {
         setTestData(response.data);
       } else {
@@ -1937,12 +1955,20 @@ export default function TestGen() {
 
   const onSubmit = async (testId, questions, answers, timeTakenSeconds) => {
     try {
-      const response = await api.post("/testgen/submit", {
-        testId,
-        questions,
-        answers,
-        timeTakenSeconds,
-      });
+      const response = await fetch("https://upskill25-myagent.hf.space/api/submit-answers", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    test_id: testId,
+    student_id: String(user?.id || "anonymous"),
+    questions,
+    answers,
+    time_taken_seconds: timeTakenSeconds,
+  }),
+});
+const data = await response.json();
+if (!response.ok) throw new Error(data.detail || "Submit failed");
+return data;
       console.log("SUBMIT RESPONSE:", JSON.stringify(response.data, null, 2));
       // ✅ Don't clear testData here — TestTakingScreen handles the result display
       // setTestData(null) is only called via onForceExit after result is shown
