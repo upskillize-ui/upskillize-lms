@@ -1,428 +1,499 @@
 // routes/attendance.js
 // ═══════════════════════════════════════════════════════════════
-// ATTENDANCE SYSTEM — Faculty marks, Student views, Nudge AI connected
+// AUTOMATIC ATTENDANCE — No manual marking by faculty
+//
+// How it works:
+// 1. Student opens a lesson → auto-marks "joined" with timestamp
+// 2. Video player sends progress → updates watch duration
+// 3. Student closes/leaves → marks "left" with timestamp
+// 4. Faculty, student, admin can all VIEW the data
 // ═══════════════════════════════════════════════════════════════
 
 const express = require('express');
 const router = express.Router();
-const { Faculty, Student, Course, Enrollment, User } = require('../models');
+const { Faculty, Student, Course, Enrollment, User, Lesson, CourseModule } = require('../models');
 const authMiddleware = require('../middleware/auth');
 const rbac = require('../middleware/rbac');
 const db = require('../models');
 const sequelize = db.sequelize;
 
 // ─────────────────────────────────────────────────────────────
-// AUTO-CREATE TABLES ON FIRST USE
+// AUTO-CREATE TABLE ON FIRST USE
 // ─────────────────────────────────────────────────────────────
-let _tablesReady = false;
-async function ensureTables() {
-  if (_tablesReady) return;
+let _tableReady = false;
+async function ensureTable() {
+  if (_tableReady) return;
   await sequelize.query(`
-    CREATE TABLE IF NOT EXISTS attendance_sessions (
+    CREATE TABLE IF NOT EXISTS student_attendance (
       id INT AUTO_INCREMENT PRIMARY KEY,
-      title VARCHAR(255) NOT NULL,
+      student_id INT NOT NULL,
+      user_id INT NOT NULL,
       course_id INT NOT NULL,
-      batch_id INT DEFAULT NULL,
-      faculty_id INT NOT NULL,
+      lesson_id INT DEFAULT NULL,
+      lesson_title VARCHAR(255) DEFAULT '',
       session_date DATE NOT NULL,
-      session_type VARCHAR(20) DEFAULT 'live',
-      status VARCHAR(20) DEFAULT 'open',
+      joined_at DATETIME NOT NULL,
+      left_at DATETIME DEFAULT NULL,
+      duration_minutes INT DEFAULT 0,
+      watch_percent INT DEFAULT 0,
+      status VARCHAR(20) DEFAULT 'joined',
+      ip_address VARCHAR(50) DEFAULT '',
+      device VARCHAR(100) DEFAULT '',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY unique_student_lesson_date (student_id, lesson_id, session_date)
+    )
+  `);
+  await sequelize.query(`
+    CREATE TABLE IF NOT EXISTS student_logins (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT NOT NULL,
+      student_id INT DEFAULT NULL,
+      login_at DATETIME NOT NULL,
+      logout_at DATETIME DEFAULT NULL,
+      duration_minutes INT DEFAULT 0,
+      ip_address VARCHAR(50) DEFAULT '',
+      device VARCHAR(255) DEFAULT '',
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `);
-  await sequelize.query(`
-    CREATE TABLE IF NOT EXISTS attendance_records (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      session_id INT NOT NULL,
-      student_id INT NOT NULL,
-      course_id INT NOT NULL,
-      status VARCHAR(20) DEFAULT 'absent',
-      marked_by INT DEFAULT NULL,
-      marked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE KEY unique_session_student (session_id, student_id)
-    )
-  `);
-  _tablesReady = true;
+  _tableReady = true;
 }
 
 // ═════════════════════════════════════════════════════════════
-// FACULTY: Create attendance session
-// POST /api/attendance/session
+// AUTO-RECORD: Student OPENS a lesson
+// POST /api/attendance/join
+// Frontend calls this when student clicks on any lesson
+// Body: { lesson_id, course_id }
 // ═════════════════════════════════════════════════════════════
-router.post('/session', authMiddleware, rbac(['faculty', 'admin']), async (req, res) => {
+router.post('/join', authMiddleware, rbac(['student']), async (req, res) => {
   try {
-    await ensureTables();
-    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
-    if (!faculty) return res.status(404).json({ success: false, message: 'Faculty not found' });
+    await ensureTable();
+    const student = await Student.findOne({ where: { user_id: req.user.id } });
+    if (!student) return res.status(404).json({ success: false, message: 'Student not found' });
 
-    const { title, course_id, batch_id, session_date, session_type } = req.body;
-    if (!title || !course_id) {
-      return res.status(400).json({ success: false, message: 'Title and course_id are required' });
+    const { lesson_id, course_id } = req.body;
+    if (!lesson_id) return res.status(400).json({ success: false, message: 'lesson_id is required' });
+
+    // Get lesson title
+    let lessonTitle = '';
+    try {
+      const lesson = await Lesson.findByPk(lesson_id);
+      lessonTitle = lesson?.title || lesson?.lesson_title || '';
+    } catch (e) {}
+
+    // Determine course_id from lesson if not provided
+    let cId = course_id;
+    if (!cId) {
+      try {
+        const lesson = await Lesson.findByPk(lesson_id, { include: [{ model: CourseModule }] });
+        cId = lesson?.CourseModule?.course_id || 0;
+      } catch (e) {}
     }
 
-    const [result] = await sequelize.query(
-      `INSERT INTO attendance_sessions (title, course_id, batch_id, faculty_id, session_date, session_type, status, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, 'open', NOW())`,
-      { replacements: [title, course_id, batch_id || null, faculty.id, session_date || new Date().toISOString().split('T')[0], session_type || 'live'] }
-    );
+    const today = new Date().toISOString().split('T')[0];
+    const now = new Date();
+    const ip = req.headers['x-forwarded-for'] || req.connection?.remoteAddress || '';
+    const device = req.headers['user-agent'] || '';
 
-    // Get all enrolled students for this course and pre-fill as absent
-    const enrollments = await Enrollment.findAll({
-      where: { course_id },
-      attributes: ['student_id']
-    });
-
-    for (const e of enrollments) {
-      await sequelize.query(
-        `INSERT IGNORE INTO attendance_records (session_id, student_id, course_id, status, marked_at)
-         VALUES (?, ?, ?, 'absent', NOW())`,
-        { replacements: [result, e.student_id, course_id] }
-      ).catch(() => {});
-    }
-
-    res.json({
-      success: true,
-      message: 'Attendance session created',
-      session_id: result,
-      students_count: enrollments.length
-    });
-  } catch (error) {
-    console.error('POST /attendance/session error:', error);
-    res.status(500).json({ success: false, message: 'Error creating session', error: error.message });
-  }
-});
-
-// ═════════════════════════════════════════════════════════════
-// FACULTY: Get all sessions for their courses
-// GET /api/attendance/sessions
-// ═════════════════════════════════════════════════════════════
-router.get('/sessions', authMiddleware, rbac(['faculty', 'admin']), async (req, res) => {
-  try {
-    await ensureTables();
-    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
-    if (!faculty) return res.json({ success: true, sessions: [] });
-
-    const { course_id } = req.query;
-    let query = `SELECT s.*, c.course_name,
-                   (SELECT COUNT(*) FROM attendance_records r WHERE r.session_id = s.id AND r.status = 'present') AS present_count,
-                   (SELECT COUNT(*) FROM attendance_records r WHERE r.session_id = s.id) AS total_count
-                 FROM attendance_sessions s
-                 LEFT JOIN courses c ON c.id = s.course_id
-                 WHERE s.faculty_id = ?`;
-    const params = [faculty.id];
-
-    if (course_id) {
-      query += ' AND s.course_id = ?';
-      params.push(course_id);
-    }
-    query += ' ORDER BY s.session_date DESC, s.created_at DESC';
-
-    const [sessions] = await sequelize.query(query, { replacements: params });
-    res.json({ success: true, sessions });
-  } catch (error) {
-    console.error('GET /attendance/sessions error:', error);
-    res.json({ success: true, sessions: [] });
-  }
-});
-
-// ═════════════════════════════════════════════════════════════
-// FACULTY: Get students for a session (to mark attendance)
-// GET /api/attendance/session/:id/students
-// ═════════════════════════════════════════════════════════════
-router.get('/session/:id/students', authMiddleware, rbac(['faculty', 'admin']), async (req, res) => {
-  try {
-    await ensureTables();
-    const sessionId = req.params.id;
-
-    const [session] = await sequelize.query(
-      'SELECT * FROM attendance_sessions WHERE id = ? LIMIT 1',
-      { replacements: [sessionId] }
-    );
-    if (!session.length) return res.status(404).json({ success: false, message: 'Session not found' });
-
-    const [students] = await sequelize.query(
-      `SELECT r.id AS record_id, r.student_id, r.status, r.marked_at,
-              u.full_name, u.email, u.profile_photo
-       FROM attendance_records r
-       LEFT JOIN students st ON st.id = r.student_id
-       LEFT JOIN users u ON u.id = st.user_id
-       WHERE r.session_id = ?
-       ORDER BY u.full_name ASC`,
-      { replacements: [sessionId] }
-    );
-
-    res.json({
-      success: true,
-      session: session[0],
-      students,
-      summary: {
-        total: students.length,
-        present: students.filter(s => s.status === 'present').length,
-        absent: students.filter(s => s.status === 'absent').length,
-        late: students.filter(s => s.status === 'late').length,
-      }
-    });
-  } catch (error) {
-    console.error('GET /attendance/session/:id/students error:', error);
-    res.status(500).json({ success: false, message: 'Error fetching students' });
-  }
-});
-
-// ═════════════════════════════════════════════════════════════
-// FACULTY: Mark attendance for ONE student
-// POST /api/attendance/mark
-// Body: { session_id, student_id, status: 'present'|'absent'|'late' }
-// ═════════════════════════════════════════════════════════════
-router.post('/mark', authMiddleware, rbac(['faculty', 'admin']), async (req, res) => {
-  try {
-    await ensureTables();
-    const { session_id, student_id, status } = req.body;
-    if (!session_id || !student_id || !status) {
-      return res.status(400).json({ success: false, message: 'session_id, student_id, and status are required' });
-    }
-
-    const validStatuses = ['present', 'absent', 'late'];
-    if (!validStatuses.includes(status)) {
-      return res.status(400).json({ success: false, message: 'Status must be: present, absent, or late' });
-    }
-
-    // Get session info
-    const [session] = await sequelize.query(
-      'SELECT * FROM attendance_sessions WHERE id = ? LIMIT 1',
-      { replacements: [session_id] }
-    );
-    if (!session.length) return res.status(404).json({ success: false, message: 'Session not found' });
-
-    // Update or insert attendance record
+    // Check if already joined this lesson today
     const [existing] = await sequelize.query(
-      'SELECT id FROM attendance_records WHERE session_id = ? AND student_id = ? LIMIT 1',
-      { replacements: [session_id, student_id] }
+      'SELECT id, joined_at FROM student_attendance WHERE student_id = ? AND lesson_id = ? AND session_date = ? LIMIT 1',
+      { replacements: [student.id, lesson_id, today] }
     );
 
     if (existing.length) {
       await sequelize.query(
-        'UPDATE attendance_records SET status = ?, marked_by = ?, marked_at = NOW() WHERE session_id = ? AND student_id = ?',
-        { replacements: [status, req.user.id, session_id, student_id] }
+        "UPDATE student_attendance SET status = 'watching', updated_at = NOW() WHERE id = ?",
+        { replacements: [existing[0].id] }
       );
     } else {
       await sequelize.query(
-        'INSERT INTO attendance_records (session_id, student_id, course_id, status, marked_by, marked_at) VALUES (?, ?, ?, ?, ?, NOW())',
-        { replacements: [session_id, student_id, session[0].course_id, status, req.user.id] }
+        `INSERT INTO student_attendance
+         (student_id, user_id, course_id, lesson_id, lesson_title, session_date, joined_at, status, ip_address, device)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'joined', ?, ?)`,
+        { replacements: [student.id, req.user.id, cId || 0, lesson_id, lessonTitle, today, now, ip, device.substring(0, 100)] }
       );
-    }
 
-    // ══════════════════════════════════════════════════════════
-    // NUDGE AI: Send attendance to agent
-    // ══════════════════════════════════════════════════════════
-    const nudge = req.app.get('nudge');
-    if (nudge) {
-      try {
-        // Get student name
-        const student = await Student.findByPk(student_id, {
-          include: [{ model: User, as: 'user', attributes: ['full_name'] }]
-        });
-        const studentName = student?.user?.full_name || '';
-
-        // Get batch_id if available
-        const batchId = session[0].batch_id
-          ? `batch_${session[0].batch_id}`
-          : `course_${session[0].course_id}`;
-
-        // Get faculty name as mentor_id
-        const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
-        const mentorId = faculty ? `faculty_${faculty.id}` : '';
-
+      // Nudge AI: student is active (attended)
+      const nudge = req.app.get('nudge');
+      if (nudge && cId) {
+        const user = await User.findByPk(req.user.id, { attributes: ['full_name'] });
         nudge.attendance(
-          String(student_id),               // user_id
-          String(session[0].course_id),      // course_id
-          batchId,                           // batch_id
-          status === 'present' || status === 'late',  // attended (late = attended)
-          session[0].title || '',            // lecture_title
-          mentorId,                          // mentor_id
-          studentName                        // student_name
+          String(student.id), String(cId), `course_${cId}`,
+          true, lessonTitle, '', user?.full_name || ''
         ).catch(() => {});
-      } catch (nudgeErr) {
-        console.warn('Nudge attendance failed (non-critical):', nudgeErr.message);
       }
     }
 
-    res.json({ success: true, message: `Marked ${status}` });
+    res.json({ success: true, message: 'Attendance recorded', joined_at: now });
   } catch (error) {
-    console.error('POST /attendance/mark error:', error);
-    res.status(500).json({ success: false, message: 'Error marking attendance', error: error.message });
+    console.error('POST /attendance/join error:', error);
+    res.status(500).json({ success: false, message: 'Error recording attendance', error: error.message });
   }
 });
 
 // ═════════════════════════════════════════════════════════════
-// FACULTY: Mark attendance for ALL students at once (bulk)
-// POST /api/attendance/mark-bulk
-// Body: { session_id, records: [{ student_id, status }] }
+// AUTO-UPDATE: Video player sends progress
+// POST /api/attendance/progress
+// Body: { lesson_id, watch_percent, current_minutes }
 // ═════════════════════════════════════════════════════════════
-router.post('/mark-bulk', authMiddleware, rbac(['faculty', 'admin']), async (req, res) => {
+router.post('/progress', authMiddleware, rbac(['student']), async (req, res) => {
   try {
-    await ensureTables();
-    const { session_id, records } = req.body;
-    if (!session_id || !records || !records.length) {
-      return res.status(400).json({ success: false, message: 'session_id and records are required' });
-    }
+    await ensureTable();
+    const student = await Student.findOne({ where: { user_id: req.user.id } });
+    if (!student) return res.json({ success: true });
 
-    // Get session info
-    const [session] = await sequelize.query(
-      'SELECT * FROM attendance_sessions WHERE id = ? LIMIT 1',
-      { replacements: [session_id] }
-    );
-    if (!session.length) return res.status(404).json({ success: false, message: 'Session not found' });
+    const { lesson_id, watch_percent, current_minutes } = req.body;
+    const today = new Date().toISOString().split('T')[0];
 
-    let marked = 0;
-    const nudge = req.app.get('nudge');
-
-    for (const record of records) {
-      const { student_id, status } = record;
-      if (!student_id || !status) continue;
-
-      const [existing] = await sequelize.query(
-        'SELECT id FROM attendance_records WHERE session_id = ? AND student_id = ? LIMIT 1',
-        { replacements: [session_id, student_id] }
-      );
-
-      if (existing.length) {
-        await sequelize.query(
-          'UPDATE attendance_records SET status = ?, marked_by = ?, marked_at = NOW() WHERE session_id = ? AND student_id = ?',
-          { replacements: [status, req.user.id, session_id, student_id] }
-        );
-      } else {
-        await sequelize.query(
-          'INSERT INTO attendance_records (session_id, student_id, course_id, status, marked_by, marked_at) VALUES (?, ?, ?, ?, ?, NOW())',
-          { replacements: [session_id, student_id, session[0].course_id, status, req.user.id] }
-        );
-      }
-      marked++;
-
-      // Send to Nudge AI
-      if (nudge) {
-        const batchId = session[0].batch_id
-          ? `batch_${session[0].batch_id}`
-          : `course_${session[0].course_id}`;
-
-        nudge.attendance(
-          String(student_id),
-          String(session[0].course_id),
-          batchId,
-          status === 'present' || status === 'late',
-          session[0].title || '',
-          '',
-          ''
-        ).catch(() => {});
-      }
-    }
-
-    // Close the session after bulk marking
     await sequelize.query(
-      "UPDATE attendance_sessions SET status = 'closed' WHERE id = ?",
-      { replacements: [session_id] }
+      `UPDATE student_attendance
+       SET watch_percent = GREATEST(watch_percent, ?),
+           duration_minutes = GREATEST(duration_minutes, ?),
+           status = 'watching',
+           updated_at = NOW()
+       WHERE student_id = ? AND lesson_id = ? AND session_date = ?`,
+      { replacements: [watch_percent || 0, current_minutes || 0, student.id, lesson_id, today] }
     );
 
-    res.json({ success: true, message: `Marked ${marked} students`, marked });
+    res.json({ success: true });
   } catch (error) {
-    console.error('POST /attendance/mark-bulk error:', error);
-    res.status(500).json({ success: false, message: 'Error marking bulk attendance', error: error.message });
+    res.json({ success: true }); // Silent fail — don't break video
   }
 });
 
 // ═════════════════════════════════════════════════════════════
-// FACULTY: Get attendance report for a course
-// GET /api/attendance/report?course_id=1
+// AUTO-RECORD: Student LEAVES a lesson
+// POST /api/attendance/leave
+// Frontend calls this on page unload / navigation away
+// Body: { lesson_id }
 // ═════════════════════════════════════════════════════════════
-router.get('/report', authMiddleware, rbac(['faculty', 'admin']), async (req, res) => {
+router.post('/leave', authMiddleware, rbac(['student']), async (req, res) => {
   try {
-    await ensureTables();
-    const { course_id, batch_id } = req.query;
-    if (!course_id) return res.status(400).json({ success: false, message: 'course_id is required' });
+    await ensureTable();
+    const student = await Student.findOne({ where: { user_id: req.user.id } });
+    if (!student) return res.json({ success: true });
 
-    const [report] = await sequelize.query(
-      `SELECT r.student_id, u.full_name, u.email,
-              COUNT(*) AS total_sessions,
-              SUM(CASE WHEN r.status = 'present' THEN 1 ELSE 0 END) AS present_count,
-              SUM(CASE WHEN r.status = 'absent' THEN 1 ELSE 0 END) AS absent_count,
-              SUM(CASE WHEN r.status = 'late' THEN 1 ELSE 0 END) AS late_count,
-              ROUND(SUM(CASE WHEN r.status IN ('present','late') THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 1) AS attendance_pct
-       FROM attendance_records r
-       LEFT JOIN students st ON st.id = r.student_id
-       LEFT JOIN users u ON u.id = st.user_id
-       WHERE r.course_id = ?
-       GROUP BY r.student_id, u.full_name, u.email
-       ORDER BY attendance_pct ASC`,
-      { replacements: [course_id] }
+    const { lesson_id } = req.body;
+    const today = new Date().toISOString().split('T')[0];
+
+    const [record] = await sequelize.query(
+      'SELECT id, joined_at FROM student_attendance WHERE student_id = ? AND lesson_id = ? AND session_date = ? LIMIT 1',
+      { replacements: [student.id, lesson_id, today] }
+    );
+
+    if (record.length) {
+      const joinedAt = new Date(record[0].joined_at);
+      const now = new Date();
+      const durationMin = Math.round((now - joinedAt) / 60000);
+
+      await sequelize.query(
+        `UPDATE student_attendance
+         SET left_at = ?, duration_minutes = GREATEST(duration_minutes, ?), status = 'completed', updated_at = NOW()
+         WHERE id = ?`,
+        { replacements: [now, durationMin, record[0].id] }
+      );
+    }
+
+    res.json({ success: true, message: 'Session ended' });
+  } catch (error) {
+    res.json({ success: true });
+  }
+});
+
+// ═════════════════════════════════════════════════════════════
+// Track login (call from auth.js after successful login)
+// POST /api/attendance/login
+// ═════════════════════════════════════════════════════════════
+router.post('/login', authMiddleware, async (req, res) => {
+  try {
+    await ensureTable();
+    const student = await Student.findOne({ where: { user_id: req.user.id } });
+    const ip = req.headers['x-forwarded-for'] || req.connection?.remoteAddress || '';
+    const device = req.headers['user-agent'] || '';
+
+    await sequelize.query(
+      `INSERT INTO student_logins (user_id, student_id, login_at, ip_address, device)
+       VALUES (?, ?, NOW(), ?, ?)`,
+      { replacements: [req.user.id, student?.id || null, ip, device.substring(0, 255)] }
+    );
+
+    // Nudge AI: track login for ML data
+    const nudge = req.app.get('nudge');
+    if (nudge) nudge.login(String(req.user.id), '', 0).catch(() => {});
+
+    res.json({ success: true });
+  } catch (error) {
+    res.json({ success: true });
+  }
+});
+
+// ═════════════════════════════════════════════════════════════
+// STUDENT VIEW: My attendance
+// GET /api/attendance/my?course_id=5
+// ═════════════════════════════════════════════════════════════
+router.get('/my', authMiddleware, rbac(['student']), async (req, res) => {
+  try {
+    await ensureTable();
+    const student = await Student.findOne({ where: { user_id: req.user.id } });
+    if (!student) return res.json({ success: true, records: [], summary: [], logins: [] });
+
+    const { course_id } = req.query;
+
+    let query = `SELECT a.*, c.course_name
+                 FROM student_attendance a
+                 LEFT JOIN courses c ON c.id = a.course_id
+                 WHERE a.student_id = ?`;
+    const params = [student.id];
+    if (course_id) { query += ' AND a.course_id = ?'; params.push(course_id); }
+    query += ' ORDER BY a.session_date DESC, a.joined_at DESC LIMIT 100';
+
+    const [records] = await sequelize.query(query, { replacements: params });
+
+    const [summary] = await sequelize.query(
+      `SELECT a.course_id, c.course_name,
+              COUNT(DISTINCT a.session_date) AS days_attended,
+              COUNT(DISTINCT a.lesson_id) AS lessons_watched,
+              SUM(a.duration_minutes) AS total_minutes,
+              ROUND(AVG(a.watch_percent), 0) AS avg_watch_percent
+       FROM student_attendance a
+       LEFT JOIN courses c ON c.id = a.course_id
+       WHERE a.student_id = ?
+       ${course_id ? 'AND a.course_id = ?' : ''}
+       GROUP BY a.course_id, c.course_name`,
+      { replacements: course_id ? [student.id, course_id] : [student.id] }
+    );
+
+    const [logins] = await sequelize.query(
+      `SELECT login_at, ip_address, device FROM student_logins
+       WHERE user_id = ? ORDER BY login_at DESC LIMIT 20`,
+      { replacements: [req.user.id] }
     );
 
     res.json({
       success: true,
-      report,
-      summary: {
-        total_students: report.length,
-        below_75: report.filter(r => r.attendance_pct < 75).length,
-        below_50: report.filter(r => r.attendance_pct < 50).length,
-      }
+      records: records.map(r => ({
+        ...r,
+        joined_at: r.joined_at,
+        left_at: r.left_at,
+        duration: `${r.duration_minutes || 0} min`,
+        watch_percent: r.watch_percent || 0,
+      })),
+      summary: summary.map(s => ({
+        ...s,
+        total_hours: Math.round((s.total_minutes || 0) / 60 * 10) / 10,
+      })),
+      logins,
     });
   } catch (error) {
-    console.error('GET /attendance/report error:', error);
-    res.status(500).json({ success: false, message: 'Error fetching report' });
+    console.error('GET /attendance/my error:', error);
+    res.json({ success: true, records: [], summary: [], logins: [] });
   }
 });
 
 // ═════════════════════════════════════════════════════════════
-// STUDENT: View my attendance
-// GET /api/attendance/my
+// FACULTY/MENTOR VIEW: Attendance for their course
+// GET /api/attendance/course/:course_id
 // ═════════════════════════════════════════════════════════════
-router.get('/my', authMiddleware, rbac(['student']), async (req, res) => {
+router.get('/course/:course_id', authMiddleware, rbac(['faculty', 'admin']), async (req, res) => {
   try {
-    await ensureTables();
-    const student = await Student.findOne({ where: { user_id: req.user.id } });
-    if (!student) return res.json({ success: true, attendance: [] });
+    await ensureTable();
+    const courseId = req.params.course_id;
 
+    const [students] = await sequelize.query(
+      `SELECT a.student_id, u.full_name, u.email, u.profile_photo,
+              COUNT(DISTINCT a.session_date) AS days_attended,
+              COUNT(DISTINCT a.lesson_id) AS lessons_watched,
+              SUM(a.duration_minutes) AS total_minutes,
+              ROUND(AVG(a.watch_percent), 0) AS avg_watch_percent,
+              MAX(a.joined_at) AS last_active,
+              MIN(a.joined_at) AS first_active
+       FROM student_attendance a
+       LEFT JOIN students st ON st.id = a.student_id
+       LEFT JOIN users u ON u.id = st.user_id
+       WHERE a.course_id = ?
+       GROUP BY a.student_id, u.full_name, u.email, u.profile_photo
+       ORDER BY last_active DESC`,
+      { replacements: [courseId] }
+    );
+
+    const [lessonCount] = await sequelize.query(
+      `SELECT COUNT(*) AS total FROM lessons l
+       JOIN course_modules cm ON cm.id = l.course_module_id
+       WHERE cm.course_id = ?`,
+      { replacements: [courseId] }
+    );
+    const totalLessons = lessonCount[0]?.total || 0;
+
+    const enriched = students.map(s => ({
+      ...s,
+      total_hours: Math.round((s.total_minutes || 0) / 60 * 10) / 10,
+      lesson_progress: totalLessons > 0
+        ? Math.round(((s.lessons_watched || 0) / totalLessons) * 100) : 0,
+      status: (s.total_minutes || 0) === 0 ? 'inactive'
+        : (s.avg_watch_percent || 0) >= 70 ? 'active' : 'at_risk'
+    }));
+
+    res.json({
+      success: true,
+      course_id: courseId,
+      total_lessons: totalLessons,
+      total_students: students.length,
+      students: enriched,
+      at_risk: enriched.filter(s => s.status === 'at_risk').length,
+      inactive: enriched.filter(s => s.status === 'inactive').length,
+    });
+  } catch (error) {
+    console.error('GET /attendance/course error:', error);
+    res.status(500).json({ success: false, message: 'Error fetching attendance' });
+  }
+});
+
+// ═════════════════════════════════════════════════════════════
+// FACULTY: Detailed timeline for ONE student
+// GET /api/attendance/student/:student_id?course_id=5
+// ═════════════════════════════════════════════════════════════
+router.get('/student/:student_id', authMiddleware, rbac(['faculty', 'admin']), async (req, res) => {
+  try {
+    await ensureTable();
+    const studentId = req.params.student_id;
     const { course_id } = req.query;
-    let query = `SELECT r.status, r.marked_at, s.title, s.session_date, s.session_type,
-                        c.course_name, c.id AS course_id
-                 FROM attendance_records r
-                 LEFT JOIN attendance_sessions s ON s.id = r.session_id
-                 LEFT JOIN courses c ON c.id = r.course_id
-                 WHERE r.student_id = ?`;
-    const params = [student.id];
 
-    if (course_id) {
-      query += ' AND r.course_id = ?';
-      params.push(course_id);
-    }
-    query += ' ORDER BY s.session_date DESC';
+    const student = await Student.findByPk(studentId, {
+      include: [{ model: User, as: 'user', attributes: ['full_name', 'email', 'profile_photo'] }]
+    });
+
+    let query = `SELECT a.*, c.course_name
+                 FROM student_attendance a
+                 LEFT JOIN courses c ON c.id = a.course_id
+                 WHERE a.student_id = ?`;
+    const params = [studentId];
+    if (course_id) { query += ' AND a.course_id = ?'; params.push(course_id); }
+    query += ' ORDER BY a.joined_at DESC LIMIT 200';
 
     const [records] = await sequelize.query(query, { replacements: params });
 
-    // Calculate summary per course
-    const courseMap = {};
-    for (const r of records) {
-      const cid = r.course_id;
-      if (!courseMap[cid]) {
-        courseMap[cid] = { course_name: r.course_name, total: 0, present: 0, absent: 0, late: 0 };
-      }
-      courseMap[cid].total++;
-      if (r.status === 'present') courseMap[cid].present++;
-      else if (r.status === 'absent') courseMap[cid].absent++;
-      else if (r.status === 'late') courseMap[cid].late++;
-    }
+    const [logins] = await sequelize.query(
+      `SELECT login_at, ip_address, device FROM student_logins
+       WHERE student_id = ? ORDER BY login_at DESC LIMIT 30`,
+      { replacements: [studentId] }
+    );
 
-    const summary = Object.entries(courseMap).map(([cid, data]) => ({
-      course_id: parseInt(cid),
-      course_name: data.course_name,
-      total: data.total,
-      present: data.present + data.late,
-      absent: data.absent,
-      percentage: data.total > 0 ? Math.round(((data.present + data.late) / data.total) * 100) : 0,
-    }));
+    const [courseSummary] = await sequelize.query(
+      `SELECT a.course_id, c.course_name,
+              COUNT(DISTINCT a.session_date) AS days_attended,
+              COUNT(DISTINCT a.lesson_id) AS lessons_watched,
+              SUM(a.duration_minutes) AS total_minutes,
+              ROUND(AVG(a.watch_percent), 0) AS avg_watch_percent,
+              MAX(a.joined_at) AS last_active
+       FROM student_attendance a
+       LEFT JOIN courses c ON c.id = a.course_id
+       WHERE a.student_id = ?
+       ${course_id ? 'AND a.course_id = ?' : ''}
+       GROUP BY a.course_id, c.course_name`,
+      { replacements: course_id ? [studentId, course_id] : [studentId] }
+    );
 
-    res.json({ success: true, records, summary });
+    res.json({
+      success: true,
+      student: {
+        id: studentId,
+        name: student?.user?.full_name || 'Unknown',
+        email: student?.user?.email || '',
+        photo: student?.user?.profile_photo || null,
+      },
+      records: records.map(r => ({
+        ...r,
+        duration: `${r.duration_minutes || 0} min`,
+      })),
+      logins,
+      course_summary: courseSummary.map(s => ({
+        ...s,
+        total_hours: Math.round((s.total_minutes || 0) / 60 * 10) / 10,
+      })),
+    });
   } catch (error) {
-    console.error('GET /attendance/my error:', error);
-    res.json({ success: true, records: [], summary: [] });
+    console.error('GET /attendance/student error:', error);
+    res.status(500).json({ success: false, message: 'Error fetching student attendance' });
+  }
+});
+
+// ═════════════════════════════════════════════════════════════
+// ADMIN VIEW: Attendance across ALL courses
+// GET /api/attendance/admin/overview?days=30
+// ═════════════════════════════════════════════════════════════
+router.get('/admin/overview', authMiddleware, rbac(['admin']), async (req, res) => {
+  try {
+    await ensureTable();
+    const { days } = req.query;
+    const since = days ? `AND a.session_date >= DATE_SUB(CURDATE(), INTERVAL ${parseInt(days)} DAY)` : '';
+
+    const [courses] = await sequelize.query(
+      `SELECT a.course_id, c.course_name,
+              COUNT(DISTINCT a.student_id) AS active_students,
+              COUNT(DISTINCT a.session_date) AS active_days,
+              SUM(a.duration_minutes) AS total_minutes,
+              ROUND(AVG(a.watch_percent), 0) AS avg_watch_percent
+       FROM student_attendance a
+       LEFT JOIN courses c ON c.id = a.course_id
+       WHERE 1=1 ${since}
+       GROUP BY a.course_id, c.course_name
+       ORDER BY active_students DESC`
+    );
+
+    const [daily] = await sequelize.query(
+      `SELECT session_date, COUNT(DISTINCT student_id) AS active_students
+       FROM student_attendance
+       WHERE session_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+       GROUP BY session_date ORDER BY session_date ASC`
+    );
+
+    const [loginsToday] = await sequelize.query(
+      `SELECT COUNT(*) AS cnt FROM student_logins WHERE DATE(login_at) = CURDATE()`
+    );
+
+    const [inactive] = await sequelize.query(
+      `SELECT s.id AS student_id, u.full_name, u.email,
+              MAX(a.joined_at) AS last_active,
+              DATEDIFF(NOW(), MAX(a.joined_at)) AS days_inactive
+       FROM students s
+       LEFT JOIN users u ON u.id = s.user_id
+       LEFT JOIN student_attendance a ON a.student_id = s.id
+       GROUP BY s.id, u.full_name, u.email
+       HAVING days_inactive >= 7 OR last_active IS NULL
+       ORDER BY days_inactive DESC LIMIT 50`
+    );
+
+    res.json({
+      success: true,
+      logins_today: loginsToday[0]?.cnt || 0,
+      courses: courses.map(c => ({ ...c, total_hours: Math.round((c.total_minutes || 0) / 60) })),
+      daily_active: daily,
+      inactive_students: inactive,
+    });
+  } catch (error) {
+    console.error('GET /attendance/admin/overview error:', error);
+    res.status(500).json({ success: false, message: 'Error fetching overview' });
+  }
+});
+
+// ═════════════════════════════════════════════════════════════
+// FACULTY: Get my courses (for dropdown filter)
+// GET /api/attendance/my-courses
+// ═════════════════════════════════════════════════════════════
+router.get('/my-courses', authMiddleware, rbac(['faculty', 'admin']), async (req, res) => {
+  try {
+    if (req.user.role === 'admin') {
+      const courses = await Course.findAll({ attributes: ['id', 'course_name'], where: { is_active: true } });
+      return res.json({ success: true, courses });
+    }
+    const faculty = await Faculty.findOne({ where: { user_id: req.user.id } });
+    if (!faculty) return res.json({ success: true, courses: [] });
+    const courses = await Course.findAll({ where: { faculty_id: faculty.id, is_active: true }, attributes: ['id', 'course_name'] });
+    res.json({ success: true, courses });
+  } catch (error) {
+    res.json({ success: true, courses: [] });
   }
 });
 
