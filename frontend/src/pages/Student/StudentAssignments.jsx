@@ -1,600 +1,232 @@
-// src/pages/Student/StudentAssignments.jsx
-// Extracted from Dashboard.jsx + AiRev button added
-
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import {
-  Clock,
-  CheckCircle,
-  Star,
-  AlertCircle,
-  Eye,
-  Upload,
-  X,
-  Calendar,
-  Award,
-  ClipboardList,
-  Zap,
-} from "lucide-react";
 import api from "../../services/api";
+import {
+  Clock, BookOpen, Calendar, Monitor, Activity, Eye, Layers, RefreshCw
+} from "lucide-react";
 
-export default function StudentAssignments() {
-  const navigate = useNavigate();
-  const [assignments, setAssignments] = useState([]);
+const T = {
+  navy: "#1a2744", navyLight: "#2c3e6b", gold: "#b8960b", goldSoft: "#fdf8ed",
+  goldBorder: "#e8d89a", white: "#ffffff", bg: "#f7f8fc", border: "#e8e9f0",
+  text: "#1a1a1a", muted: "#72706b", subtle: "#a8a49f",
+  redSoft: "#fdf1f0", red: "#c0392b", greenSoft: "#edf7ed", green: "#2d6a2d",
+  blueSoft: "#eef2fb", blue: "#1e3a6b",
+};
+
+export default function StudentAttendance() {
+  const [records, setRecords] = useState([]);
+  const [summary, setSummary] = useState([]);
+  const [logins, setLogins] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState("pending");
-  const [selectedAssignment, setSelectedAssignment] = useState(null);
-  const [showSubmitModal, setShowSubmitModal] = useState(false);
-  const [showDetailsModal, setShowDetailsModal] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [submitForm, setSubmitForm] = useState({ notes: "", file: null });
-  const [successMsg, setSuccessMsg] = useState("");
+  const [tab, setTab] = useState("overview");
 
-  useEffect(() => {
-    fetchAssignments();
-  }, []);
+  useEffect(() => { load(); }, []);
 
-  const fetchAssignments = async () => {
-    setLoading(true);
+  const load = async () => {
     try {
-      const res = await api.get("/student/assignments");
-      if (res.data.success) setAssignments(res.data.assignments || []);
-    } catch (e) {
-      console.error("Error fetching assignments:", e);
-    } finally {
-      setLoading(false);
-    }
+      setLoading(true);
+      const { data } = await api.get("/attendance/my");
+      setRecords(data.records || []);
+      setSummary(data.summary || []);
+      setLogins(data.logins || []);
+    } catch (e) { console.error(e); }
+    finally { setLoading(false); }
   };
 
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) setSubmitForm({ ...submitForm, file });
-  };
+  const fmt = (d) => d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "-";
+  const fmtTime = (d) => d ? new Date(d).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "-";
+  const totalHours = summary.reduce((s, c) => s + (c.total_hours || 0), 0);
+  const totalLessons = summary.reduce((s, c) => s + (c.lessons_watched || 0), 0);
+  const avgWatch = summary.length > 0 ? Math.round(summary.reduce((s, c) => s + (c.avg_watch_percent || 0), 0) / summary.length) : 0;
 
-  const handleSubmit = async () => {
-    if (!submitForm.file && !submitForm.notes.trim()) {
-      alert("Please add a file or notes before submitting.");
-      return;
-    }
-    setSubmitting(true);
-    try {
-      const formData = new FormData();
-      formData.append("notes", submitForm.notes);
-      if (submitForm.file) formData.append("file", submitForm.file);
-      const res = await api.post(
-        `/student/assignments/${selectedAssignment.id}/submit`,
-        formData,
-        { headers: { "Content-Type": "multipart/form-data" } },
-      );
-      if (res.data.success) {
-        setAssignments((prev) =>
-          prev.map((a) =>
-            a.id === selectedAssignment.id
-              ? {
-                  ...a,
-                  status: "submitted",
-                  submitted_at: new Date().toISOString(),
-                }
-              : a,
-          ),
-        );
-        setShowSubmitModal(false);
-        setSubmitForm({ notes: "", file: null });
-        setSuccessMsg("Assignment submitted successfully!");
-        setTimeout(() => setSuccessMsg(""), 4000);
-      }
-    } catch (e) {
-      alert(
-        e.response?.data?.message || "Submission failed. Please try again.",
-      );
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const getStatusBadge = (status, dueDate) => {
-    const isOverdue = new Date(dueDate) < new Date() && status === "pending";
-    if (isOverdue) return { label: "Overdue", cls: "bg-red-100 text-red-800" };
-    switch (status) {
-      case "graded":
-        return { label: "Graded", cls: "bg-purple-100 text-purple-800" };
-      case "submitted":
-        return { label: "Submitted", cls: "bg-blue-100 text-blue-800" };
-      default:
-        return { label: "Pending", cls: "bg-yellow-100 text-yellow-800" };
-    }
-  };
-
-  const getDaysLeft = (dueDate) => {
-    const diff = Math.ceil(
-      (new Date(dueDate) - new Date()) / (1000 * 60 * 60 * 24),
-    );
-    if (diff < 0)
-      return { text: `${Math.abs(diff)}d overdue`, cls: "text-red-600" };
-    if (diff === 0) return { text: "Due today", cls: "text-orange-600" };
-    if (diff <= 3) return { text: `${diff}d left`, cls: "text-orange-500" };
-    return { text: `${diff}d left`, cls: "text-green-600" };
-  };
-
-  const getMaxMarks = (a) =>
-    a.max_marks ||
-    (a.rubric?.categories?.length > 0
-      ? a.rubric.categories.reduce((s, c) => s + (parseInt(c.points) || 0), 0)
-      : a.total_marks);
-
-  const filtered = assignments.filter((a) => {
-    if (filter === "all") return true;
-    if (filter === "overdue")
-      return new Date(a.due_date) < new Date() && a.status === "pending";
-    return a.status === filter;
-  });
-
-  const counts = {
-    pending: assignments.filter(
-      (a) => a.status === "pending" && new Date(a.due_date) >= new Date(),
-    ).length,
-    submitted: assignments.filter((a) => a.status === "submitted").length,
-    graded: assignments.filter((a) => a.status === "graded").length,
-    overdue: assignments.filter(
-      (a) => a.status === "pending" && new Date(a.due_date) < new Date(),
-    ).length,
-  };
-
-  if (loading)
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500" />
-      </div>
-    );
+  if (loading) return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 300, color: T.muted, fontSize: 14 }}>
+      <RefreshCw size={18} style={{ marginRight: 8, animation: "spin 1s linear infinite" }} /> Loading attendance...
+    </div>
+  );
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-gray-900">My Assignments</h2>
-
-      {successMsg && (
-        <div className="flex items-center gap-2 bg-green-100 text-green-800 px-4 py-3 rounded-xl font-semibold">
-          <CheckCircle size={18} /> {successMsg}
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
+        <div>
+          <h2 className="mba-section-title" style={{ margin: 0 }}>Attendance</h2>
+          <p className="mba-section-sub">Your lecture activity, watch history & login records</p>
         </div>
-      )}
-
-      {/* ── Stat Cards ── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {[
-          {
-            label: "Pending",
-            count: counts.pending,
-            borderCls: "border-yellow-500",
-            iconCls: "text-yellow-500",
-            icon: Clock,
-          },
-          {
-            label: "Submitted",
-            count: counts.submitted,
-            borderCls: "border-blue-500",
-            iconCls: "text-blue-500",
-            icon: CheckCircle,
-          },
-          {
-            label: "Graded",
-            count: counts.graded,
-            borderCls: "border-purple-500",
-            iconCls: "text-purple-500",
-            icon: Star,
-          },
-          {
-            label: "Overdue",
-            count: counts.overdue,
-            borderCls: "border-red-500",
-            iconCls: "text-red-500",
-            icon: AlertCircle,
-          },
-        ].map(({ label, count, borderCls, iconCls, icon: Icon }) => (
-          <div
-            key={label}
-            className={`bg-white p-5 rounded-xl shadow-md border-l-4 ${borderCls}`}
-          >
-            <Icon className={`h-8 w-8 ${iconCls} mb-2`} />
-            <p className="text-2xl font-bold text-gray-800">{count}</p>
-            <p className="text-sm text-gray-500">{label}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* ── Filter Tabs + AiRev Button ── */}
-      <div className="flex items-center gap-2 flex-wrap">
-        {["all", "pending", "submitted", "graded", "overdue"].map((f) => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold capitalize transition ${
-              filter === f
-                ? "bg-orange-500 text-white"
-                : "bg-gray-100 hover:bg-gray-200 text-gray-700"
-            }`}
-          >
-            {f}
-            {f !== "all" && counts[f] !== undefined ? ` (${counts[f]})` : ""}
-          </button>
-        ))}
-
-        {/* ── AiRev Button ── */}
-        <button
-          onClick={() => navigate("/student/case-study")}
-          className="ml-auto flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#1e3a5f] to-[#2c5aa0] hover:from-[#164266] hover:to-[#1e5a8e] text-white rounded-lg text-sm font-semibold shadow transition-all"
-        >
-          <Zap size={15} />
-          AiRev
+        <button className="mba-btn-outline" onClick={load} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <RefreshCw size={13} /> Refresh
         </button>
       </div>
 
-      {/* ── Assignment Cards ── */}
-      {filtered.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-xl shadow-md">
-          <ClipboardList className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-          <p className="text-gray-500 text-lg">No {filter} assignments</p>
+      <div style={{ background: `linear-gradient(135deg, ${T.navy} 0%, ${T.navyLight} 100%)`, borderRadius: 12, padding: "20px 24px", marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "space-between", boxShadow: "0 4px 14px rgba(26,39,68,.2)" }}>
+        <div>
+          <p style={{ fontSize: 16, fontWeight: 700, color: "#fff", margin: 0 }}>Learning Activity</p>
+          <p style={{ fontSize: 13, color: "rgba(255,255,255,.55)", margin: "4px 0 0" }}>Track your progress across all courses</p>
         </div>
-      ) : (
-        <div className="space-y-4">
-          {filtered.map((assignment) => {
-            const badge = getStatusBadge(
-              assignment.status,
-              assignment.due_date,
-            );
-            const daysLeft = getDaysLeft(assignment.due_date);
-            const maxM = getMaxMarks(assignment);
-            const scorePercent =
-              maxM > 0 && assignment.grade != null
-                ? Math.round((assignment.grade / maxM) * 100)
-                : null;
+        <div style={{ display: "flex", gap: 28 }}>
+          {[
+            { num: summary.length, lbl: "Courses" },
+            { num: totalLessons, lbl: "Lessons" },
+            { num: `${totalHours}h`, lbl: "Hours" },
+            { num: `${avgWatch}%`, lbl: "Avg Watch" },
+          ].map((s, i) => (
+            <div key={i} style={{ textAlign: "center" }}>
+              <p style={{ fontSize: 22, fontWeight: 800, color: "#fff", margin: 0 }}>{s.num}</p>
+              <p style={{ fontSize: 11, color: "rgba(255,255,255,.5)", margin: 0 }}>{s.lbl}</p>
+            </div>
+          ))}
+        </div>
+      </div>
 
-            return (
-              <div
-                key={assignment.id}
-                className="bg-white rounded-xl shadow-md hover:shadow-lg transition p-6"
-              >
-                <div className="flex justify-between items-start mb-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">
-                        {assignment.course_name}
-                      </span>
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full font-semibold ${badge.cls}`}
-                      >
-                        {badge.label}
-                      </span>
-                    </div>
-                    <h3 className="text-lg font-bold text-gray-800">
-                      {assignment.title}
-                    </h3>
-                    <p className="text-sm text-gray-500 mt-1 line-clamp-2">
-                      {assignment.description}
-                    </p>
+      <div style={{ display: "flex", gap: 0, marginBottom: 20, borderBottom: `1.5px solid ${T.border}` }}>
+        {[
+          { key: "overview", label: "Course Overview" },
+          { key: "lectures", label: "Lecture History" },
+          { key: "logins", label: "Login History" },
+        ].map(t => (
+          <button key={t.key} onClick={() => setTab(t.key)} style={{
+            padding: "10px 20px", fontSize: 13, fontWeight: tab === t.key ? 700 : 500, cursor: "pointer",
+            background: "none", border: "none", color: tab === t.key ? T.navy : T.muted,
+            borderBottom: tab === t.key ? `2.5px solid ${T.gold}` : "2.5px solid transparent", marginBottom: -1.5,
+          }}>{t.label}</button>
+        ))}
+      </div>
+
+      {tab === "overview" && (
+        summary.length === 0 ? (
+          <div className="mba-card mba-empty" style={{ textAlign: "center", padding: 40 }}>
+            <BookOpen size={36} style={{ color: T.border, margin: "0 auto 10px" }} />
+            <p>No attendance data yet. Start watching lectures!</p>
+          </div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 14 }}>
+            {summary.map((s, i) => (
+              <div key={i} className="mba-card" style={{ overflow: "hidden", padding: 0 }}>
+                <div style={{ height: 3, background: i % 3 === 0 ? T.navy : i % 3 === 1 ? T.gold : T.green }} />
+                <div style={{ padding: 16 }}>
+                  <p style={{ fontSize: 14, fontWeight: 700, color: T.navy, margin: "0 0 14px" }}>{s.course_name}</p>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                    <MetricBox icon={<Calendar size={13} />} label="Days Active" value={s.days_attended || 0} />
+                    <MetricBox icon={<Layers size={13} />} label="Lessons" value={s.lessons_watched || 0} />
+                    <MetricBox icon={<Clock size={13} />} label="Total Hours" value={`${s.total_hours || 0}h`} />
+                    <MetricBox icon={<Eye size={13} />} label="Avg Watch" value={`${s.avg_watch_percent || 0}%`}
+                      color={(s.avg_watch_percent || 0) >= 70 ? T.green : (s.avg_watch_percent || 0) >= 40 ? T.gold : T.red} />
                   </div>
-                  {assignment.status === "graded" && scorePercent !== null && (
-                    <div
-                      className={`ml-4 flex-shrink-0 w-16 h-16 rounded-full flex items-center justify-center font-bold text-lg border-4 ${
-                        scorePercent >= 80
-                          ? "border-green-500 text-green-700 bg-green-50"
-                          : scorePercent >= 60
-                            ? "border-yellow-500 text-yellow-700 bg-yellow-50"
-                            : "border-red-400 text-red-700 bg-red-50"
-                      }`}
-                    >
-                      {scorePercent}%
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex flex-wrap gap-4 text-sm text-gray-600 mb-4">
-                  <span className="flex items-center gap-1">
-                    <Calendar size={14} /> Due:{" "}
-                    {new Date(assignment.due_date).toLocaleDateString("en-IN", {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric",
-                    })}
-                  </span>
-                  <span
-                    className={`flex items-center gap-1 font-semibold ${daysLeft.cls}`}
-                  >
-                    <Clock size={14} /> {daysLeft.text}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Star size={14} /> {assignment.total_marks} marks
-                  </span>
-                  {assignment.status === "graded" && (
-                    <span className="flex items-center gap-1 font-semibold text-purple-700">
-                      <Award size={14} /> Score:{" "}
-                      {assignment.grade != null
-                        ? `${assignment.grade}/${maxM}`
-                        : "Awaiting grade"}
-                    </span>
-                  )}
-                </div>
-
-                {assignment.rubric?.categories?.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    {assignment.rubric.categories.map((cat, i) => (
-                      <span
-                        key={i}
-                        className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded-full"
-                      >
-                        {cat.name}: {cat.points}pts
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                {assignment.status === "graded" && assignment.feedback && (
-                  <div className="bg-purple-50 border-l-4 border-purple-400 p-3 rounded-lg mb-4">
-                    <p className="text-xs font-semibold text-purple-800 mb-1">
-                      Faculty Feedback
-                    </p>
-                    <p className="text-sm text-gray-700">
-                      {assignment.feedback}
-                    </p>
-                  </div>
-                )}
-
-                {assignment.status === "submitted" &&
-                  assignment.submitted_at && (
-                    <div className="bg-blue-50 border-l-4 border-blue-400 p-3 rounded-lg mb-4">
-                      <p className="text-xs font-semibold text-blue-800">
-                        ✅ Submitted on{" "}
-                        {new Date(assignment.submitted_at).toLocaleString(
-                          "en-IN",
-                        )}
-                      </p>
-                    </div>
-                  )}
-
-                <div className="flex gap-2 flex-wrap">
-                  <button
-                    onClick={() => {
-                      setSelectedAssignment(assignment);
-                      setShowDetailsModal(true);
-                    }}
-                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-semibold flex items-center gap-1 transition"
-                  >
-                    <Eye size={15} /> View Details
-                  </button>
-                  {assignment.status === "pending" && (
-                    <button
-                      onClick={() => {
-                        setSelectedAssignment(assignment);
-                        setShowSubmitModal(true);
-                      }}
-                      className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-semibold flex items-center gap-1 transition"
-                    >
-                      <Upload size={15} /> Submit Assignment
-                    </button>
-                  )}
-                  {assignment.status === "submitted" && (
-                    <span className="px-4 py-2 bg-green-100 text-green-700 rounded-lg text-sm font-semibold flex items-center gap-1">
-                      <CheckCircle size={15} /> Submitted
-                    </span>
-                  )}
                 </div>
               </div>
-            );
-          })}
+            ))}
+          </div>
+        )
+      )}
+
+      {tab === "lectures" && (
+        <div className="mba-card" style={{ padding: 0, overflow: "hidden" }}>
+          <div style={{ padding: "13px 17px", borderBottom: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: T.navy }}>All Sessions</span>
+            <span style={{ fontSize: 12, color: T.muted }}>{records.length} records</span>
+          </div>
+          {records.length === 0 ? (
+            <div style={{ padding: 40, textAlign: "center", color: T.muted }}>
+              <Activity size={32} style={{ color: T.border, marginBottom: 8 }} />
+              <p>No lectures watched yet</p>
+            </div>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                <thead><tr style={{ background: T.bg }}>
+                  <th style={th}>Lecture</th><th style={th}>Date</th><th style={th}>Joined</th>
+                  <th style={th}>Left</th><th style={th}>Duration</th><th style={th}>Watched</th>
+                </tr></thead>
+                <tbody>
+                  {records.map((r, i) => (
+                    <tr key={i} style={{ borderTop: `1px solid ${T.border}` }}>
+                      <td style={td}>
+                        <p style={{ fontWeight: 600, color: T.navy, margin: 0 }}>{r.lesson_title || `Lesson ${r.lesson_id}`}</p>
+                        {r.course_name && <p style={{ fontSize: 11, color: T.subtle, margin: "2px 0 0" }}>{r.course_name}</p>}
+                      </td>
+                      <td style={td}>{fmt(r.session_date)}</td>
+                      <td style={td}><span style={{ color: T.green, fontWeight: 600 }}>{fmtTime(r.joined_at)}</span></td>
+                      <td style={td}><span style={{ color: r.left_at ? T.red : T.subtle, fontWeight: r.left_at ? 600 : 400 }}>{r.left_at ? fmtTime(r.left_at) : "in progress"}</span></td>
+                      <td style={td}><span style={{ fontWeight: 600 }}>{r.duration_minutes || 0}</span> <span style={{ color: T.subtle }}>min</span></td>
+                      <td style={td}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <div style={{ width: 55, height: 6, borderRadius: 3, background: T.border, overflow: "hidden" }}>
+                            <div style={{ width: `${Math.min(r.watch_percent || 0, 100)}%`, height: 6, borderRadius: 3, background: (r.watch_percent || 0) >= 70 ? T.green : (r.watch_percent || 0) >= 40 ? "#d4a017" : T.red }} />
+                          </div>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: (r.watch_percent || 0) >= 70 ? T.green : (r.watch_percent || 0) >= 40 ? "#d4a017" : T.red }}>{r.watch_percent || 0}%</span>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 
-      {/* ── Details Modal ── */}
-      {showDetailsModal &&
-        selectedAssignment &&
-        (() => {
-          const modalMaxM = getMaxMarks(selectedAssignment);
-          return (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-              <div className="bg-white rounded-xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-xl font-bold text-gray-900">
-                    Assignment Details
-                  </h3>
-                  <button onClick={() => setShowDetailsModal(false)}>
-                    <X size={24} />
-                  </button>
-                </div>
-                <div className="space-y-4">
-                  <div>
-                    <p className="text-xs text-gray-500 uppercase font-semibold mb-1">
-                      Course
-                    </p>
-                    <p className="font-semibold text-gray-800">
-                      {selectedAssignment.course_name}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 uppercase font-semibold mb-1">
-                      Title
-                    </p>
-                    <p className="font-bold text-lg text-gray-900">
-                      {selectedAssignment.title}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 uppercase font-semibold mb-1">
-                      Description
-                    </p>
-                    <p className="text-gray-700 bg-gray-50 p-4 rounded-lg">
-                      {selectedAssignment.description}
-                    </p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-gray-50 p-4 rounded-lg">
-                      <p className="text-xs text-gray-500 mb-1">Due Date</p>
-                      <p className="font-semibold">
-                        {new Date(
-                          selectedAssignment.due_date,
-                        ).toLocaleDateString("en-IN", {
-                          weekday: "long",
-                          day: "numeric",
-                          month: "long",
-                          year: "numeric",
-                        })}
-                      </p>
-                    </div>
-                    <div className="bg-gray-50 p-4 rounded-lg">
-                      <p className="text-xs text-gray-500 mb-1">Total Marks</p>
-                      <p className="font-semibold">
-                        {selectedAssignment.total_marks}
-                      </p>
-                    </div>
-                  </div>
-                  {selectedAssignment.rubric?.categories?.length > 0 && (
-                    <div>
-                      <p className="text-xs text-gray-500 uppercase font-semibold mb-2">
-                        Grading Rubric
-                      </p>
-                      <div className="space-y-2">
-                        {selectedAssignment.rubric.categories.map((cat, i) => (
-                          <div
-                            key={i}
-                            className="flex justify-between items-center bg-blue-50 p-3 rounded-lg"
-                          >
-                            <span className="text-sm font-medium text-gray-700">
-                              {cat.name}
-                            </span>
-                            <span className="text-sm font-bold text-blue-700">
-                              {cat.points} pts
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {selectedAssignment.status === "graded" && (
-                    <div className="bg-purple-50 border border-purple-200 p-4 rounded-lg">
-                      <p className="text-xs text-gray-500 uppercase font-semibold mb-2">
-                        Grade & Feedback
-                      </p>
-                      {selectedAssignment.grade != null ? (
-                        <p className="text-2xl font-bold text-purple-700 mb-2">
-                          {selectedAssignment.grade}/{modalMaxM}
-                          <span className="text-base ml-2 text-purple-500">
-                            (
-                            {Math.round(
-                              (selectedAssignment.grade / modalMaxM) * 100,
-                            )}
-                            %)
-                          </span>
-                        </p>
-                      ) : (
-                        <p className="text-base font-semibold text-purple-400 mb-2">
-                          Grade not yet recorded
-                        </p>
-                      )}
-                      {selectedAssignment.feedback && (
-                        <p className="text-sm text-gray-700">
-                          {selectedAssignment.feedback}
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
-                <button
-                  onClick={() => setShowDetailsModal(false)}
-                  className="mt-6 w-full bg-gray-200 hover:bg-gray-300 text-gray-700 py-3 rounded-lg font-semibold transition"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          );
-        })()}
-
-      {/* ── Submit Modal ── */}
-      {showSubmitModal && selectedAssignment && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl p-8 max-w-xl w-full shadow-2xl">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-bold text-gray-900">
-                Submit Assignment
-              </h3>
-              <button onClick={() => setShowSubmitModal(false)}>
-                <X size={24} />
-              </button>
-            </div>
-            <p className="text-sm text-gray-600 mb-4 bg-blue-50 p-3 rounded-lg">
-              <strong>{selectedAssignment.title}</strong> – Due:{" "}
-              {new Date(selectedAssignment.due_date).toLocaleDateString()}
-            </p>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Upload File
-                </label>
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-orange-500 transition">
-                  <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                  <p className="text-sm text-gray-500 mb-2">
-                    Upload your assignment file (PDF, DOC, ZIP)
-                  </p>
-                  <input
-                    type="file"
-                    id="assign-upload"
-                    onChange={handleFileChange}
-                    className="hidden"
-                    accept=".pdf,.doc,.docx,.zip,.txt,.ppt,.pptx"
-                  />
-                  <label
-                    htmlFor="assign-upload"
-                    className="inline-block px-4 py-2 bg-orange-500 text-white rounded-lg cursor-pointer hover:bg-orange-600 text-sm font-semibold transition"
-                  >
-                    Choose File
-                  </label>
-                  {submitForm.file && (
-                    <p className="text-sm text-green-600 mt-2 font-semibold">
-                      ✅ {submitForm.file.name}
-                    </p>
-                  )}
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Notes / Comments{" "}
-                  <span className="text-gray-400 font-normal">(optional)</span>
-                </label>
-                <textarea
-                  value={submitForm.notes}
-                  onChange={(e) =>
-                    setSubmitForm({ ...submitForm, notes: e.target.value })
-                  }
-                  rows={4}
-                  placeholder="Add any notes for your faculty..."
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400 resize-none"
-                />
-              </div>
-            </div>
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={handleSubmit}
-                disabled={submitting}
-                className="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-lg font-bold transition disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {submitting ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />{" "}
-                    Submitting...
-                  </>
-                ) : (
-                  <>
-                    <Upload size={16} /> Submit Assignment
-                  </>
-                )}
-              </button>
-              <button
-                onClick={() => setShowSubmitModal(false)}
-                className="px-6 bg-gray-200 hover:bg-gray-300 text-gray-700 py-3 rounded-lg font-semibold transition"
-              >
-                Cancel
-              </button>
-            </div>
+      {tab === "logins" && (
+        <div className="mba-card" style={{ padding: 0, overflow: "hidden" }}>
+          <div style={{ padding: "13px 17px", borderBottom: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: T.navy }}>Login Records</span>
+            <span style={{ fontSize: 12, color: T.muted }}>{logins.length} logins</span>
           </div>
+          {logins.length === 0 ? (
+            <div style={{ padding: 40, textAlign: "center", color: T.muted }}>
+              <Monitor size={32} style={{ color: T.border, marginBottom: 8 }} />
+              <p>No login records yet</p>
+            </div>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                <thead><tr style={{ background: T.bg }}>
+                  <th style={th}>Date & Time</th><th style={th}>IP Address</th><th style={th}>Device / Browser</th>
+                </tr></thead>
+                <tbody>
+                  {logins.map((l, i) => (
+                    <tr key={i} style={{ borderTop: `1px solid ${T.border}` }}>
+                      <td style={td}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <div style={{ width: 32, height: 32, borderRadius: 8, background: `${T.navy}12`, border: `1.5px solid ${T.navy}25`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            <Calendar size={14} color={T.navy} />
+                          </div>
+                          <div>
+                            <p style={{ margin: 0, fontWeight: 600, color: T.navy, fontSize: 13 }}>{fmt(l.login_at)}</p>
+                            <p style={{ margin: 0, fontSize: 11, color: T.subtle }}>{fmtTime(l.login_at)}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td style={td}><code style={{ background: T.bg, padding: "2px 8px", borderRadius: 4, fontSize: 12, color: T.text }}>{l.ip_address || "-"}</code></td>
+                      <td style={td}><span style={{ fontSize: 12, color: T.muted }}>{fmtDevice(l.device)}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
     </div>
   );
 }
+
+function MetricBox({ icon, label, value, color }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <div style={{ color: "#a8a49f" }}>{icon}</div>
+      <div>
+        <p style={{ fontSize: 10, color: "#a8a49f", margin: 0, textTransform: "uppercase", letterSpacing: ".05em" }}>{label}</p>
+        <p style={{ fontSize: 15, fontWeight: 700, color: color || "#1a2744", margin: 0 }}>{value}</p>
+      </div>
+    </div>
+  );
+}
+
+function fmtDevice(d) {
+  if (!d) return "-";
+  if (d.includes("Chrome")) return "Chrome / " + (d.includes("Windows") ? "Windows" : d.includes("Mac") ? "Mac" : d.includes("Android") ? "Android" : "Other");
+  if (d.includes("Safari")) return "Safari / " + (d.includes("iPhone") ? "iPhone" : d.includes("Mac") ? "Mac" : "Other");
+  if (d.includes("Firefox")) return "Firefox / " + (d.includes("Windows") ? "Windows" : "Other");
+  return d.substring(0, 40);
+}
+
+const th = { textAlign: "left", padding: "10px 16px", fontSize: 10, fontWeight: 700, color: "#a8a49f", textTransform: "uppercase", letterSpacing: ".08em" };
+const td = { padding: "12px 16px" };
