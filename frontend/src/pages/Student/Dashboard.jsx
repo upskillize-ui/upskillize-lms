@@ -5,6 +5,7 @@ import {
 import { useAuth } from "../../context/AuthContext";
 import api from "../../services/api";
 import CoursePlayer from "./CoursePlayer";import StudentAttendance from "./StudentAttendance";import StudentAttendance from "./StudentAttendance";
+import TestGen from "./TestGen";
 import BrowseCourses from "../../pages/BrowseCourses";
 import AiRevPanel from "../../components/AiRevPanel";
 import AIEnhancer from "../../components/AIEnhancer";
@@ -3789,6 +3790,7 @@ export default function StudentDashboard() {
         { path:"/student/jobs",         label:"Placements / Internships", icon:Briefcase,  keywords:["job","internship","apply","career"] },
         { path:"/student/ai-interview", label:"AI Interview",             icon:Mic,        keywords:["mock","practice","interview"] },
         { path:"/student/psychometric", label:"Psychometric Test",        icon:Brain,      keywords:["personality","mbti","test"] },
+        { path:"/student/testgen",      label:"AI TestGen",               icon:Zap,        keywords:["test","generate","quiz","ai","questions"] },
       ],
     },
     {
@@ -3907,7 +3909,7 @@ export default function StudentDashboard() {
           <div style={{ display:"flex",alignItems:"center",gap:8,flexShrink:0 }}>
             {/* FIX 1: Working Global Search */}
             <GlobalSearch allNavItems={allNavItems} />
-              <button className="mba-btn-primary" onClick={() => navigate(`https://upskill25-myagent.hf.space/testgen?student_id=${user?.id}&course_id=1`, '_blank')} style={{ fontSize:12,padding:"6px 12px" }}>
+              <button className="mba-btn-primary" onClick={() => navigate('/student/testgen')} style={{ fontSize:12,padding:"6px 12px" }}>
                 <Zap size={12}/> TestGen
               </button>
  
@@ -4067,6 +4069,7 @@ export default function StudentDashboard() {
               <Route path="/jobs"                       element={<JobsModule />} />
               <Route path="/ai-interview"               element={<AIInterviewSimulation />} />
               <Route path="/psychometric"               element={<PsychometricTestPage />} />
+              <Route path="/testgen"                    element={<TestGen />} />
  
               {/* Engagement */}
               <Route path="/gamification"               element={<Gamification />} />

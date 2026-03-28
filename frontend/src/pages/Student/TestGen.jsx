@@ -12,6 +12,7 @@
  */
 
 import { useState, useEffect } from "react";
+import { useAuth } from "../../context/AuthContext";
 import api from "../../services/api";
 
 // ============================================================================
@@ -945,7 +946,6 @@ function SetupScreen({ onGenerate, loading, slots }) {
                   ? `0 4px 12px rgba(255, 140, 0, 0.3)`
                   : "none",
             }}
-            onHover
           >
             {loading
               ? "⚡ Generating Test…"
@@ -1885,6 +1885,7 @@ function TestTakingScreen({ testData, onSubmit, onForceExit }) {
 // ============================================================================
 
 export default function TestGen() {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [slots, setSlots] = useState(null);
@@ -1928,15 +1929,6 @@ const response = await fetch("https://upskill25-myagent.hf.space/api/generate-te
 const data = await response.json();
 if (!response.ok) throw new Error(data.detail || "Failed");
 setTestData({ success: true, ...data });
-      if (response.data.success) {
-        setTestData(response.data);
-      } else {
-        setError(
-          response.data.message ||
-            response.data.error ||
-            "Failed to generate test",
-        );
-      }
     } catch (err) {
       const status = err.response?.status;
       const msg =
@@ -1969,10 +1961,6 @@ setTestData({ success: true, ...data });
 const data = await response.json();
 if (!response.ok) throw new Error(data.detail || "Submit failed");
 return data;
-      console.log("SUBMIT RESPONSE:", JSON.stringify(response.data, null, 2));
-      // ✅ Don't clear testData here — TestTakingScreen handles the result display
-      // setTestData(null) is only called via onForceExit after result is shown
-      return response.data;
     } catch (err) {
       console.error("Submit failed:", err.message);
       throw err;
